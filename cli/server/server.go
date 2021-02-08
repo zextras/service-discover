@@ -1,7 +1,44 @@
+// Package main represents the main entrypoint of the whole agent CLI application
 package main
 
-import "fmt"
+import (
+	"bitbucket.org/zextras/service-discover/cli/lib/command"
+	"bitbucket.org/zextras/service-discover/cli/lib/parser"
+	internalCommand "bitbucket.org/zextras/service-discover/cli/server/command"
+	"bitbucket.org/zextras/service-discover/cli/server/config"
+	"github.com/alecthomas/kong"
+	"os"
+)
+
+// The CLI represents the actual cli representation
+type CLI struct {
+	internalCommand.ServerFlags
+
+	Version command.Version `cmd help:"Show the version of this CLI and of the agent running in the host"`
+	Help    command.Help    `cmd help:"Print the program help"`
+}
 
 func main() {
-	fmt.Println("Server CLI stub")
+	cmd := command.NewCommand(
+		config.ApplicationName,
+		config.ApplicationVersion,
+	)
+	cli := &CLI{
+		Version: cmd.Version(
+			os.Stdout,
+			config.ApplicationName,
+			config.AgentName,
+		),
+		Help: cmd.Help(),
+	}
+	ctx := parser.Parse(cli,
+		kong.Name(config.ApplicationName),
+		kong.Description(config.ApplicationDescription),
+		kong.UsageOnError(),
+	)
+	err := ctx.Validate()
+	if err != nil {
+		panic(err)
+	}
+	ctx.FatalIfErrorf(ctx.Run(&cli.GlobalCommonFlags))
 }
