@@ -26,7 +26,6 @@ func main() {
 	cli := &CLI{
 		Version: cmd.Version(
 			os.Stdout,
-			config.ApplicationVersion,
 			config.AgentName,
 		),
 		Help: cmd.Help(),

@@ -1,0 +1,11 @@
+[Unit]
+Description=Service discover agent for Zextras
+Documentation=https://docs.zextras.com/zextras-suite-documentation/latest/docs.html
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/service-discoverd agent
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

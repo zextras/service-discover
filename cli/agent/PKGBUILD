@@ -1,0 +1,47 @@
+targets=(
+  "centos"
+  "ubuntu"
+)
+pkgname="service-discover-agent"
+pkgver="0.1.0"
+pkgrel="1"
+pkgdesc="Service discover agent cli"
+pkgdesclong=(
+  "Service discover agent cli"
+)
+maintainer="Zextras srl <packages@zextras.com>"
+arch="amd64"
+license=("PROPRIETARY")
+section="admin"
+priority="optional"
+url="https://www.zextras.com/"
+provides=(
+  "service-discover"
+)
+depends=(
+  "service-discover-base"
+  "service-discover-daemon"
+)
+conflicts=(
+  "service-discover-server"
+)
+sources=(
+  "/repo/"
+)
+hashsums=(
+  "SKIP"
+)
+
+postinst:ubuntu() {
+  systemctl enable service-discover
+}
+
+build() {
+  cd "cli/agent"
+  go build .
+}
+
+package() {
+  install -Dm 755 cli/agent/agent "${pkgdir}/usr/bin/service-discover"
+  install -Dm 755 cli/agent/service-discover.service "${pkgdir}/lib/systemd/system/service-discover.service"
+}
