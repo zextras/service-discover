@@ -1,6 +1,9 @@
 package command
 
-import "io"
+import (
+	"io"
+	"io/ioutil"
+)
 
 // The Command struct holds all the common data between all the different commands. It hold base information like the
 // application name and the application version.
@@ -29,4 +32,30 @@ func (c *Command) Version(writer io.Writer, agentName string) Version {
 // "man <applicationName>"
 func (c *Command) Help() Help {
 	return Help{*c}
+}
+
+func (c *Command) Config(writer io.Writer, agentName string) Config {
+	return Config{
+		Command:   *c,
+		writer:    writer,
+		agentName: agentName,
+		Get: GetConfig{
+			Command:   *c,
+			ReadFile: ioutil.ReadFile,
+			writer:    writer,
+			agentName: agentName,
+		},
+		Set: SetConfig{
+			Command:   *c,
+			ReadFile: ioutil.ReadFile,
+			WriteFile: ioutil.WriteFile,
+			writer:    writer,
+			agentName: agentName,
+		},
+		List: ListConfig{
+			Command:   *c,
+			writer:    writer,
+			agentName: agentName,
+		},
+	}
 }

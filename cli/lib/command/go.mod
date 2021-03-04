@@ -1,6 +1,6 @@
 module bitbucket.org/zextras/service-discover/cli/lib/command
 
-go 1.15
+go 1.16
 
 replace bitbucket.org/zextras/service-discover/cli/lib/formatter => ./../formatter
 

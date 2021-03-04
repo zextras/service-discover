@@ -14,6 +14,7 @@ import (
 type CLI struct {
 	internalCommand.ServerFlags
 
+	Config  command.Config  `cmd help:"Manage service-discover configuration"`
 	Version command.Version `cmd help:"Show the version of this CLI and of the agent running in the host"`
 	Help    command.Help    `cmd help:"Print the program help"`
 }
@@ -24,6 +25,10 @@ func main() {
 		config.ApplicationVersion,
 	)
 	cli := &CLI{
+		Config: cmd.Config(
+			os.Stdout,
+			config.AgentName,
+		),
 		Version: cmd.Version(
 			os.Stdout,
 			config.AgentName,
