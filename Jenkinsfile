@@ -4,6 +4,9 @@ pipeline {
             label 'golang-agent-v2'
         }
     }
+    parameters {
+        booleanParam defaultValue: false, description: 'Whether to upload the packages in playground repositories', name: 'PLAYGROUND'
+    }
     options {
         skipDefaultCheckout()
         buildDiscarder(logRotator(numToKeepStr: '25'))
@@ -117,6 +120,75 @@ pipeline {
                             archiveArtifacts artifacts: "artifacts/*.rpm", fingerprint: true
                         }
                     }
+                }
+            }
+        }
+        stage('Upload To Playground') {
+            when {
+                anyOf {
+                    branch 'playground/*'
+                    expression { params.PLAYGROUND == true }
+                }
+            }
+            steps {
+                unstash 'artifacts-deb'
+                unstash 'artifacts-rpm'
+                script {
+                    def server = Artifactory.server 'zextras-artifactory'
+                    def buildInfo
+                    def uploadSpec
+
+                    buildInfo = Artifactory.newBuildInfo()
+                    uploadSpec = """{
+                        "files": [
+                            {
+                                "pattern": "artifacts/service-discover-server*.deb",
+                                "target": "ubuntu-playground/pool/",
+                                "props": "deb.distribution=xenial;deb.distribution=bionic;deb.distribution=focal;deb.component=main;deb.architecture=amd64"
+                            },
+                            {
+                                "pattern": "artifacts/service-discover-agent*.deb",
+                                "target": "ubuntu-playground/pool/",
+                                "props": "deb.distribution=xenial;deb.distribution=bionic;deb.distribution=focal;deb.component=main;deb.architecture=amd64"
+                            },
+                            {
+                                "pattern": "artifacts/service-discover-daemon*.deb",
+                                "target": "ubuntu-playground/pool/",
+                                "props": "deb.distribution=xenial;deb.distribution=bionic;deb.distribution=focal;deb.component=main;deb.architecture=amd64"
+                            },
+                             {
+                                "pattern": "artifacts/(service-discover-server)-(*).rpm",
+                                "target": "centos7-playground/zextras/{1}/{1}-{2}.rpm",
+                                "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
+                            },
+                            {
+                                "pattern": "artifacts/(service-discover-agent)-(*).rpm",
+                                "target": "centos7-playground/zextras/{1}/{1}-{2}.rpm",
+                                "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
+                            },
+                            {
+                                "pattern": "artifacts/(service-discover-daemon)-(*).rpm",
+                                "target": "centos7-playground/zextras/{1}/{1}-{2}.rpm",
+                                "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
+                            },
+                            {
+                                "pattern": "artifacts/(service-discover-server)-(*).rpm",
+                                "target": "centos8-playground/zextras/{1}/{1}-{2}.rpm",
+                                "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
+                            },
+                            {
+                                "pattern": "artifacts/(service-discover-agent)-(*).rpm",
+                                "target": "centos8-playground/zextras/{1}/{1}-{2}.rpm",
+                                "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
+                            },
+                            {
+                                "pattern": "artifacts/(service-discover-daemon)-(*).rpm",
+                                "target": "centos8-playground/zextras/{1}/{1}-{2}.rpm",
+                                "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
+                            }
+                        ]
+                    }"""
+                    server.upload spec: uploadSpec, buildInfo: buildInfo, failNoOp: false
                 }
             }
         }
