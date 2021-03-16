@@ -6,6 +6,7 @@ After=network.target
 [Service]
 ExecStart=/usr/bin/service-discoverd agent
 Restart=on-failure
+LimitNOFILE=65534
 
 [Install]
 WantedBy=default.target

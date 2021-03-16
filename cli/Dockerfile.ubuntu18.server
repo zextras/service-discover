@@ -1,0 +1,48 @@
+# Use glibc based distro since otherwise golang will bind with muslc if we use alpine!
+FROM golang:1.16-buster as builder
+
+WORKDIR /dist
+COPY ./ /dist
+
+RUN cd server && go build
+
+FROM ubuntu:18.04
+
+LABEL maintainer="Davide Polonio <davide.polonio@zextras.com>"
+LABEL description="service-discover CLI image to manually test the server CLI without messing up your system"
+
+RUN apt-get update -qq && \
+  apt-get install -yqq \
+    curl \
+    ca-certificates && \
+  curl -L https://files.zimbra.com/downloads/8.8.15_GA/zcs-8.8.15_GA_3869.UBUNTU18_64.20190918004220.tgz --output - | tar zxvf - && \
+  echo "resolvconf resolvconf/linkify-resolvconf boolean false" | debconf-set-selections && \
+  rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && \
+  apt-get install -y \
+    iproute2 \
+    lsb-release \
+    gnupg2 \
+    ifupdown2 \
+    net-tools \
+    jq \
+    less && \
+  echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal main" > /etc/apt/sources.list.d/zextras.list && \
+  apt-get update && \
+  apt-get install -y service-discover-base service-discover-server systemd-sysv dbus sudo && \
+  rm -rf /var/lib/apt/lists/* && \
+  systemctl disable service-discover.service && \
+  systemctl disable systemd-resolved.service && \
+  useradd test -G sudo -s /bin/bash -m && \
+  echo "test:test" | chpasswd && \
+  echo 'LANG="en_US.UTF-8"' > /etc/default/locale
+
+COPY misc/zinstall.service /etc/systemd/system
+RUN systemctl enable zinstall.service
+
+COPY misc/imahuman.sh /bin/
+COPY misc/zinstaller.sh /bin/
+COPY --from=builder /dist/server/server /usr/bin/service-discover
+
+ENTRYPOINT ["/sbin/init"]

@@ -6,4 +6,10 @@ const (
 	ApplicationDescription = "CLI utility to interact with a service-discover server node"
 	ApplicationVersion     = "0.1.0"
 	AgentName              = "agent"
+	ConsulHome             = "/var/lib/service-discover"
+	ConsulData             = ConsulHome + "/data"
+	ConsulConfig           = "/etc/zextras/service-discover"
+	ConsultFileConfig      = ConsulConfig + "/main.json"
+	LocalConfigPath        = "/opt/zimbra/conf/localconfig.xml"
+	ClusterCredential      = ConsulConfig + "/cluster-credentials.tar.gz.gpg"
 )

@@ -16,6 +16,14 @@ pipeline {
         GOPRIVATE="gitlab.com/zextras,bitbucket.org/zextras,github.com/zextras"
     }
     stages {
+        stage('Setup') {
+            steps {
+                sh '''
+sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu bionic main" > /etc/apt/sources.list.d/zextras.list'
+'''
+                sh 'sudo apt-get update && sudo apt-get install -y service-discover-base'
+            }
+        }
         stage('Stash') {
             steps {
                 checkout scm
@@ -25,6 +33,8 @@ pipeline {
         stage('Tests') {
             steps {
                 script {
+                    sh 'rm -rfv /home/agent/.gnupg'
+                    sh 'mkdir -p /home/agent/.gnupg'
                     def modules = [:]
                     def builds = [:]
                     modules["agent"] = "cli/agent"
@@ -32,11 +42,13 @@ pipeline {
                     modules["parser"] = "cli/lib/parser"
                     modules["formatter"] = "cli/lib/formatter"
                     modules["command"] = "cli/lib/command"
+                    modules["credentialsEncrypter"] = "cli/lib/credentialsEncrypter"
+                    modules["zimbra"] = "cli/lib/zimbra"
                     modules.each{key, value ->
                         builds[key] = {
                             dir(value) {
-                                sh 'gotestsum --format testname --junitfile tests.xml || true'
-                                junit checksName: "Test for " + key, testResults: 'tests.xml'
+                                sh 'gotestsum --format testname --junitfile tests.xml'
+                                junit allowEmptyResults: false, checksName: "Test for " + key, testResults: 'tests.xml'
                             }
                         }
                     }
@@ -59,12 +71,15 @@ pipeline {
 
                         sh 'cp /repo/cli/server/PKGBUILD /pacur/'
                         sh 'sudo pacur build ubuntu'
+                        sh 'sudo rm -rf /pacur_build/'
 
                         sh 'cp /repo/cli/agent/PKGBUILD /pacur/'
                         sh 'sudo pacur build ubuntu'
+                        sh 'sudo rm -rf /pacur_build/'
 
                         sh 'cp /repo/service-discoverd/PKGBUILD /pacur/'
                         sh 'sudo pacur build ubuntu'
+                        sh 'sudo rm -rf /pacur_build/'
 
                         sh 'mkdir artifacts/'
                         sh 'sudo cp /pacur/service-discover-server*.deb artifacts/'

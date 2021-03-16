@@ -33,6 +33,17 @@ type Formatter interface {
 	JsonRender() (string, error)
 }
 
+
+type EmptyFormatter struct {}
+
+func (e EmptyFormatter) PlainRender() (string, error) {
+	return "", nil
+}
+
+func (e EmptyFormatter) JsonRender() (string, error) {
+	return "{}", nil
+}
+
 // DefaultJsonRender wrappers a call to json.Marshal function, saving up time and keeping your code DRY.
 func DefaultJsonRender(v interface{}) (string, error) {
 	bytes, err := json.Marshal(v)

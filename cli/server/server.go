@@ -5,6 +5,7 @@ import (
 	"bitbucket.org/zextras/service-discover/cli/lib/command"
 	"bitbucket.org/zextras/service-discover/cli/lib/parser"
 	internalCommand "bitbucket.org/zextras/service-discover/cli/server/command"
+	"bitbucket.org/zextras/service-discover/cli/server/command/setup"
 	"bitbucket.org/zextras/service-discover/cli/server/config"
 	"github.com/alecthomas/kong"
 	"os"
@@ -13,6 +14,8 @@ import (
 // The CLI represents the actual cli representation
 type CLI struct {
 	internalCommand.ServerFlags
+
+	Setup setup.Setup `cmd help:"Perform first time setup of the server installation"`
 
 	Config  command.Config  `cmd help:"Manage service-discover configuration"`
 	Version command.Version `cmd help:"Show the version of this CLI and of the agent running in the host"`
@@ -25,6 +28,7 @@ func main() {
 		config.ApplicationVersion,
 	)
 	cli := &CLI{
+		Setup: setup.New(),
 		Config: cmd.Config(
 			os.Stdout,
 			config.AgentName,

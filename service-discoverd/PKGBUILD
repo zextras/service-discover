@@ -1,8 +1,6 @@
 targets=(
-  "centos-7"
-  "centos-8"
-  "ubuntu-xenial"
-  "ubuntu-bionic"
+  "centos"
+  "ubuntu"
 )
 pkgname="service-discover-daemon"
 pkgver="0.1.0"
@@ -27,6 +25,24 @@ sources=(
 hashsums=(
   "SKIP"
 )
+
+postinst:ubuntu() {
+    adduser --system --group --home '/var/lib/service-discover/' 'service-discover'
+    mkdir -p '/etc/zextras/service-discover/'
+    mkdir -p '/var/lib/service-discover/'
+    chown 'service-discover:service-discover' '/var/lib/service-discover/'
+}
+
+postinst:centos() {
+    getent group 'service-discover' >/dev/null || \
+        groupadd -r 'service-discover'
+    getent passwd 'service-discover' >/dev/null || \
+        useradd -r -g 'service-discover' -d '/var/lib/service-discover/' -s /sbin/nologin 'service-discover'
+
+    mkdir -p '/etc/zextras/service-discover/'
+    mkdir -p '/var/lib/service-discover/'
+    chown 'service-discover:service-discover' '/var/lib/service-discover/'
+}
 
 build() {
   cd "service-discoverd/"

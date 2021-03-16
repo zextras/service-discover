@@ -1,0 +1,11 @@
+[Unit]
+Description=Non-interactive Zimbra installer
+Before=console-getty.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/zinstaller.sh
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target

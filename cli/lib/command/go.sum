@@ -4,6 +4,8 @@ bitbucket.org/zextras/service-discover/cli/agent v0.0.0-20210128143755-ea4223a07
 bitbucket.org/zextras/service-discover/cli/lib v0.0.0-20210128143755-ea4223a07516 h1:0ofyQwwhLVTdv94wOI8iNu7UhQX2BYjMI1G75hg13IA=
 bitbucket.org/zextras/service-discover/cli/lib/formatter v0.0.0-20210127130406-2da1389a2a40 h1:BndoLfkpTL6YnGF6C5tNjauRgAcEYY9OddhbXxwSyAw=
 bitbucket.org/zextras/service-discover/cli/lib/formatter v0.0.0-20210127130406-2da1389a2a40/go.mod h1:moGbyhN3eg3e5E8zPEZdSp1Y7emz9vexCkXMEzHSMsc=
+bitbucket.org/zextras/service-discover/cli/lib/formatter v0.0.0-20210216162151-6cf5f6d1aa51 h1:o/AWK5x1SWMrq0SaZMMbMhiL2YWq9UV/vhG26Js4ptA=
+bitbucket.org/zextras/service-discover/cli/lib/formatter v0.0.0-20210216162151-6cf5f6d1aa51/go.mod h1:moGbyhN3eg3e5E8zPEZdSp1Y7emz9vexCkXMEzHSMsc=
 github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
