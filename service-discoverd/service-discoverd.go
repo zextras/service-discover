@@ -206,6 +206,10 @@ func startConsul(d deps, isServer bool, servers []string, localServer string) *E
 		}
 	}
 
+
+	// HACK: consul doesn't notify readiness to systemd if the list of servers is empty
+	args = append(args, fmt.Sprintf("-retry-join=%s", localServer))
+
 	found := false
 	for _, server := range servers {
 		if localServer != server {
@@ -233,13 +237,20 @@ func startConsul(d deps, isServer bool, servers []string, localServer string) *E
 		}
 	}
 
+
+	envs := make([]string,0)
+
+	if len(d.Getenv("SHELL")) > 0 {
+		envs = append(envs,"SHELL="+d.Getenv("SHELL"))
+	}
+	if len(d.Getenv("NOTIFY_SOCKET")) > 0 {
+		envs = append(envs,"NOTIFY_SOCKET="+d.Getenv("NOTIFY_SOCKET"))
+	}
+
 	err := d.Exec(
 		"/usr/bin/consul",
 		args,
-		[]string{
-			d.Getenv("SHELL"),
-			d.Getenv("NOTIFY_SOCKET"),
-		},
+		envs,
 	)
 	if err != nil {
 		return &ErrorWithExitCode{

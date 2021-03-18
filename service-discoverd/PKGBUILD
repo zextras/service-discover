@@ -44,6 +44,18 @@ postinst:centos() {
     chown 'service-discover:service-discover' '/var/lib/service-discover/'
 }
 
+postrm:ubuntu() {
+  if [ "$1" = "purge" ]; then
+    echo 'Data have been left in the file system. In order to perform a final purge please check documentation on https://docs.zextras.com/zextras-suite-documentation/latest/docs.html'
+  fi
+}
+
+postrm:centos() {
+  if [ $1 -eq 0 ]; then
+    echo 'Data have been left in the file system. In order to perform a final purge please check documentation on https://docs.zextras.com/zextras-suite-documentation/latest/docs.html'
+  fi
+}
+
 build() {
   cd "service-discoverd/"
   go build .

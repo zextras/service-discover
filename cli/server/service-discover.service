@@ -1,12 +1,19 @@
 [Unit]
 Description=Service discover server for Zextras
 Documentation=https://docs.zextras.com/zextras-suite-documentation/latest/docs.html
-After=network.target
+Requires=network-online.target
+After=network-online.target
 
 [Service]
+Type=notify
 ExecStart=/usr/bin/service-discoverd server
 Restart=on-failure
-LimitNOFILE=65534
+RestartSec=15
+KillMode=process
+LimitNOFILE=65536
+ExecReload=/usr/bin/consul reload
+TimeoutSec=120
+TimeoutStopSec=120
 
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target

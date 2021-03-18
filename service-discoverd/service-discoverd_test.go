@@ -254,12 +254,13 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 				"-bootstrap-expect", "2",
 				"-config-dir", "/etc/zextras/service-discover/",
 				"-server",
+				"-retry-join=local-hostname", //hack
 				"-retry-join=remote-hostname-1",
 				"-retry-join=remote-hostname-2",
 			},
 			[]string{
-				"/bin/custom-shell",
-				"/run/dbus/systemd-socket",
+				"SHELL=/bin/custom-shell",
+				"NOTIFY_SOCKET=/run/dbus/systemd-socket",
 			},
 		).Return(errors.New("fake error"))
 		setupMock(mockDependencies, true)
@@ -307,12 +308,13 @@ func setupMock(mockDependencies *mockDependencies, isServer bool) {
 				"-bootstrap-expect", "2",
 				"-config-dir", "/etc/zextras/service-discover/",
 				"-server",
+				"-retry-join=local-hostname",  //hack
 				"-retry-join=remote-hostname-1",
 				"-retry-join=remote-hostname-2",
 			},
 			[]string{
-				"/bin/custom-shell",
-				"/run/dbus/systemd-socket",
+				"SHELL=/bin/custom-shell",
+				"NOTIFY_SOCKET=/run/dbus/systemd-socket",
 			},
 		).Return(nil)
 	} else {
@@ -328,12 +330,13 @@ func setupMock(mockDependencies *mockDependencies, isServer bool) {
 				"/usr/bin/consul",
 				"agent",
 				"-config-dir", "/etc/zextras/service-discover/",
+				"-retry-join=local-hostname",  //hack
 				"-retry-join=remote-hostname-1",
 				"-retry-join=remote-hostname-2",
 			},
 			[]string{
-				"/bin/custom-shell",
-				"/run/dbus/systemd-socket",
+				"SHELL=/bin/custom-shell",
+				"NOTIFY_SOCKET=/run/dbus/systemd-socket",
 			},
 		).Return(nil)
 	}
