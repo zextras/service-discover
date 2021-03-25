@@ -21,6 +21,8 @@ provides=(
 depends=(
   "service-discover-base"
   "service-discover-daemon"
+  "config-generator"
+  "envoyproxy"
 )
 conflicts=(
   "service-discover-agent"
