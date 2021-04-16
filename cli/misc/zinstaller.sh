@@ -2,7 +2,7 @@
 
 set -e
 
-FILENAME="ALREADY_INSTALLED"
+FILENAME="ZIMBRA_ALREADY_INSTALLED"
 
 echo "Checking if Zimbra is already installed..."
 

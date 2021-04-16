@@ -105,7 +105,7 @@ func (v *SetConfig) Run(_globalFlags *GlobalCommonFlags) error {
 		return errors.New("unknown configuration '" + v.Config + "'")
 	}
 
-	data, _ = json.Marshal(&config)
+	data, _ = json.MarshalIndent(&config, "", "  ")
 	err = v.WriteFile(ConsulMutableConfigFile, data, 0644)
 	if err != nil {
 		return errors.New("unable to write " + ConsulMutableConfigFile + ": " + err.Error())
@@ -133,7 +133,7 @@ func (o *listConfigOutput) PlainRender() (string, error) {
 }
 
 func (o *listConfigOutput) JsonRender() (string, error) {
-	out, err := json.Marshal(o.configs)
+	out, err := json.MarshalIndent(o.configs, "", "  ")
 	return string(out), err
 }
 

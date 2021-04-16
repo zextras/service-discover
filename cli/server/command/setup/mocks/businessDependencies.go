@@ -5,13 +5,13 @@ package mocks
 import (
 	io "io"
 
-	exec "bitbucket.org/zextras/service-discover/cli/server/exec"
+	exec "bitbucket.org/zextras/service-discover/cli/lib/exec"
 
 	mock "github.com/stretchr/testify/mock"
 
 	net "net"
 
-	systemd "bitbucket.org/zextras/service-discover/cli/server/systemd"
+	systemd "bitbucket.org/zextras/service-discover/cli/lib/systemd"
 
 	zimbra "bitbucket.org/zextras/service-discover/cli/lib/zimbra"
 )

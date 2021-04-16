@@ -1,16 +1,15 @@
-package util
+package systemd
 
 import (
-	"bitbucket.org/zextras/service-discover/cli/server/systemd"
 	"fmt"
 	"github.com/pkg/errors"
 )
 
-func StartSystemdUnit(systemdHandler func() (systemd.UnitManager, error), unitName string) error {
+func StartSystemdUnit(systemdHandler func() (UnitManager, error), unitName string) error {
 	// Connect to systemd via dbus
 	dBusConn, err := systemdHandler()
 	if err != nil {
-		return errors.New(fmt.Sprintf("unable to establish connection to any D-Bus\n%s", err))
+		return errors.WithMessage(err, "unable to establish connection to any D-Bus")
 	}
 	defer dBusConn.Close()
 	unitOutput := make(chan string, 1) // Channel with 1 inbox slot
@@ -20,12 +19,12 @@ func StartSystemdUnit(systemdHandler func() (systemd.UnitManager, error), unitNa
 	}
 	// We block the execution until the channel send us back the systemd operation result
 	if opOutput := <-unitOutput; opOutput != "done" {
-		return errors.New("systemd unit startup finished with a code different than 'done'. Got " + opOutput)
+		return errors.New("systemd unit startup finished with a code different than 'done'. Systemd returned: " + opOutput)
 	}
 	return nil
 }
 
-func EnableSystemdUnit(systemdHandler func() (systemd.UnitManager, error), unitName string) error {
+func EnableSystemdUnit(systemdHandler func() (UnitManager, error), unitName string) error {
 	dBusConn, err := systemdHandler()
 	if err != nil {
 		return errors.New(fmt.Sprintf("unable to establish connection to any D-Bus\n%s", err))

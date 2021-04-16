@@ -9,6 +9,8 @@ replace (
 	bitbucket.org/zextras/service-discover/cli/lib/parser => ./../lib/parser
 	bitbucket.org/zextras/service-discover/cli/lib/test => ./../lib/test
 	bitbucket.org/zextras/service-discover/cli/lib/zimbra => ./../lib/zimbra
+	bitbucket.org/zextras/service-discover/cli/lib/systemd => ./../lib/systemd
+	bitbucket.org/zextras/service-discover/cli/lib/exec => ./../lib/exec
 )
 
 require (
@@ -18,6 +20,8 @@ require (
 	bitbucket.org/zextras/service-discover/cli/lib/parser v0.0.0-00010101000000-000000000000
 	bitbucket.org/zextras/service-discover/cli/lib/test v0.0.0-00010101000000-000000000000
 	bitbucket.org/zextras/service-discover/cli/lib/zimbra v0.0.0-00010101000000-000000000000
+	bitbucket.org/zextras/service-discover/cli/lib/systemd v0.0.0-00010101000000-000000000000
+	bitbucket.org/zextras/service-discover/cli/lib/exec v0.0.0-00010101000000-000000000000
 	github.com/alecthomas/kong v0.2.15
 	github.com/coreos/go-systemd/v22 v22.2.0 // indirect
 	github.com/godbus/dbus v4.1.0+incompatible // indirect

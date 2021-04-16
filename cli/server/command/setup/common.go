@@ -2,20 +2,17 @@ package setup
 
 import (
 	"bitbucket.org/zextras/service-discover/cli/lib/command"
+	"bitbucket.org/zextras/service-discover/cli/lib/command/setup"
 	"bitbucket.org/zextras/service-discover/cli/lib/formatter"
+	"bitbucket.org/zextras/service-discover/cli/lib/systemd"
 	"bitbucket.org/zextras/service-discover/cli/lib/zimbra"
 	"bitbucket.org/zextras/service-discover/cli/server/config"
-	"bitbucket.org/zextras/service-discover/cli/server/util"
 	"bufio"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
-	"io/ioutil"
 	"net"
-	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -23,15 +20,11 @@ const (
 	rootUid               = 0
 	consulBin             = "/usr/bin/consul"
 	certificateExpiration = 365 * 30
-	defaultLogLever       = "INFO"
+	defaultLogLevel       = "INFO"
 	serviceDiscoverUnit   = "service-discover.service"
-	ConsulCAFile          = "consul-agent-ca.pem"
-	ConsulCertificate     = "dc1-server-consul-0.pem"
-	ConsulCertificateKey  = "dc1-server-consul-0-key.pem"
-	ConsulAclBootstrap    = "consul-acl-secret.json"
 )
 
-type setupConfigurations struct {
+type setupConfiguration struct {
 	firstInstance bool //TODO should be unused&removed in future
 	Password      string
 	BindAddress   string
@@ -77,21 +70,37 @@ type aclConfig struct {
 	EnableTokenPersistence bool   `json:"enable_token_persistence"`
 }
 
+type uiConfig struct {
+	Enabled bool `json:"enabled"`
+}
+
+type portsConfig struct {
+	Grpc int `json:"grpc"`
+}
+
+type connectConfig struct {
+	Enabled    bool   `json:"enabled"`
+	CaProvider string `json:"ca_provider"`
+}
+
 type setupConfig struct {
-	AclConfig               aclConfig   `json:"acl"`
-	AutoEncrypt             autoEncrypt `json:"auto_encrypt,omitempty"`
-	CaFile                  string      `json:"ca_file"`
-	CertFile                string      `json:"cert_file"`
-	DataDir                 string      `json:"data_dir"`
-	EnableLocalScriptChecks bool        `json:"enable_local_script_checks"`
-	Encrypt                 string      `json:"encrypt"`
-	KeyFile                 string      `json:"key_file"`
-	LogLevel                string      `json:"log_level"`
-	NodeName                string      `json:"node_name"`
-	Server                  bool        `json:"server"`
-	VerifyIncoming          bool        `json:"verify_incoming"`
-	VerifyOutgoing          bool        `json:"verify_outgoing"`
-	VerifyServerHostname    bool        `json:"verify_server_hostname"`
+	AclConfig               aclConfig     `json:"acl"`
+	AutoEncrypt             autoEncrypt   `json:"auto_encrypt,omitempty"`
+	CaFile                  string        `json:"ca_file"`
+	CertFile                string        `json:"cert_file"`
+	DataDir                 string        `json:"data_dir"`
+	EnableLocalScriptChecks bool          `json:"enable_local_script_checks"`
+	Encrypt                 string        `json:"encrypt"`
+	KeyFile                 string        `json:"key_file"`
+	LogLevel                string        `json:"log_level"`
+	NodeName                string        `json:"node_name"`
+	Server                  bool          `json:"server"`
+	VerifyIncoming          bool          `json:"verify_incoming"`
+	VerifyOutgoing          bool          `json:"verify_outgoing"`
+	VerifyServerHostname    bool          `json:"verify_server_hostname"`
+	UiConfig                uiConfig      `json:"ui_config"`
+	Ports                   portsConfig   `json:"ports"`
+	Connect                 connectConfig `json:"connect"`
 }
 
 // nonInteractiveOutput is only an internal struct to output the result to the final user in an appropriate way
@@ -108,7 +117,7 @@ func (n *nonInteractiveOutput) JsonRender() (string, error) {
 	return formatter.DefaultJsonRender(n)
 }
 
-func gatherInputs(d interactiveDependencies) (*setupConfigurations, error) {
+func gatherInputs(d interactiveDependencies) (*setupConfiguration, error) {
 	scanner := bufio.NewScanner(d.Reader())
 	fmt.Fprintf(d.Writer(), "This is the setup for a new instance discover server.\n")
 	fmt.Fprintf(d.Writer(), "Is this the first instance? [Y] ")
@@ -126,7 +135,7 @@ func gatherInputs(d interactiveDependencies) (*setupConfigurations, error) {
 	fmt.Fprintf(d.Writer(), "Create the cluster credentials password (will be used for setups): ")
 	password := readUserInput(scanner) // FIXME avoid echoing password in tty
 
-	return &setupConfigurations{
+	return &setupConfiguration{
 		firstInstance: firstInstance,
 		Password:      password,
 		BindAddress:   bindAddress,
@@ -189,33 +198,11 @@ func (s *Setup) preRun(d businessDependencies) error {
 	}
 
 	if d.GetuidSyscall() != rootUid {
-		return errors.New("this command must be executed as rootUid")
+		return errors.New("this command must be executed as root")
 	}
 
 	//TODO: check if already present in LDAP or second setup
 
-	return nil
-}
-
-// execInPath change directory in the desired path before executing the desired command. It then proceed to return to
-// the original folder
-func (s *Setup) execInPath(d businessDependencies, path string, name string, args ...string) error {
-	executionPath, err := os.Executable()
-	if err != nil {
-		return err
-	}
-	originalPath := filepath.Dir(executionPath)
-	if err = os.Chdir(path); err != nil {
-		return err
-	}
-	cmd := d.CreateCommand(name, args...)
-	_, err = cmd.Output()
-	if err != nil {
-		return err
-	}
-	if err = os.Chdir(originalPath); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -267,7 +254,7 @@ func (s *Setup) addServiceInLDAP(ldap zimbra.LdapHandler, zimbraHostname string)
 }
 
 func (s *Setup) enableServiceDiscoverd(d businessDependencies) error {
-	err := util.EnableSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit)
+	err := systemd.EnableSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit)
 	if err != nil {
 		return errors.New(fmt.Sprintf("unable to enable %s unit: %s", serviceDiscoverUnit, err))
 	}
@@ -275,7 +262,7 @@ func (s *Setup) enableServiceDiscoverd(d businessDependencies) error {
 }
 
 func wizardBindAddressSelection(d interactiveDependencies, scanner *bufio.Scanner) (string, error) {
-	networks, err := nonLoopbackInterfaces(d)
+	networks, err := setup.NonLoopbackInterfaces(d)
 	if err != nil {
 		return "", err
 	}
@@ -295,57 +282,9 @@ func wizardBindAddressSelection(d interactiveDependencies, scanner *bufio.Scanne
 
 	fmt.Fprintf(d.Writer(), "Specify the binding address for service discovery: ")
 	bindingAddress := readUserInput(scanner)
-	err = checkValidBindingAddress(d, networks, bindingAddress)
+	err = setup.CheckValidBindingAddress(d, networks, bindingAddress)
 	if err != nil {
 		return "", err
 	}
 	return bindingAddress, nil
-}
-
-type networkIntefaces interface {
-	NetInterfaces() ([]net.Interface, error)
-	AddrResolver(n net.Interface) ([]net.Addr, error)
-}
-
-// checkValidBindingAddress ensured that the selected bindingAddress is in one of the network interfaces passed
-func checkValidBindingAddress(resolver networkIntefaces, networks []net.Interface, bindingAddress string) error {
-	isBindingAddressValid := false
-	for _, n := range networks {
-		addrs, _ := resolver.AddrResolver(n)
-		for _, a := range addrs {
-			if bindingAddress == a.String() || bindingAddress == strings.Split(a.String(), "/")[0] {
-				isBindingAddressValid = true
-			}
-		}
-	}
-	if !isBindingAddressValid {
-		return errors.New("invalid binding address selected")
-	}
-	return nil
-}
-
-// nonLoopbackInterfaces returns all the network interfaces but the loopback one
-func nonLoopbackInterfaces(d networkIntefaces) ([]net.Interface, error) {
-	networks, err := d.NetInterfaces()
-	if err != nil {
-		return nil, err
-	}
-
-	for i, n := range networks {
-		if strings.ToLower(n.Name) == "lo" {
-			networks[i] = networks[len(networks)-1]
-			networks = networks[:len(networks)-1]
-		}
-	}
-	return networks, nil
-}
-
-// saveBindAddressConfiguration adds the bindAddress to the Consul configuration file
-func (s *Setup) saveBindAddressConfiguration(bindAddress string) error {
-	mutableConsulConfig := command.MutableConsulConfig{BindAddress: bindAddress}
-	bs, err := json.Marshal(mutableConsulConfig)
-	if err != nil {
-		return err
-	}
-	return ioutil.WriteFile(s.MutableConfigFile, bs, os.FileMode(0644))
 }

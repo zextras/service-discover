@@ -1,19 +1,19 @@
 package setup
 
 import (
+	setup2 "bitbucket.org/zextras/service-discover/cli/lib/command/setup"
 	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
+	mocks3 "bitbucket.org/zextras/service-discover/cli/lib/exec/mocks"
+	mocks4 "bitbucket.org/zextras/service-discover/cli/lib/systemd/mocks"
 	"bitbucket.org/zextras/service-discover/cli/lib/test"
 	"bitbucket.org/zextras/service-discover/cli/lib/zimbra"
 	mocks2 "bitbucket.org/zextras/service-discover/cli/server/command/setup/mocks"
 	"bitbucket.org/zextras/service-discover/cli/server/config"
-	mocks3 "bitbucket.org/zextras/service-discover/cli/server/exec/mocks"
 	"bitbucket.org/zextras/service-discover/cli/server/mocks"
-	mocks4 "bitbucket.org/zextras/service-discover/cli/server/systemd/mocks"
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"io"
 	"io/ioutil"
 	"net"
 	"os"
@@ -28,25 +28,14 @@ func TestSetup_importSetup(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	xmlLocalConfig := `<?xml version="1.0" encoding="UTF-8"?>
-<localconfig>
-<key name="zimbra_server_hostname">
-  <value>mailbox-1.example.com</value>
-</key>
-<key name="ldap_master_url">
-  <value>ldap://mailbox-1.example.com:389</value>
-</key>
-<key name="ldap_url">
-  <value>ldap://mailbox-1.example.com:389</value>
-</key>
-<key name="zimbra_ldap_userdn">
-  <value>uid=zimbra,cn=admins,cn=zimbra</value>
-</key>
-<key name="zimbra_ldap_password">
-  <value>pa$$word</value>
-</key>
-</localconfig>`
-	if err := ioutil.WriteFile(zimbraLocalConfig.Name(), []byte(xmlLocalConfig), os.FileMode(0755)); err != nil {
+	if err := ioutil.WriteFile(zimbraLocalConfig.Name(), test.GenerateLocalConfig(
+		t,
+		"mailbox-1.example.com",
+		"ldap://mailbox-1.example.com:389",
+		"ldap://mailbox-1.example.com:389",
+		test.DefaultLdapUserDN,
+		"pa$$word",
+	), os.FileMode(0755)); err != nil {
 		panic(err)
 	}
 	defer os.Remove(zimbraLocalConfig.Name())
@@ -176,8 +165,8 @@ func TestSetup_importSetup(t *testing.T) {
 		)
 	})
 
-	t.Run("Missing file in cluster credential", func(t *testing.T) {
-		setupFiles, cleanup := setup("Missing file in cluster credential")
+	t.Run("Wrong cluster credentials password", func(t *testing.T) {
+		setupFiles, cleanup := setup("Wrong cluster credentials password")
 		defer cleanup()
 		businessDep := new(mocks2.BusinessDependencies)
 		businessDep.On("NetInterfaces").Return([]net.Interface{
@@ -230,7 +219,7 @@ func TestSetup_importSetup(t *testing.T) {
 		stat, err := consulFileConfig.Stat()
 		assert.NoError(t, err)
 
-		assert.NoError(t, tarWriter.AddFile(consulFileConfig, stat, ConsulCAFile, config.ConsulHome))
+		assert.NoError(t, tarWriter.AddFile(consulFileConfig, stat, setup2.ConsulCA, config.ConsulHome))
 		assert.NoError(t, tarWriter.Close())
 		_, err = s.importSetup(businessDep)
 		assert.EqualError(
@@ -290,27 +279,15 @@ func TestSetup_importSetup(t *testing.T) {
 		assert.NoError(t, err)
 		tarWriter, err := credentialsEncrypter.NewWriter(clusterCredential, []byte("password"))
 		assert.NoError(t, err)
-		err = ioutil.WriteFile(setupFiles.consulFileConfig, []byte("Test"), os.FileMode(0644))
-		assert.NoError(t, err)
-		err = ioutil.WriteFile(setupFiles.consulCAKeyFile, []byte("Test"), os.FileMode(0644))
-		assert.NoError(t, err)
-		err = ioutil.WriteFile(setupFiles.consulCertificate, []byte("Test"), os.FileMode(0644))
-		assert.NoError(t, err)
-		err = ioutil.WriteFile(setupFiles.consulAclBootstrap, []byte("Test"), os.FileMode(0644))
-		assert.NoError(t, err)
+		assert.NoError(t, ioutil.WriteFile(setupFiles.consulFileConfig, []byte("Test"), os.FileMode(0644)))
+		assert.NoError(t, ioutil.WriteFile(setupFiles.consulCAKeyFile, []byte("Test"), os.FileMode(0644)))
+		assert.NoError(t, ioutil.WriteFile(setupFiles.consulCertificate, []byte("Test"), os.FileMode(0644)))
+		assert.NoError(t, ioutil.WriteFile(setupFiles.consulAclBootstrap, []byte("Test"), os.FileMode(0644)))
 		consulFileConfig, err := os.Open(setupFiles.consulFileConfig)
-		assert.NoError(t, err)
-		consulCAKey, err := os.Open(setupFiles.consulCAKeyFile)
-		assert.NoError(t, err)
-		consulCertificate, err := os.Open(setupFiles.consulCertificate)
 		assert.NoError(t, err)
 		consulAclBootstrap, err := os.Open(setupFiles.consulAclBootstrap)
 		assert.NoError(t, err)
 		consulFileConfigStat, err := consulFileConfig.Stat()
-		assert.NoError(t, err)
-		consulCAKeyStat, err := consulCAKey.Stat()
-		assert.NoError(t, err)
-		consulCertificateStat, err := consulCertificate.Stat()
 		assert.NoError(t, err)
 		consulAclBootstrapStat, err := consulAclBootstrap.Stat()
 		assert.NoError(t, err)
@@ -318,25 +295,13 @@ func TestSetup_importSetup(t *testing.T) {
 		assert.NoError(t, tarWriter.AddFile(
 			consulFileConfig,
 			consulFileConfigStat,
-			ConsulCAFile,
-			config.ConsulHome,
-		))
-		assert.NoError(t, tarWriter.AddFile(
-			consulCAKey,
-			consulCAKeyStat,
-			ConsulCertificateKey,
-			config.ConsulHome,
-		))
-		assert.NoError(t, tarWriter.AddFile(
-			consulCertificate,
-			consulCertificateStat,
-			ConsulCertificate,
-			config.ConsulHome,
+			setup2.ConsulCA,
+			setupFiles.consulHome+"/",
 		))
 		assert.NoError(t, tarWriter.AddFile(
 			consulAclBootstrap,
 			consulAclBootstrapStat,
-			ConsulAclBootstrap,
+			setup2.ConsulAclBootstrap,
 			"/",
 		))
 		assert.NoError(t, tarWriter.Close())
@@ -448,171 +413,5 @@ func TestCreateTLSCertificate(t *testing.T) {
 			s.createTLSCertificate(businessDep, file),
 			fmt.Sprintf("unable to generate correct CA certificate: %s", expectedErrorMessage),
 		)
-	})
-}
-
-func TestExecInPath(t *testing.T) {
-	t.Parallel()
-
-	t.Run("Error if chdir in a non-existing dir", func(t *testing.T) {
-		businessDep := new(mocks2.BusinessDependencies)
-		nonExistingFolder := test.GenerateRandomFolder("Error if chdir in a non-existing dir")
-		assert.NoError(t, os.RemoveAll(nonExistingFolder))
-		s := Setup{}
-		assert.EqualError(
-			t,
-			s.execInPath(businessDep, nonExistingFolder, "it", "doesn't", "matter"),
-			fmt.Sprintf("chdir %s: no such file or directory", nonExistingFolder),
-		)
-	})
-
-	t.Run("Error is reported if command fails", func(t *testing.T) {
-		mockCmd := new(mocks3.Cmd)
-		mockCmd.On("Output").Return(nil, errors.New("this is an error message"))
-		businessDep := new(mocks2.BusinessDependencies)
-		existingFolder := test.GenerateRandomFolder("Works correctly in an existing dir")
-		defer os.RemoveAll(existingFolder)
-		businessDep.On("CreateCommand",
-			"/usr/bin/consul",
-			"version",
-		).Return(mockCmd)
-		s := Setup{}
-		assert.EqualError(
-			t,
-			s.execInPath(businessDep, existingFolder, "/usr/bin/consul", "version"),
-			fmt.Sprint("this is an error message"),
-		)
-	})
-
-	t.Run("Works correctly in an existing dir", func(t *testing.T) {
-		mockCmd := new(mocks3.Cmd)
-		mockCmd.On("Output").Return([]byte("something"), nil)
-		businessDep := new(mocks2.BusinessDependencies)
-		existingFolder := test.GenerateRandomFolder("Works correctly in an existing dir")
-		defer os.RemoveAll(existingFolder)
-		businessDep.On("CreateCommand",
-			"/usr/bin/consul",
-			"version",
-		).Return(mockCmd)
-		s := Setup{}
-		assert.NoError(t, s.execInPath(businessDep, existingFolder, "/usr/bin/consul", "version"))
-	})
-}
-
-func TestSetup_openClusterCredential(t *testing.T) {
-	t.Parallel()
-
-	t.Run("File doesn't exists", func(t *testing.T) {
-		nonExistingFile := test.GenerateRandomFile("File doesn't exists")
-		assert.NoError(t, os.Remove(nonExistingFile.Name()))
-		s := &Setup{
-			ClusterCredential: nonExistingFile.Name(),
-		}
-		_, err := s.openClusterCredential()
-		assert.EqualError(
-			t,
-			err,
-			fmt.Sprintf(
-				"cannot find Cluster credential in %s, please copy the file from the existing server",
-				s.ClusterCredential,
-			),
-		)
-	})
-
-	t.Run("File exists", func(t *testing.T) {
-		existingFile := test.GenerateRandomFile("File exists")
-		defer os.Remove(existingFile.Name())
-		s := &Setup{
-			ClusterCredential: existingFile.Name(),
-		}
-		_, err := s.openClusterCredential()
-		assert.NoError(t, err)
-	})
-}
-
-func TestSetup_extractNecessaryFilesFromArchive(t *testing.T) {
-	t.Parallel()
-
-	type setupData struct {
-		clusterCredential string
-		caFile            string
-	}
-	setup := func(name string) (*setupData, func()) {
-		clusterCredential := test.GenerateRandomFile(name)
-		caFile := test.GenerateRandomFile(name)
-
-		return &setupData{
-				clusterCredential: clusterCredential.Name(),
-				caFile:            caFile.Name(),
-			}, func() {
-				err := os.Remove(clusterCredential.Name())
-				err = os.Remove(caFile.Name())
-				if err != nil {
-					panic(err)
-				}
-			}
-	}
-
-	t.Run("Not all files are present", func(t *testing.T) {
-		// We include only CaFile, but here we need other ones too
-		setupData, cleanup := setup("Not all files are present")
-		defer cleanup()
-
-		err := ioutil.WriteFile(setupData.caFile, []byte("data"), os.FileMode(0644))
-		assert.NoError(t, err)
-		clusterCredentialFile, err := os.Create(setupData.clusterCredential)
-		assert.NoError(t, err)
-		credWriter, err := credentialsEncrypter.NewWriter(clusterCredentialFile, []byte("password"))
-		caFile, err := os.Open(setupData.caFile)
-		assert.NoError(t, err)
-		caFileStat, err := caFile.Stat()
-		assert.NoError(t, err)
-		assert.NoError(t, credWriter.AddFile(caFile, caFileStat, ConsulCAFile, "/"))
-		assert.NoError(t, credWriter.Close())
-		_, err = clusterCredentialFile.Seek(0, io.SeekStart)
-		assert.NoError(t, err)
-
-		s := &Setup{
-			ClusterCredential: setupData.clusterCredential,
-		}
-		_, err = s.extractNecessaryFilesFromArchive(clusterCredentialFile, "password")
-		assert.EqualError(t, err, fmt.Sprintf(
-			"not all required files where detected in %s",
-			setupData.clusterCredential,
-		))
-	})
-
-	t.Run("All files are present", func(t *testing.T) {
-		// We include only CaFile, but here we need other ones too
-		setupData, cleanup := setup("All files are present")
-		defer cleanup()
-
-		expectedContent := []byte("you made it king")
-		err := ioutil.WriteFile(setupData.caFile, expectedContent, os.FileMode(0644))
-		assert.NoError(t, err)
-		clusterCredentialFile, err := os.Create(setupData.clusterCredential)
-		assert.NoError(t, err)
-		credWriter, err := credentialsEncrypter.NewWriter(clusterCredentialFile, []byte("password"))
-		caFile, err := os.Open(setupData.caFile)
-		assert.NoError(t, err)
-		caFileStat, err := caFile.Stat()
-		assert.NoError(t, err)
-		assert.NoError(t, credWriter.AddFile(caFile, caFileStat, ConsulCAFile, "/"))
-		_, err = caFile.Seek(0, io.SeekStart)
-		assert.NoError(t, err)
-		assert.NoError(t, credWriter.AddFile(caFile, caFileStat, ConsulAclBootstrap, "/"))
-		_, err = caFile.Seek(0, io.SeekStart)
-		assert.NoError(t, err)
-		assert.NoError(t, credWriter.AddFile(caFile, caFileStat, ConsulCertificateKey, "/"))
-		assert.NoError(t, credWriter.Close())
-		_, err = clusterCredentialFile.Seek(0, io.SeekStart)
-		assert.NoError(t, err)
-
-		s := &Setup{
-			ClusterCredential: setupData.clusterCredential,
-		}
-		outputBs, err := s.extractNecessaryFilesFromArchive(clusterCredentialFile, "password")
-		assert.NoError(t, err)
-		assert.Equal(t, string(expectedContent), string(outputBs))
 	})
 }

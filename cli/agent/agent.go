@@ -3,6 +3,7 @@ package main
 
 import (
 	internalCommand "bitbucket.org/zextras/service-discover/cli/agent/command"
+	"bitbucket.org/zextras/service-discover/cli/agent/command/setup"
 	"bitbucket.org/zextras/service-discover/cli/agent/config"
 	"bitbucket.org/zextras/service-discover/cli/lib/command"
 	"bitbucket.org/zextras/service-discover/cli/lib/parser"
@@ -14,7 +15,9 @@ import (
 type CLI struct {
 	internalCommand.AgentFlags
 
+	Setup setup.Setup `cmd help:"Run first time setup for an agent node"`
 	Config  command.Config  `cmd help:"Manage service-discover configuration"`
+
 	Version command.Version `cmd help:"Show the version of this CLI and of the agent running in the host"`
 	Help    command.Help    `cmd help:"Print the program help"`
 }
@@ -25,6 +28,7 @@ func main() {
 		config.ApplicationVersion,
 	)
 	cli := &CLI{
+		Setup: setup.New(),
 		Config: cmd.Config(
 			os.Stdout,
 			config.AgentName,

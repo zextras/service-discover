@@ -16,7 +16,7 @@ echo N #(drive)
 echo N #(imap beta)
 echo N #(chat)
 echo Y #Continue?
-echo No #change hostname?
+#echo No #change hostname?
 echo No #change domain name?
 echo 6 #config store
 echo 4 #admin password

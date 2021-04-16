@@ -2,6 +2,7 @@ package credentialsEncrypter
 
 import (
 	"archive/tar"
+	mocks2 "bitbucket.org/zextras/service-discover/cli/lib/test/mocks"
 	"bytes"
 	"github.com/stretchr/testify/assert"
 	"io"
@@ -39,7 +40,6 @@ func TestNewReader(t *testing.T) {
 			},
 			wantErr: true,
 		},
-		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -127,4 +127,107 @@ func TestNewReader(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestReadFiles(t *testing.T) {
+	t.Parallel()
+	t.Run("Extract all desired files", func(t *testing.T) {
+		clearTar := bytes.Buffer{}
+		encWriter, err := NewWriter(&clearTar, []byte("password"))
+		assert.NoError(t, err)
+		defer encWriter.Close()
+		dummyFile := []byte("TestString")
+		dummyFileStat := new(mocks2.FileInfoMock)
+		dummyFileStat.
+			On("Name").
+			Return("test").
+			On("Size").
+			Return(int64(len(dummyFile))).
+			On("Mode").
+			Return(os.FileMode(0644)).
+			On("ModTime").
+			Return(time.Now())
+		assert.NoError(t, encWriter.AddFile(
+			bytes.NewBuffer(dummyFile),
+			dummyFileStat,
+			"test",
+			"/",
+		))
+		dummyFile2 := []byte("TestString2")
+		dummyFileStat2 := new(mocks2.FileInfoMock)
+		dummyFileStat2.
+			On("Name").
+			Return("test").
+			On("Size").
+			Return(int64(len(dummyFile2))).
+			On("Mode").
+			Return(os.FileMode(0644)).
+			On("ModTime").
+			Return(time.Now())
+		assert.NoError(t, encWriter.AddFile(
+			bytes.NewBuffer(dummyFile2),
+			dummyFileStat2,
+			"test2",
+			"/",
+		))
+		assert.NoError(t, encWriter.Close())
+
+		reader, err := NewReader(&clearTar, []byte("password"))
+		assert.NoError(t, err)
+
+		actualFiles, err := ReadFiles(reader, "test", "test2")
+		assert.NoError(t, err)
+		assert.Len(t, actualFiles, 2, "Expected two files extracted")
+
+		assert.Equal(t, dummyFile, actualFiles["test"])
+		assert.Equal(t, dummyFile2, actualFiles["test2"])
+	})
+
+	t.Run("Returns error when asking non-existing content", func(t *testing.T) {
+		clearTar := bytes.Buffer{}
+		encWriter, err := NewWriter(&clearTar, []byte("password"))
+		assert.NoError(t, err)
+		defer encWriter.Close()
+		dummyFile := []byte("TestString")
+		dummyFileStat := new(mocks2.FileInfoMock)
+		dummyFileStat.
+			On("Name").
+			Return("test").
+			On("Size").
+			Return(int64(len(dummyFile))).
+			On("Mode").
+			Return(os.FileMode(0644)).
+			On("ModTime").
+			Return(time.Now())
+		assert.NoError(t, encWriter.AddFile(
+			bytes.NewBuffer(dummyFile),
+			dummyFileStat,
+			"test",
+			"/",
+		))
+		dummyFile2 := []byte("TestString2")
+		dummyFileStat2 := new(mocks2.FileInfoMock)
+		dummyFileStat2.
+			On("Name").
+			Return("test").
+			On("Size").
+			Return(int64(len(dummyFile2))).
+			On("Mode").
+			Return(os.FileMode(0644)).
+			On("ModTime").
+			Return(time.Now())
+		assert.NoError(t, encWriter.AddFile(
+			bytes.NewBuffer(dummyFile2),
+			dummyFileStat2,
+			"test2",
+			"/",
+		))
+		assert.NoError(t, encWriter.Close())
+
+		reader, err := NewReader(&clearTar, []byte("password"))
+		assert.NoError(t, err)
+
+		_, err = ReadFiles(reader, "test", "test2", "iDontExists")
+		assert.EqualError(t, err, "not all files where found in the archive: iDontExists")
+	})
 }

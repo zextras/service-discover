@@ -37,7 +37,9 @@ func TestListConfig(t *testing.T) {
 		}
 		err := cmd.Run(&flags)
 		assert.Nil(t, err)
-		assert.Equal(t, "[\"bind-address\"]", buffer.String())
+		assert.Equal(t, `[
+  "bind-address"
+]`, buffer.String())
 	})
 }
 
@@ -144,7 +146,9 @@ func TestSetConfig(t *testing.T) {
 		err := cmd.Run(&flags)
 		assert.Nil(t, err)
 		assert.Equal(t, "", consoleOutput.String())
-		assert.Equal(t, "{\"bind_addr\":\"10.0.0.1\"}", configFileOutput.String())
+		assert.Equal(t, `{
+  "bind_addr": "10.0.0.1"
+}`, configFileOutput.String())
 	})
 
 	t.Run("set unknown config", func(t *testing.T) {

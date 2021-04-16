@@ -39,10 +39,12 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu bionic m
                     def builds = [:]
                     modules["agent"] = "cli/agent"
                     modules["server"] = "cli/server"
-                    modules["parser"] = "cli/lib/parser"
-                    modules["formatter"] = "cli/lib/formatter"
                     modules["command"] = "cli/lib/command"
                     modules["credentialsEncrypter"] = "cli/lib/credentialsEncrypter"
+                    modules["exec"] = "cli/lib/exec"
+                    modules["formatter"] = "cli/lib/formatter"
+                    modules["parser"] = "cli/lib/parser"
+                    modules["systemd"] = "cli/lib/systemd"
                     modules["zimbra"] = "cli/lib/zimbra"
                     modules.each{key, value ->
                         builds[key] = {

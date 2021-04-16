@@ -1,23 +1,20 @@
 package setup
 
 import (
-	//"bitbucket.org/zextras/service-discover/cli/lib/command"
+	commonSetup "bitbucket.org/zextras/service-discover/cli/lib/command/setup"
 	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
+	"bitbucket.org/zextras/service-discover/cli/lib/exec"
+	mocks4 "bitbucket.org/zextras/service-discover/cli/lib/exec/mocks"
+	mocks3 "bitbucket.org/zextras/service-discover/cli/lib/systemd/mocks"
 	mocks2 "bitbucket.org/zextras/service-discover/cli/server/command/setup/mocks"
-	"bitbucket.org/zextras/service-discover/cli/server/exec"
 	"bitbucket.org/zextras/service-discover/cli/server/mocks"
-	mocks3 "bitbucket.org/zextras/service-discover/cli/server/systemd/mocks"
 	"syscall"
 
-	//"bitbucket.org/zextras/service-discover/cli/lib/formatter"
 	"bitbucket.org/zextras/service-discover/cli/lib/test"
 	"bitbucket.org/zextras/service-discover/cli/lib/zimbra"
-	//"bitbucket.org/zextras/service-discover/cli/server/exec"
-	//"bitbucket.org/zextras/service-discover/cli/server/systemd"
 	"bytes"
 	"crypto/rand"
 
-	//"github.com/sethvargo/go-password/password"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"io"
@@ -122,7 +119,7 @@ func TestFirstSetup_business(t *testing.T) {
 		assert.Equal(t, "{\"cluster_credentials\":\""+setup.ClusterCredential+"\"}", text)
 
 		mockLdapHandler.AssertNumberOfCalls(t, "AddService", 1)
-		mockDependencies.AssertNumberOfCalls(t, "CreateCommand", 3)
+		mockDependencies.AssertNumberOfCalls(t, "CreateCommand", 6)
 
 		clusterCredentialFile, err := os.Open(setup.ClusterCredential)
 		assert.NoError(t, err, "File should exist")
@@ -143,13 +140,13 @@ func TestFirstSetup_business(t *testing.T) {
 
 		// Note: we use relative path since the tarball will not have absolute paths.
 		expectedFileList := make([]string, 0)
-		caFileNameRel, _ := filepath.Rel("/", setup.ConsulHome+"/"+ConsulCAFile)
-		cCertificateRel, _ := filepath.Rel("/", setup.ConsulHome+"/"+ConsulCertificate)
-		cCAKeyFileNameRel, _ := filepath.Rel("/", setup.ConsulHome+"/"+ConsulCertificateKey)
-		expectedFileList = append(expectedFileList, ConsulAclBootstrap)
+		caFileNameRel, _ := filepath.Rel("/", setup.ConsulHome+"/"+commonSetup.ConsulCA)
+		caKeyFileNameRel, _ := filepath.Rel("/", setup.ConsulHome+"/"+commonSetup.ConsulCAKey)
+
+		expectedFileList = append(expectedFileList, commonSetup.GossipKey)
+		expectedFileList = append(expectedFileList, commonSetup.ConsulAclBootstrap)
+		expectedFileList = append(expectedFileList, caKeyFileNameRel)
 		expectedFileList = append(expectedFileList, caFileNameRel)
-		expectedFileList = append(expectedFileList, cCertificateRel)
-		expectedFileList = append(expectedFileList, cCAKeyFileNameRel)
 		assert.Equal(
 			t,
 			len(expectedFileList),
@@ -198,16 +195,68 @@ func mockBusinessDependencies(
 	mockLdapHandler *mocks.LdapHandler,
 	mockSystemdUnit *mocks3.UnitManager,
 ) func() {
-	mockDependencies.On("GetuidSyscall").Return(0)
-	mockDependencies.On(
-		"CreateCommand",
-		"/usr/bin/consul",
-		"tls",
-		"ca",
-		"create",
-		"-days=10950",
-		"-name-constraint",
-	).Return(
+	var cleanups = make([]func(), 0)
+	aclPolicyCreateMock := new(mocks4.Cmd)
+	aclPolicyCreateMock.On("Output").Return([]byte("something"), nil)
+	tokenCreateMock := new(mocks4.Cmd)
+	tokenCreateMock.On("Output").Return([]byte(`{
+		  "SecretID": "secret-token-2"
+		}`), nil)
+	setTokenCmd := new(mocks4.Cmd)
+	setTokenCmd.On("Output").Return(make([]byte, 0), nil)
+	mockDependencies.On("GetuidSyscall").Return(0).
+		On("CreateCommand",
+			"/usr/bin/consul",
+			"acl",
+			"policy",
+			"create",
+			"-name",
+			"server-mailbox-1-example-com",
+			"-rules",
+			`{
+   "node":{
+      "server-mailbox-1-example-com":{
+         "policy":"write"
+      }
+   },
+   "node_prefix":{
+      "":{
+         "policy":"read"
+      }
+   },
+   "service_prefix":{
+      "":{
+         "policy":"read"
+      }
+   }
+}`).
+		Return(aclPolicyCreateMock, nil).
+		On("CreateCommand",
+			"/usr/bin/consul",
+			"acl",
+			"token",
+			"create",
+			"-policy-name",
+			"server-mailbox-1-example-com",
+			"-format",
+			"json").
+		Return(tokenCreateMock).
+		On("CreateCommand",
+			"/usr/bin/consul",
+			"acl",
+			"set-agent-token",
+			"agent",
+			"secret-token-2",
+		).Return(setTokenCmd).
+		On(
+			"CreateCommand",
+			"/usr/bin/consul",
+			"tls",
+			"ca",
+			"create",
+			"-days=10950",
+			"-name-constraint",
+		).Return(
 		exec.Command(
 			"/usr/bin/consul",
 			"tls",
@@ -216,9 +265,7 @@ func mockBusinessDependencies(
 			"-days=10950",
 			"-name-constraint",
 		),
-	)
-
-	mockDependencies.On(
+	).On(
 		"CreateCommand",
 		"/usr/bin/consul",
 		"tls",
@@ -235,9 +282,7 @@ func mockBusinessDependencies(
 			"-days=10950",
 			"-server",
 		),
-	)
-
-	mockDependencies.On(
+	).On(
 		"CreateCommand",
 		"/usr/bin/consul",
 		"acl",
@@ -252,15 +297,12 @@ func mockBusinessDependencies(
 			"-format",
 			"json",
 		),
-	)
-
-	mockDependencies.On("SystemdUnitHandler").Return(mockSystemdUnit, nil)
+	).On("SystemdUnitHandler").Return(mockSystemdUnit, nil).
+		On("LocalConfigLoader", setup.LocalConfigPath).Return(mockLocalConfig).
+		On("LdapHandler", mock.Anything).Return(mockLdapHandler)
 	mockSystemdUnit.On("EnableUnitFiles", []string{"service-discover.service"}, false, false).Return(
 		false, nil, nil,
-	)
-
-	var cleanups = make([]func(), 0)
-	mockSystemdUnit.On("StartUnit", "service-discover.service", "replace", mock.Anything).Return(
+	).On("StartUnit", "service-discover.service", "replace", mock.Anything).Return(
 		0, nil,
 	).Run(func(args mock.Arguments) {
 		ch := args.Get(2).(chan<- string)
@@ -288,12 +330,9 @@ func mockBusinessDependencies(
 		})
 		time.Sleep(250 * time.Millisecond)
 		ch <- "done"
-	})
-	mockSystemdUnit.On("Close").Return(nil)
-	mockDependencies.On("LocalConfigLoader", setup.LocalConfigPath).Return(mockLocalConfig)
-	mockDependencies.On("LdapHandler", mock.Anything).Return(mockLdapHandler)
-	mockLdapHandler.On("CheckServerAvailability", true).Return(nil)
-	mockLdapHandler.On("AddService", "mailbox-1.example.com", "service-discover").Return(nil)
+	}).On("Close").Return(nil)
+	mockLdapHandler.On("CheckServerAvailability", true).Return(nil).
+		On("AddService", "mailbox-1.example.com", "service-discover").Return(nil)
 	return func() {
 		for _, f := range cleanups {
 			f()
@@ -332,26 +371,14 @@ func createSetup(t *testing.T) (Setup, func()) {
 		panic(err)
 	}
 
-	localConfig := `<?xml version="1.0" encoding="UTF-8"?>
-<localconfig>
-<key name="zimbra_server_hostname">
-  <value>mailbox-1.example.com</value>
-</key>
-<key name="ldap_master_url">
-  <value>ldap://mailbox-1.example.com:389</value>
-</key>
-<key name="ldap_url">
-  <value>ldap://mailbox-1.example.com:389</value>
-</key>
-<key name="zimbra_ldap_userdn">
-  <value>uid=zimbra,cn=admins,cn=zimbra</value>
-</key>
-<key name="zimbra_ldap_password">
-  <value>pa$$word</value>
-</key>
-</localconfig>`
-
-	err = ioutil.WriteFile(setup.LocalConfigPath, []byte(localConfig), 0644)
+	err = ioutil.WriteFile(setup.LocalConfigPath, test.GenerateLocalConfig(
+		t,
+		"mailbox-1.example.com",
+		"ldap://mailbox-1.example.com:389",
+		"ldap://mailbox-1.example.com:389",
+		test.DefaultLdapUserDN,
+		"pa$$word",
+	), 0644)
 	if err != nil {
 		panic(err)
 	}
@@ -521,129 +548,6 @@ func mockNetwork(network mocked, withoutLocalHost bool, includeSubnet bool) {
 			nil,
 		)
 	}
-}
-
-type mockedNetworkInterfaces struct {
-	mock.Mock
-}
-
-func (m *mockedNetworkInterfaces) AddrResolver(n net.Interface) ([]net.Addr, error) {
-	args := m.Called(n)
-	return args.Get(0).([]net.Addr), args.Error(1)
-}
-
-func (m *mockedNetworkInterfaces) NetInterfaces() ([]net.Interface, error) {
-	args := m.Called()
-	return args.Get(0).([]net.Interface), args.Error(1)
-}
-
-func TestSetup_checkValidBindingAddress(t *testing.T) {
-	t.Parallel()
-
-	t.Run("Valid interface selected", func(t *testing.T) {
-		mockDependencies := new(mockedNetworkInterfaces)
-		networkInterface := net.Interface{
-			Name: "lo",
-		}
-		mockDependencies.On("AddrResolver", networkInterface).Return(
-			[]net.Addr{
-				&addrStub{ip: "127.0.0.1"},
-				&addrStub{ip: "10.0.0.1"},
-			},
-			nil,
-		)
-		err := checkValidBindingAddress(
-			mockDependencies,
-			[]net.Interface{
-				networkInterface,
-			},
-			"127.0.0.1",
-		)
-		assert.NoError(t, err)
-	})
-
-	t.Run("Invalid interface selected", func(t *testing.T) {
-		mockDependencies := new(mockedNetworkInterfaces)
-		networkInterface := net.Interface{
-			Name: "lo",
-		}
-		mockDependencies.On("AddrResolver", networkInterface).Return(
-			[]net.Addr{
-				&addrStub{ip: "127.0.0.1"},
-			},
-			nil,
-		)
-		err := checkValidBindingAddress(
-			mockDependencies,
-			[]net.Interface{
-				networkInterface,
-			},
-			"192.168.1.2", //random one, it doesn't really matter
-		)
-		assert.EqualError(t, err, "invalid binding address selected")
-	})
-
-	t.Run("Valid address selected with subnet", func(t *testing.T) {
-		mockDependencies := new(mockedNetworkInterfaces)
-		networkInterface := net.Interface{
-			Name: "lo",
-		}
-		mockDependencies.On("AddrResolver", networkInterface).Return(
-			[]net.Addr{
-				&addrStub{ip: "127.0.0.1/24"},
-			}, nil,
-			nil,
-		)
-		err := checkValidBindingAddress(
-			mockDependencies,
-			[]net.Interface{
-				networkInterface,
-			},
-			"127.0.0.1",
-		)
-		assert.NoError(t, err)
-	})
-
-	t.Run("Valid subnet selected with subnet", func(t *testing.T) {
-		mockDependencies := new(mockedNetworkInterfaces)
-		networkInterface := net.Interface{
-			Name: "lo",
-		}
-		mockDependencies.On("AddrResolver", networkInterface).Return(
-			[]net.Addr{
-				&addrStub{ip: "127.0.0.1/24"},
-			},
-			nil,
-		)
-		err := checkValidBindingAddress(
-			mockDependencies,
-			[]net.Interface{
-				networkInterface,
-			},
-			"127.0.0.1/24",
-		)
-		assert.NoError(t, err)
-	})
-
-	t.Run("Invalid subnet selected with subnet", func(t *testing.T) {
-		mockDependencies := new(mockedNetworkInterfaces)
-		networkInterface := net.Interface{
-			Name: "lo",
-		}
-		mockDependencies.On("AddrResolver", networkInterface).Return(
-			[]net.Addr{
-				&addrStub{ip: "127.0.0.1/24"},
-			}, nil,
-		)
-		err := checkValidBindingAddress(
-			mockDependencies,
-			[]net.Interface{
-				networkInterface,
-			},
-			"10.0.0.1/8",
-		)
-		assert.EqualError(t, err, "invalid binding address selected")
-	})
 }
 
 func TestSetup_createEncryptedSecret(t *testing.T) {

@@ -1,9 +1,9 @@
 package setup
 
 import (
+	"bitbucket.org/zextras/service-discover/cli/lib/exec"
+	"bitbucket.org/zextras/service-discover/cli/lib/systemd"
 	"bitbucket.org/zextras/service-discover/cli/lib/zimbra"
-	"bitbucket.org/zextras/service-discover/cli/server/exec"
-	"bitbucket.org/zextras/service-discover/cli/server/systemd"
 	"context"
 	"github.com/coreos/go-systemd/v22/dbus"
 	"io"

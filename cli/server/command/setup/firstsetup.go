@@ -1,10 +1,12 @@
 package setup
 
 import (
+	"bitbucket.org/zextras/service-discover/cli/lib/command/setup"
 	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
+	exec2 "bitbucket.org/zextras/service-discover/cli/lib/exec"
 	"bitbucket.org/zextras/service-discover/cli/lib/formatter"
+	"bitbucket.org/zextras/service-discover/cli/lib/systemd"
 	"bitbucket.org/zextras/service-discover/cli/lib/zimbra"
-	"bitbucket.org/zextras/service-discover/cli/server/util"
 	"bufio"
 	"encoding/json"
 	"fmt"
@@ -12,20 +14,21 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 )
 
 // firstSetup specifically handles the command sent by the final user in a non-interactive way. This will print
 // as less as possible and it is intended to be used in with power users or from other programs
 func (s *Setup) firstSetup(d businessDependencies) (formatter.Formatter, error) {
-	networks, err := nonLoopbackInterfaces(d)
+	networks, err := setup.NonLoopbackInterfaces(d)
 	if err != nil {
 		return nil, err
 	}
-	if err := checkValidBindingAddress(d, networks, s.BindAddress); err != nil {
+	if err := setup.CheckValidBindingAddress(d, networks, s.BindAddress); err != nil {
 		return nil, err
 	}
-	err = s.performSetup(d, &setupConfigurations{
+	err = s.performSetup(d, &setupConfiguration{
 		firstInstance: s.FirstInstance,
 		Password:      s.Password,
 		BindAddress:   s.BindAddress,
@@ -44,13 +47,13 @@ func (s *Setup) firstSetup(d businessDependencies) (formatter.Formatter, error) 
 // installation (that it doesn't mean it is the hostname of the machine), then it proceeds to generate the appropriate
 // keys for the service discover to work in a secure way to finally write all the configuration in a PGP signed tarball
 // archive
-func (s *Setup) performSetup(d businessDependencies, inputs *setupConfigurations) error {
+func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration) error {
 	zimbraLocalConfig, err := zimbra.LoadLocalConfig(s.LocalConfigPath)
 	if err != nil {
 		return errors.New(fmt.Sprintf("unable to read Zimbra local config: %s", err))
 	}
 	ldapHandler := d.LdapHandler(zimbraLocalConfig)
-	zimbraHostname, err := s.retrieveZimbraHostname(zimbraLocalConfig, ldapHandler)
+	zimbraHostname, err := setup.RetrieveZimbraHostname(zimbraLocalConfig, ldapHandler)
 	if err != nil {
 		return err
 	}
@@ -59,43 +62,82 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfigurations
 	if err != nil {
 		return err
 	}
-	consulFileBytes, _ := json.Marshal(consulConfigFile)
-	err = ioutil.WriteFile(s.ConsulFileConfig, consulFileBytes, os.FileMode(0644))
+	consulFileBytes, err := json.MarshalIndent(consulConfigFile, "", "  ")
 	if err != nil {
-		return errors.New("unable to save generated configuration file in " + s.ConsulHome)
+		return err
+	}
+	// FIXME the ownership of the file should be fixed! + 0600 perm should be used
+	if err := ioutil.WriteFile(s.ConsulFileConfig, consulFileBytes, os.FileMode(0644)); err != nil {
+		return errors.New(fmt.Sprintf("unable to save generated configuration file in %s: %s", s.ConsulHome, err))
 	}
 
-	if err := s.saveBindAddressConfiguration(inputs.BindAddress); err != nil {
+	if err := setup.SaveBindAddressConfiguration(s.MutableConfigFile, inputs.BindAddress); err != nil {
 		return err
 	}
 
-	if err := s.addServiceInLDAP(ldapHandler, zimbraHostname); err != nil {
+	if err := setup.AddServiceInLDAP(ldapHandler, zimbraHostname); err != nil {
+		return err
+	}
+	err = systemd.StartSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit)
+	if err != nil {
 		return err
 	}
 	aclBootstrapJson, err := s.createACLBootstrapToken(d)
 	if err != nil {
 		return err
 	}
-	aclFile, err := ioutil.TempFile("", ConsulAclBootstrap)
+	aclBootstrapUnmarshal := &setup.ACLTokenCreation{}
+	err = json.Unmarshal(aclBootstrapJson, aclBootstrapUnmarshal)
+	if err != nil {
+		return errors.WithMessage(
+			err,
+			"unable to decode ACL bootstrap response from Consul",
+		)
+	}
+	serverToken, err := setup.CreateACLToken(
+		d.CreateCommand,
+		setup.Server,
+		zimbraHostname,
+		aclBootstrapUnmarshal.SecretID,
+	)
+	if err != nil {
+		return err
+	}
+	if err := setup.SetACLToken(d.CreateCommand, serverToken, aclBootstrapUnmarshal.SecretID); err != nil {
+		return err
+	}
+	aclFile, err := ioutil.TempFile("", setup.ConsulAclBootstrap)
 	if err != nil {
 		return err
 	}
 	defer os.Remove(aclFile.Name())
-	if err = ioutil.WriteFile(aclFile.Name(), aclBootstrapJson, 0644); err != nil {
+	if err = ioutil.WriteFile(aclFile.Name(), aclBootstrapJson, 0600); err != nil {
+		return err
+	}
+	gossipKeyFile, err := ioutil.TempFile("", setup.GossipKey)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(gossipKeyFile.Name())
+	if err = ioutil.WriteFile(gossipKeyFile.Name(), []byte(consulConfigFile.Encrypt), 0600); err != nil {
 		return err
 	}
 	filesToCompress := map[string]string{
-		ConsulAclBootstrap:                        aclFile.Name(),
-		s.ConsulHome + "/" + ConsulCAFile:         s.ConsulHome + "/" + ConsulCAFile,
-		s.ConsulHome + "/" + ConsulCertificate:    s.ConsulHome + "/" + ConsulCertificate,
-		s.ConsulHome + "/" + ConsulCertificateKey: s.ConsulHome + "/" + ConsulCertificateKey,
+		setup.GossipKey:                        gossipKeyFile.Name(),
+		setup.ConsulAclBootstrap:               aclFile.Name(),
+		s.ConsulHome + "/" + setup.ConsulCA:    s.ConsulHome + "/" + setup.ConsulCA,
+		s.ConsulHome + "/" + setup.ConsulCAKey: s.ConsulHome + "/" + setup.ConsulCAKey,
 	}
 
 	if err = s.createEncryptedSecret(filesToCompress, inputs.Password); err != nil {
 		return err
 	}
 
-	return s.enableServiceDiscoverd(d)
+	err = systemd.EnableSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit)
+	if err != nil {
+		return errors.New(fmt.Sprintf("unable to enable %s unit: %s", serviceDiscoverUnit, err))
+	}
+	return nil
 }
 
 // createEncryptedSecret takes the passed files as [destination in tarball]: current location and puts it in a
@@ -106,6 +148,9 @@ func (s *Setup) createEncryptedSecret(filesToCompress map[string]string, passwor
 		return errors.New(fmt.Sprintf("unable to create %s: %s", s.ClusterCredential, err))
 	}
 	defer encryptedSecretFiles.Close()
+	if err := encryptedSecretFiles.Chmod(os.FileMode(0600)); err != nil {
+		return errors.New(fmt.Sprintf("unable to change permission to %s: %s", s.ClusterCredential, err))
+	}
 	encWriter, err := credentialsEncrypter.NewWriter(encryptedSecretFiles, []byte(password))
 	if err != nil {
 		return err
@@ -129,37 +174,71 @@ func (s *Setup) createEncryptedSecret(filesToCompress map[string]string, passwor
 }
 
 func (s *Setup) createACLBootstrapToken(d businessDependencies) ([]byte, error) {
-	err := util.StartSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit)
-	if err != nil {
-		return nil, err
+	type returnResult struct {
+		data []byte
+		err  error
 	}
-	time.Sleep(time.Second * 12)
-	// Ok so now service-discoverd is running, we can now create our acl bootstrap token and save it in our secure
-	// tarball
-	aclBootstrapJson, err := d.CreateCommand(consulBin, "acl", "bootstrap", "-format", "json").Output()
-	if err != nil {
-		reason := err.Error()
-		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
-			reason = string(ee.Stderr)
+	result := make(chan returnResult, 1)
+	ticker := time.NewTicker(250 * time.Millisecond)
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				aclBootstrapJson, err := d.CreateCommand(consulBin, "acl", "bootstrap", "-format", "json").Output()
+				if err != nil {
+					stderr := err.Error()
+					if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
+						stderr = strings.TrimSpace(string(ee.Stderr))
+						if stderr != "Failed ACL bootstrapping: Unexpected response code: 500 (The ACL system is currently in legacy mode.)" {
+							res := returnResult{err: exec2.ErrorFromStderr(err, "unable to create ACL bootstrap token")}
+							result <- res
+							return
+						}
+					}
+				} else {
+					res := returnResult{data: aclBootstrapJson}
+					result <- res
+					return
+				}
+			}
 		}
-		return nil, errors.New(fmt.Sprintf("unable to create ACL bootstrap token: %s", reason))
+	}()
+
+	select {
+	case res := <-result:
+		ticker.Stop() // note: we don't really need this since the goroutine at this point should already be exited
+		return res.data, res.err
+	case <-time.After(time.Second * 30):
+		ticker.Stop()
+		return nil, errors.New("timeout reached while waiting for consul to be ready")
 	}
-	return aclBootstrapJson, nil
 }
 
 // generateKeys creates the TLS certificates for consul and finally it generates the gossip key. This ensure secure
 // communications inside Consul
 func (s *Setup) generateKeys(d businessDependencies, zimbraHostname string) (*setupConfig, error) {
 	certificateDaysFlag := fmt.Sprintf("-days=%d", certificateExpiration)
-	err := s.execInPath(d, s.ConsulHome, consulBin, "tls", "ca", "create", certificateDaysFlag, "-name-constraint")
+	err := exec2.ExecInPath(
+		d.CreateCommand(consulBin,
+			"tls",
+			"ca",
+			"create",
+			certificateDaysFlag,
+			"-name-constraint"),
+		s.ConsulHome,
+	)
 	if err != nil {
-		reason := err.Error()
-		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
-			reason = string(ee.Stderr)
-		}
-		return nil, errors.New(fmt.Sprintf("unable to create a valid CA with Consul: %s", reason))
+		return nil, exec2.ErrorFromStderr(err, "unable to create a valid CA with Consul")
 	}
-	err = s.execInPath(d, s.ConsulHome, consulBin, "tls", "cert", "create", certificateDaysFlag, "-server")
+	err = exec2.ExecInPath(
+		d.CreateCommand(consulBin,
+			"tls",
+			"cert",
+			"create",
+			certificateDaysFlag,
+			"-server"),
+		s.ConsulHome,
+	)
 	if err != nil {
 		return nil, errors.New("unable to create a valid certificate with Consul")
 	}
@@ -175,19 +254,22 @@ func (s *Setup) generateKeys(d businessDependencies, zimbraHostname string) (*se
 			DefaultPolicy:          "deny",
 			DownPolicy:             "extend-cache",
 		},
-		CaFile:                  s.ConsulHome + "/" + ConsulCAFile,
-		CertFile:                s.ConsulHome + "/" + ConsulCertificate,
-		KeyFile:                 s.ConsulHome + "/" + ConsulCertificateKey,
+		AutoEncrypt:             autoEncrypt{AllowTLS: true},
+		CaFile:                  s.ConsulHome + "/" + setup.ConsulCA,
+		CertFile:                s.ConsulHome + "/" + setup.ConsulServerCertificate,
 		DataDir:                 s.ConsulData,
-		LogLevel:                defaultLogLever,
-		NodeName:                zimbraHostname,
-		Encrypt:                 gossipKey,
 		EnableLocalScriptChecks: true,
-		AutoEncrypt:             autoEncrypt{true},
+		Encrypt:                 gossipKey,
+		KeyFile:                 s.ConsulHome + "/" + setup.ConsulServerCertificateKey,
+		LogLevel:                defaultLogLevel,
+		NodeName:                setup.ConsulNodeName(setup.Server, zimbraHostname),
 		Server:                  true,
 		VerifyIncoming:          true,
 		VerifyOutgoing:          true,
 		VerifyServerHostname:    true,
+		UiConfig:                uiConfig{Enabled: true},
+		Ports:                   portsConfig{Grpc: 8502},
+		Connect:                 connectConfig{Enabled: true},
 	}
 	return consulConfigFile, nil
 }

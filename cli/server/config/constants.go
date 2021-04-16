@@ -11,5 +11,5 @@ const (
 	ConsulConfig           = "/etc/zextras/service-discover"
 	ConsultFileConfig      = ConsulConfig + "/main.json"
 	LocalConfigPath        = "/opt/zimbra/conf/localconfig.xml"
-	ClusterCredential      = ConsulConfig + "/cluster-credentials.tar.gz.gpg"
+	ClusterCredential      = ConsulConfig + "/cluster-credentials.tar.gpg"
 )
