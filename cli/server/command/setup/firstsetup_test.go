@@ -6,8 +6,8 @@ import (
 	"bitbucket.org/zextras/service-discover/cli/lib/exec"
 	mocks4 "bitbucket.org/zextras/service-discover/cli/lib/exec/mocks"
 	mocks3 "bitbucket.org/zextras/service-discover/cli/lib/systemd/mocks"
+	mocks5 "bitbucket.org/zextras/service-discover/cli/lib/zimbra/mocks"
 	mocks2 "bitbucket.org/zextras/service-discover/cli/server/command/setup/mocks"
-	"bitbucket.org/zextras/service-discover/cli/server/mocks"
 	"syscall"
 
 	"bitbucket.org/zextras/service-discover/cli/lib/test"
@@ -98,13 +98,14 @@ func TestFirstSetup_business(t *testing.T) {
 		setup, setupCleanup := createSetup(t)
 		cleanups = append(cleanups, setupCleanup)
 
-		mockLocalConfig := new(mocks.LocalConfig)
-		mockLdapHandler := new(mocks.LdapHandler)
+		mockLocalConfig, err := zimbra.LoadLocalConfig(setup.LocalConfigPath)
+		assert.NoError(t, err)
+		mockLdapHandler := new(mocks5.LdapHandler)
 		mockSystemdUnit := new(mocks3.UnitManager)
 		mockDependencies := new(mocks2.BusinessDependencies)
 		mockDependencies.On("Writer").Return(ioutil.Discard)
 		mockNetwork(mockDependencies, false, false)
-		cleanup := mockBusinessDependencies(&setup, mockDependencies, mockLocalConfig, mockLdapHandler, mockSystemdUnit)
+		cleanup := mockBusinessDependencies(&setup, mockDependencies, &mockLocalConfig, mockLdapHandler, mockSystemdUnit)
 		cleanups = append(cleanups, cleanup)
 
 		out, err := setup.firstSetup(mockDependencies)
@@ -172,13 +173,14 @@ func TestFirstSetup_business(t *testing.T) {
 		setup, setupCleanup := createSetup(t)
 		cleanups = append(cleanups, setupCleanup)
 
-		mockLocalConfig := new(mocks.LocalConfig)
-		mockLdapHandler := new(mocks.LdapHandler)
+		mockLocalConfig, err := zimbra.LoadLocalConfig(setup.LocalConfigPath)
+		assert.NoError(t, err)
+		mockLdapHandler := new(mocks5.LdapHandler)
 		mockSystemdUnit := new(mocks3.UnitManager)
 		mockDependencies := new(mocks2.BusinessDependencies)
 		mockDependencies.On("Writer").Return(ioutil.Discard)
 		mockNetwork(mockDependencies, true, false)
-		cleanup := mockBusinessDependencies(&setup, mockDependencies, mockLocalConfig, mockLdapHandler, mockSystemdUnit)
+		cleanup := mockBusinessDependencies(&setup, mockDependencies, &mockLocalConfig, mockLdapHandler, mockSystemdUnit)
 		cleanups = append(cleanups, cleanup)
 
 		out, err := setup.firstSetup(mockDependencies)
@@ -191,8 +193,8 @@ func TestFirstSetup_business(t *testing.T) {
 func mockBusinessDependencies(
 	setup *Setup,
 	mockDependencies *mocks2.BusinessDependencies,
-	mockLocalConfig *mocks.LocalConfig,
-	mockLdapHandler *mocks.LdapHandler,
+	mockLocalConfig *zimbra.LocalConfig,
+	mockLdapHandler *mocks5.LdapHandler,
 	mockSystemdUnit *mocks3.UnitManager,
 ) func() {
 	var cleanups = make([]func(), 0)
@@ -405,7 +407,8 @@ func TestFirstSetup_inputs(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, configurations)
 
-		assert.Equal(t, true, configurations.firstInstance)
+		// This will always be false since gatherInputs doesn't take provide firstInstance anymore
+		assert.Equal(t, false, configurations.firstInstance)
 		assert.Equal(t, "10.0.0.1", configurations.BindAddress)
 		assert.Equal(t, "password", configurations.Password)
 	})
@@ -421,7 +424,8 @@ func TestFirstSetup_inputs(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, configurations)
 
-		assert.Equal(t, true, configurations.firstInstance)
+		// This will always be false since gatherInputs doesn't take provide firstInstance anymore
+		assert.Equal(t, false, configurations.firstInstance)
 		assert.Equal(t, "10.0.0.1", configurations.BindAddress)
 		assert.Equal(t, "password", configurations.Password)
 	})
@@ -448,15 +452,16 @@ func TestFirstSetup_inputs(t *testing.T) {
 		configurations, err := gatherInputs(mockDependencies)
 		assert.NoError(t, err)
 		assert.NotNil(t, configurations)
-		assert.Equal(t, true, configurations.firstInstance)
+
+		// This will always be false since gatherInputs doesn't take provide firstInstance anymore
+		assert.Equal(t, false, configurations.firstInstance)
 		assert.Equal(t, "10.0.0.1", configurations.BindAddress)
 		assert.Equal(t, "password", configurations.Password)
 	})
 }
 
 func populateWithFirstClusterInput(bindingAddress string) *bytes.Buffer {
-	buf := bytes.NewBuffer([]byte(`Y
-` + bindingAddress + `
+	buf := bytes.NewBuffer([]byte(bindingAddress + `
 password
 `))
 	return buf
@@ -466,13 +471,16 @@ func mockLdap(ldap mocked) {
 	ldap.On(
 		"CheckServerAvailability",
 		true,
-	).Return(nil)
-
-	ldap.On(
-		"AddService",
-		"mailbox-1.example.com",
-		zimbra.ServiceDiscoverServiceName,
-	).Return(nil)
+	).Return(nil).
+		On(
+			"AddService",
+			"mailbox-1.example.com",
+			zimbra.ServiceDiscoverServiceName,
+		).Return(nil).
+		On(
+			"QueryAllServersWithService",
+			zimbra.ServiceDiscoverServiceName,
+		).Return(0, nil)
 }
 
 func mockNetwork(network mocked, withoutLocalHost bool, includeSubnet bool) {

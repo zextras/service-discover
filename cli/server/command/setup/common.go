@@ -119,14 +119,6 @@ func (n *nonInteractiveOutput) JsonRender() (string, error) {
 
 func gatherInputs(d interactiveDependencies) (*setupConfiguration, error) {
 	scanner := bufio.NewScanner(d.Reader())
-	fmt.Fprintf(d.Writer(), "This is the setup for a new instance discover server.\n")
-	fmt.Fprintf(d.Writer(), "Is this the first instance? [Y] ")
-	input := strings.ToUpper(readUserInput(scanner))
-	firstInstance := false
-	if input == "" || input == "Y" {
-		firstInstance = true
-	}
-
 	bindAddress, err := wizardBindAddressSelection(d, scanner)
 	if err != nil {
 		return nil, err
@@ -136,9 +128,8 @@ func gatherInputs(d interactiveDependencies) (*setupConfiguration, error) {
 	password := readUserInput(scanner) // FIXME avoid echoing password in tty
 
 	return &setupConfiguration{
-		firstInstance: firstInstance,
-		Password:      password,
-		BindAddress:   bindAddress,
+		Password:    password,
+		BindAddress: bindAddress,
 	}, nil
 }
 
@@ -160,7 +151,10 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 			return err
 		}
 
-		s.FirstInstance = inputs.firstInstance
+		s.FirstInstance, err = s.isFirstInstance(d)
+		if err != nil {
+			return err
+		}
 		s.Password = inputs.Password
 		s.BindAddress = inputs.BindAddress
 	} else {
@@ -187,6 +181,24 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 		fmt.Fprint(d.Writer(), render)
 	}
 	return nil
+}
+
+func (s *Setup) isFirstInstance(d businessDependencies) (bool, error) {
+	_, err := setup.OpenClusterCredential(s.ClusterCredential)
+	if err != nil {
+		zimbraLocalConfig, err := zimbra.LoadLocalConfig(s.LocalConfigPath)
+		if err != nil {
+			return false, errors.New(fmt.Sprintf("unable to read Zimbra local config: %s", err))
+		}
+		ldapHandler := d.LdapHandler(zimbraLocalConfig)
+		servers, err := ldapHandler.QueryAllServersWithService(zimbra.ServiceDiscoverServiceName)
+		if err != nil {
+			return false, err
+		}
+		return len(servers) == 0, nil
+	} else {
+		return false, nil
+	}
 }
 
 func (s *Setup) preRun(d businessDependencies) error {
