@@ -19,7 +19,7 @@ func TestExecInPath(t *testing.T) {
 		assert.NoError(t, os.RemoveAll(nonExistingFolder))
 		assert.EqualError(
 			t,
-			ExecInPath(exec.Command("it", "doesn't", "matter"), nonExistingFolder),
+			InPath(exec.Command("it", "doesn't", "matter"), nonExistingFolder),
 			fmt.Sprintf("chdir %s: no such file or directory", nonExistingFolder),
 		)
 	})
@@ -31,7 +31,7 @@ func TestExecInPath(t *testing.T) {
 		defer os.RemoveAll(existingFolder)
 		assert.EqualError(
 			t,
-			ExecInPath(mockCmd, existingFolder),
+			InPath(mockCmd, existingFolder),
 			fmt.Sprint("this is an error message"),
 		)
 	})
@@ -41,6 +41,6 @@ func TestExecInPath(t *testing.T) {
 		mockCmd.On("Output").Return([]byte("something"), nil)
 		existingFolder := test.GenerateRandomFolder("Works correctly in an existing dir")
 		defer os.RemoveAll(existingFolder)
-		assert.NoError(t, ExecInPath(mockCmd, existingFolder))
+		assert.NoError(t, InPath(mockCmd, existingFolder))
 	})
 }

@@ -3,6 +3,7 @@ package setup
 import (
 	"bitbucket.org/zextras/service-discover/cli/lib/exec"
 	"bitbucket.org/zextras/service-discover/cli/lib/systemd"
+	"bitbucket.org/zextras/service-discover/cli/lib/term"
 	"bitbucket.org/zextras/service-discover/cli/lib/zimbra"
 	"context"
 	"github.com/coreos/go-systemd/v22/dbus"
@@ -12,14 +13,12 @@ import (
 )
 
 type interactiveDependencies interface {
-	Writer() io.Writer
-	Reader() io.Reader
+	Term() term.Terminal
 	NetInterfaces() ([]net.Interface, error)
 	AddrResolver(n net.Interface) ([]net.Addr, error)
 }
 
 type businessDependencies interface {
-	Writer() io.Writer
 	NetInterfaces() ([]net.Interface, error)
 	AddrResolver(n net.Interface) ([]net.Addr, error)
 	LdapHandler(zimbra.LocalConfig) zimbra.LdapHandler
@@ -29,12 +28,13 @@ type businessDependencies interface {
 	GetuidSyscall() int
 }
 
-type allDependencies interface {
-	interactiveDependencies
-	businessDependencies
+type realDependencies struct {
+	ui *term.Terminal
 }
 
-type realDependencies struct {}
+func (r realDependencies) Term() term.Terminal {
+	return *r.ui
+}
 
 func (r realDependencies) Writer() io.Writer {
 	return os.Stdout

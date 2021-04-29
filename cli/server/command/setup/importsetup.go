@@ -85,7 +85,7 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 
 func (s *Setup) createTLSCertificate(d businessDependencies, caFile *os.File) error {
 	certificateDaysFlag := fmt.Sprintf("-days=%d", certificateExpiration)
-	err := exec.ExecInPath(
+	err := exec.InPath(
 		d.CreateCommand(consulBin,
 			"tls",
 			"cert",

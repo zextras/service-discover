@@ -29,7 +29,7 @@ func (s *Setup) firstSetup(d businessDependencies) (formatter.Formatter, error) 
 		return nil, err
 	}
 	err = s.performSetup(d, &setupConfiguration{
-		firstInstance: s.FirstInstance,
+		firstInstance: s.firstInstance,
 		Password:      s.Password,
 		BindAddress:   s.BindAddress,
 	})
@@ -218,7 +218,7 @@ func (s *Setup) createACLBootstrapToken(d businessDependencies) ([]byte, error) 
 // communications inside Consul
 func (s *Setup) generateKeys(d businessDependencies, zimbraHostname string) (*setupConfig, error) {
 	certificateDaysFlag := fmt.Sprintf("-days=%d", certificateExpiration)
-	err := exec2.ExecInPath(
+	err := exec2.InPath(
 		d.CreateCommand(consulBin,
 			"tls",
 			"ca",
@@ -230,7 +230,7 @@ func (s *Setup) generateKeys(d businessDependencies, zimbraHostname string) (*se
 	if err != nil {
 		return nil, exec2.ErrorFromStderr(err, "unable to create a valid CA with Consul")
 	}
-	err = exec2.ExecInPath(
+	err = exec2.InPath(
 		d.CreateCommand(consulBin,
 			"tls",
 			"cert",

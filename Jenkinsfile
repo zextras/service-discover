@@ -46,6 +46,7 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu bionic m
                     modules["parser"] = "cli/lib/parser"
                     modules["systemd"] = "cli/lib/systemd"
                     modules["zimbra"] = "cli/lib/zimbra"
+                    modules["term"] = "cli/lib/term"
                     modules.each{key, value ->
                         builds[key] = {
                             dir(value) {

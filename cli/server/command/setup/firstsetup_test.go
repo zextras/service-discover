@@ -6,6 +6,7 @@ import (
 	"bitbucket.org/zextras/service-discover/cli/lib/exec"
 	mocks4 "bitbucket.org/zextras/service-discover/cli/lib/exec/mocks"
 	mocks3 "bitbucket.org/zextras/service-discover/cli/lib/systemd/mocks"
+	"bitbucket.org/zextras/service-discover/cli/lib/term/mocks"
 	mocks5 "bitbucket.org/zextras/service-discover/cli/lib/zimbra/mocks"
 	mocks2 "bitbucket.org/zextras/service-discover/cli/server/command/setup/mocks"
 	"syscall"
@@ -103,7 +104,7 @@ func TestFirstSetup_business(t *testing.T) {
 		mockLdapHandler := new(mocks5.LdapHandler)
 		mockSystemdUnit := new(mocks3.UnitManager)
 		mockDependencies := new(mocks2.BusinessDependencies)
-		mockDependencies.On("Writer").Return(ioutil.Discard)
+		mockDependencies.On("writer").Return(ioutil.Discard)
 		mockNetwork(mockDependencies, false, false)
 		cleanup := mockBusinessDependencies(&setup, mockDependencies, &mockLocalConfig, mockLdapHandler, mockSystemdUnit)
 		cleanups = append(cleanups, cleanup)
@@ -178,7 +179,7 @@ func TestFirstSetup_business(t *testing.T) {
 		mockLdapHandler := new(mocks5.LdapHandler)
 		mockSystemdUnit := new(mocks3.UnitManager)
 		mockDependencies := new(mocks2.BusinessDependencies)
-		mockDependencies.On("Writer").Return(ioutil.Discard)
+		mockDependencies.On("writer").Return(ioutil.Discard)
 		mockNetwork(mockDependencies, true, false)
 		cleanup := mockBusinessDependencies(&setup, mockDependencies, &mockLocalConfig, mockLdapHandler, mockSystemdUnit)
 		cleanups = append(cleanups, cleanup)
@@ -354,7 +355,7 @@ func createSetup(t *testing.T) (Setup, func()) {
 		MutableConfigFile: tmpDir + "/config/mutable.json",
 
 		Wizard:        true,
-		FirstInstance: true,
+		firstInstance: true,
 		Password:      "password",
 		BindAddress:   "10.0.0.1",
 	}
@@ -398,9 +399,17 @@ func TestFirstSetup_inputs(t *testing.T) {
 
 	t.Run("Gather all inputs in interactive mode", func(t *testing.T) {
 		out := new(bytes.Buffer)
+		mockTerm := new(mocks.Terminal)
+		mockTerm.On("Write", mock.AnythingOfType("[]uint8")).Run(func(args mock.Arguments) {
+			out.Write(args.Get(0).([]byte))
+		}).Return(0, nil).
+			On("ReadLine").
+			Return("", nil).
+			Return("10.0.0.1", nil).
+			On("ReadPassword", mock.AnythingOfType("string")).
+			Return("password", nil)
 		mockDependencies := new(mocks2.InteractiveDependencies)
-		mockDependencies.On("Reader").Return(populateWithFirstClusterInput("10.0.0.1"))
-		mockDependencies.On("Writer").Return(out)
+		mockDependencies.On("Term").Return(mockTerm)
 		mockNetwork(mockDependencies, false, false)
 
 		configurations, err := gatherInputs(mockDependencies)
@@ -411,13 +420,26 @@ func TestFirstSetup_inputs(t *testing.T) {
 		assert.Equal(t, false, configurations.firstInstance)
 		assert.Equal(t, "10.0.0.1", configurations.BindAddress)
 		assert.Equal(t, "password", configurations.Password)
+		allOut, _ := io.ReadAll(out)
+		assert.Equal(t, `Multiple network cards detected:
+eno1 10.0.0.2
+eno0 10.0.0.1
+Specify the binding address for service discovery: `, string(allOut))
 	})
 
 	t.Run("Gather all inputs in interactive mode without lo interface", func(t *testing.T) {
 		out := new(bytes.Buffer)
+		mockTerm := new(mocks.Terminal)
+		mockTerm.On("Write", mock.AnythingOfType("[]uint8")).Run(func(args mock.Arguments) {
+			out.Write(args.Get(0).([]byte))
+		}).Return(0, nil).
+			On("ReadLine").
+			Return("", nil).
+			Return("10.0.0.1", nil).
+			On("ReadPassword", mock.AnythingOfType("string")).
+			Return("password", nil)
 		mockDependencies := new(mocks2.InteractiveDependencies)
-		mockDependencies.On("Reader").Return(populateWithFirstClusterInput("10.0.0.1"))
-		mockDependencies.On("Writer").Return(out)
+		mockDependencies.On("Term").Return(mockTerm)
 		mockNetwork(mockDependencies, true, false)
 
 		configurations, err := gatherInputs(mockDependencies)
@@ -428,25 +450,51 @@ func TestFirstSetup_inputs(t *testing.T) {
 		assert.Equal(t, false, configurations.firstInstance)
 		assert.Equal(t, "10.0.0.1", configurations.BindAddress)
 		assert.Equal(t, "password", configurations.Password)
+		allOut, _ := io.ReadAll(out)
+		assert.Equal(t, `Multiple network cards detected:
+eno0 10.0.0.1
+eno1 10.0.0.2
+Specify the binding address for service discovery: `, string(allOut))
 	})
 
 	t.Run("Gather all inputs in interactive mode invalid binding address", func(t *testing.T) {
 		out := new(bytes.Buffer)
+		mockTerm := new(mocks.Terminal)
+		mockTerm.On("Write", mock.AnythingOfType("[]uint8")).Run(func(args mock.Arguments) {
+			out.Write(args.Get(0).([]byte))
+		}).Return(0, nil).
+			On("ReadLine").
+			Return("", nil).
+			Return("10.0.0.200", nil).
+			On("ReadPassword", mock.AnythingOfType("string")).
+			Return("password", nil)
 		mockDependencies := new(mocks2.InteractiveDependencies)
-		mockDependencies.On("Reader").Return(populateWithFirstClusterInput("10.0.0.200"))
-		mockDependencies.On("Writer").Return(out)
+		mockDependencies.On("Term").Return(mockTerm)
 		mockNetwork(mockDependencies, true, false)
 
 		configurations, err := gatherInputs(mockDependencies)
 		assert.EqualError(t, err, "invalid binding address selected")
 		assert.Nil(t, configurations)
+		allOut, _ := io.ReadAll(out)
+		assert.Equal(t, `Multiple network cards detected:
+eno0 10.0.0.1
+eno1 10.0.0.2
+Specify the binding address for service discovery: `, string(allOut))
 	})
 
 	t.Run("Gather all inputs in interactive mode subnet binding", func(t *testing.T) {
 		out := new(bytes.Buffer)
+		mockTerm := new(mocks.Terminal)
+		mockTerm.On("Write", mock.AnythingOfType("[]uint8")).Run(func(args mock.Arguments) {
+			out.Write(args.Get(0).([]byte))
+		}).Return(0, nil).
+			On("ReadLine").
+			Return("", nil).
+			Return("10.0.0.1", nil).
+			On("ReadPassword", mock.AnythingOfType("string")).
+			Return("password", nil)
 		mockDependencies := new(mocks2.InteractiveDependencies)
-		mockDependencies.On("Reader").Return(populateWithFirstClusterInput("10.0.0.1"))
-		mockDependencies.On("Writer").Return(out)
+		mockDependencies.On("Term").Return(mockTerm)
 		mockNetwork(mockDependencies, true, true)
 
 		configurations, err := gatherInputs(mockDependencies)
@@ -457,6 +505,11 @@ func TestFirstSetup_inputs(t *testing.T) {
 		assert.Equal(t, false, configurations.firstInstance)
 		assert.Equal(t, "10.0.0.1", configurations.BindAddress)
 		assert.Equal(t, "password", configurations.Password)
+		allOut, _ := io.ReadAll(out)
+		assert.Equal(t, `Multiple network cards detected:
+eno0 10.0.0.1/8
+eno1 10.0.0.2
+Specify the binding address for service discovery: `, string(allOut))
 	})
 }
 

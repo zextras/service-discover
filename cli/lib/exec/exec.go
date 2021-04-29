@@ -25,9 +25,9 @@ func Command(name string, arg ...string) Cmd {
 	return exec.Command(name, arg...)
 }
 
-// ExecInPath change directory in the desired path before executing the desired command. It then proceed to return to
+// InPath change directory in the desired path before executing the desired command. It then proceed to return to
 // the original folder
-func ExecInPath(cmd Cmd, path string) error {
+func InPath(cmd Cmd, path string) error {
 	executionPath, err := os.Executable()
 	if err != nil {
 		return err

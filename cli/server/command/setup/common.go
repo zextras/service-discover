@@ -5,14 +5,15 @@ import (
 	"bitbucket.org/zextras/service-discover/cli/lib/command/setup"
 	"bitbucket.org/zextras/service-discover/cli/lib/formatter"
 	"bitbucket.org/zextras/service-discover/cli/lib/systemd"
+	"bitbucket.org/zextras/service-discover/cli/lib/term"
 	"bitbucket.org/zextras/service-discover/cli/lib/zimbra"
 	"bitbucket.org/zextras/service-discover/cli/server/config"
-	"bufio"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
 	"github.com/pkg/errors"
 	"net"
+	"os"
 	"strings"
 )
 
@@ -52,9 +53,9 @@ type Setup struct {
 	ClusterCredential string `kong:"-"`
 	MutableConfigFile string `kong:"-"`
 
-	Wizard        bool `help:"Initialize the setup in interactive mode. All the non interactive flags will be ignored if this is set"`
-	FirstInstance bool `help:"Configure the note as first of the cluster initialization"`
+	firstInstance bool `kong:"-"`
 
+	Wizard      bool   `help:"Initialize the setup in interactive mode. All the non interactive flags will be ignored if this is set"`
 	Password    string `help:"Set a custom password for the encrypted secret files. If none is set, a random one will be generated and printed"`
 	BindAddress string `arg optional help:"The binding address to bind service-discoverd daemon"`
 }
@@ -118,14 +119,12 @@ func (n *nonInteractiveOutput) JsonRender() (string, error) {
 }
 
 func gatherInputs(d interactiveDependencies) (*setupConfiguration, error) {
-	scanner := bufio.NewScanner(d.Reader())
-	bindAddress, err := wizardBindAddressSelection(d, scanner)
+	bindAddress, err := wizardBindAddressSelection(d)
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Fprintf(d.Writer(), "Create the cluster credentials password (will be used for setups): ")
-	password := readUserInput(scanner) // FIXME avoid echoing password in tty
+	password := term.MustRead(d.Term().ReadPassword("Create the cluster credentials password (will be used for setups): "))
 
 	return &setupConfiguration{
 		Password:    password,
@@ -135,9 +134,16 @@ func gatherInputs(d interactiveDependencies) (*setupConfiguration, error) {
 
 // Run method runs the Setup command with the flags and settings passed by Kong.
 func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
-	d := realDependencies{}
+	ui, err := term.New(os.Stdin, os.Stdout, term.DefaultTermPrompt)
+	if err != nil {
+		return err
+	}
+	defer ui.Close()
+	d := realDependencies{
+		ui: &ui,
+	}
 
-	err := s.preRun(d)
+	err = s.preRun(d)
 	if err != nil {
 		return err
 	}
@@ -151,7 +157,7 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 			return err
 		}
 
-		s.FirstInstance, err = s.isFirstInstance(d)
+		s.firstInstance, err = s.isFirstInstance(d)
 		if err != nil {
 			return err
 		}
@@ -164,7 +170,7 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 	}
 
 	var out formatter.Formatter
-	if s.FirstInstance {
+	if s.firstInstance {
 		out, err = s.firstSetup(d)
 	} else {
 		out, err = s.importSetup(d)
@@ -218,11 +224,6 @@ func (s *Setup) preRun(d businessDependencies) error {
 	return nil
 }
 
-func readUserInput(scanner *bufio.Scanner) string {
-	scanner.Scan()
-	return scanner.Text()
-}
-
 func addrsToSingleString(addrs *[]net.Addr, sep string) string {
 	strAddrs := make([]string, len(*addrs))
 	for i, a := range *addrs {
@@ -273,14 +274,14 @@ func (s *Setup) enableServiceDiscoverd(d businessDependencies) error {
 	return nil
 }
 
-func wizardBindAddressSelection(d interactiveDependencies, scanner *bufio.Scanner) (string, error) {
+func wizardBindAddressSelection(d interactiveDependencies) (string, error) {
 	networks, err := setup.NonLoopbackInterfaces(d)
 	if err != nil {
 		return "", err
 	}
 
 	if len(networks) > 1 {
-		fmt.Fprintf(d.Writer(), "Multiple network cards detected:\n")
+		term.MustWrite(fmt.Fprintf(d.Term(), "Multiple network cards detected:\n"))
 	}
 
 	for _, n := range networks {
@@ -289,11 +290,11 @@ func wizardBindAddressSelection(d interactiveDependencies, scanner *bufio.Scanne
 			return "", err
 		}
 
-		fmt.Fprintf(d.Writer(), "%s %s\n", n.Name, addrsToSingleString(&addrs, ", "))
+		term.MustWrite(fmt.Fprintf(d.Term(), "%s %s\n", n.Name, addrsToSingleString(&addrs, ", ")))
 	}
 
-	fmt.Fprintf(d.Writer(), "Specify the binding address for service discovery: ")
-	bindingAddress := readUserInput(scanner)
+	term.MustWrite(fmt.Fprintf(d.Term(), "Specify the binding address for service discovery: "))
+	bindingAddress := term.MustRead(d.Term().ReadLine())
 	err = setup.CheckValidBindingAddress(d, networks, bindingAddress)
 	if err != nil {
 		return "", err

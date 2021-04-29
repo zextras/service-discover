@@ -8,15 +8,13 @@ import (
 	"bitbucket.org/zextras/service-discover/cli/lib/exec"
 	"bitbucket.org/zextras/service-discover/cli/lib/formatter"
 	"bitbucket.org/zextras/service-discover/cli/lib/systemd"
+	"bitbucket.org/zextras/service-discover/cli/lib/term"
 	"bitbucket.org/zextras/service-discover/cli/lib/zimbra"
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/coreos/go-systemd/v22/dbus"
 	"github.com/pkg/errors"
-	"golang.org/x/term"
-	"io"
 	"io/ioutil"
 	"net"
 	"os"
@@ -44,14 +42,12 @@ func New() Setup {
 }
 
 type interactiveDependencies interface {
-	Writer() io.Writer
-	Reader() io.Reader
+	Term() term.Terminal
 	NetInterfaces() ([]net.Interface, error)
 	AddrResolver(n net.Interface) ([]net.Addr, error)
 }
 
 type businessDependencies interface {
-	Writer() io.Writer
 	NetInterfaces() ([]net.Interface, error)
 	AddrResolver(n net.Interface) ([]net.Addr, error)
 	LdapHandler(zimbra.LocalConfig) zimbra.LdapHandler
@@ -61,19 +57,12 @@ type businessDependencies interface {
 	GetuidSyscall() int
 }
 
-type allDependencies interface {
-	interactiveDependencies
-	businessDependencies
+type realDependencies struct {
+	ui *term.Terminal
 }
 
-type realDependencies struct{}
-
-func (r realDependencies) Writer() io.Writer {
-	return os.Stdout
-}
-
-func (r realDependencies) Reader() io.Reader {
-	return os.Stdin
+func (r realDependencies) Term() term.Terminal {
+	return *r.ui
 }
 
 func (r realDependencies) NetInterfaces() ([]net.Interface, error) {
@@ -157,24 +146,7 @@ type Setup struct {
 	BindAddress string `arg optional help:"The binding address to bind service-discoverd daemon"`
 }
 
-func readPassword(d interactiveDependencies, prompt string) (string, error) {
-	// FIXME this works only because we make the term with fd 0 raw! This is only for trying things out, but this SHOULD
-	// NEVER END UP IN PRODUCTION AS IT IS. We need to think a solution in order to solve I/O with tty
-	oldState, err := term.MakeRaw(0) // FIXME
-	if err != nil {
-		return "", err
-	}
-	defer term.Restore(0, oldState) // FIXME
-	termIo := struct {
-		io.Reader
-		io.Writer
-	}{d.Reader(), d.Writer()}
-	terminal := term.NewTerminal(termIo, "")
-	return terminal.ReadPassword(prompt)
-}
-
 func gatherInputs(d interactiveDependencies) (*setupConfiguration, error) {
-	scanner := bufio.NewScanner(d.Reader())
 	networks, err := d.NetInterfaces()
 	if err != nil {
 		return nil, err
@@ -188,7 +160,7 @@ func gatherInputs(d interactiveDependencies) (*setupConfiguration, error) {
 	}
 
 	if len(networks) > 1 {
-		fmt.Fprintf(d.Writer(), "Multiple network cards detected:\n")
+		term.MustWrite(fmt.Fprint(d.Term(), "Multiple network cards detected:"+term.LineBreak))
 	}
 
 	for _, n := range networks {
@@ -197,30 +169,35 @@ func gatherInputs(d interactiveDependencies) (*setupConfiguration, error) {
 			return nil, err
 		}
 
-		fmt.Fprintf(d.Writer(), "%s %s\n", n.Name, setup.AddrsToSingleString(&addrs, ", "))
+		term.MustWrite(fmt.Fprintf(
+			d.Term(),
+			"%s %s%s",
+			n.Name,
+			setup.AddrsToSingleString(&addrs, ", "),
+			term.LineBreak,
+		))
 	}
 
-	fmt.Fprintf(d.Writer(), "Specify the binding address for service discovery: ")
-	bindingAddress := readUserInput(scanner)
+	term.MustWrite(fmt.Fprint(d.Term(), "Specify the binding address for service discovery: "))
+	bindingAddress := term.MustRead(d.Term().ReadLine())
 	err = setup.CheckValidBindingAddress(d, networks, bindingAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	pass, err := readPassword(d, "Insert the cluster credential password: ")
+	pass, err := d.Term().ReadPassword("Insert the cluster credential password: ")
 	if err != nil {
-		return nil, err
+		if ok := err.(*term.NotATerminalError); ok != nil {
+			pass = term.MustRead(d.Term().ReadLine())
+		} else {
+			return nil, err
+		}
 	}
 
 	return &setupConfiguration{
 		Password:    pass,
 		BindAddress: bindingAddress,
 	}, nil
-}
-
-func readUserInput(scanner *bufio.Scanner) string {
-	scanner.Scan()
-	return scanner.Text()
 }
 
 func (s *Setup) preRun(d businessDependencies) error {
@@ -247,9 +224,16 @@ func (s *Setup) preRun(d businessDependencies) error {
 }
 
 func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
-	d := realDependencies{}
+	ui, err := term.New(os.Stdin, os.Stdout, term.DefaultTermPrompt)
+	if err != nil {
+		return err
+	}
+	defer ui.Close()
+	d := realDependencies{
+		ui: &ui,
+	}
 
-	err := s.preRun(&d)
+	err = s.preRun(&d)
 	if err != nil {
 		return err
 	}
@@ -281,14 +265,14 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprint(d.Writer(), render)
+		term.MustWrite(d.Term().WriteString(render))
 	}
 	return nil
 }
 
 func (s *Setup) createTLSCertificate(d businessDependencies, caFile *os.File, caKeyFile *os.File) error {
 	certificateDaysFlag := fmt.Sprintf("-days=%d", certificateExpiration)
-	err := exec.ExecInPath(
+	err := exec.InPath(
 		// FIXME idea: what if we try to pass the caFile by pipe instead of passing a file?
 		// we save I/O and speed up the whole stuff 🤙
 		d.CreateCommand(setup.ConsulBin,
