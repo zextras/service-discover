@@ -29,7 +29,7 @@ func (s *Setup) firstSetup(d businessDependencies) (formatter.Formatter, error) 
 		return nil, err
 	}
 	err = s.performSetup(d, &setupConfiguration{
-		firstInstance: s.firstInstance,
+		FirstInstance: s.FirstInstance,
 		Password:      s.Password,
 		BindAddress:   s.BindAddress,
 	})
@@ -54,6 +54,10 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 	}
 	ldapHandler := d.LdapHandler(zimbraLocalConfig)
 	zimbraHostname, err := setup.RetrieveZimbraHostname(zimbraLocalConfig, ldapHandler)
+	if err != nil {
+		return err
+	}
+	err = setup.CheckHostnameAddress(d, zimbraHostname)
 	if err != nil {
 		return err
 	}

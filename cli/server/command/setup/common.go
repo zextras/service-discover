@@ -26,7 +26,7 @@ const (
 )
 
 type setupConfiguration struct {
-	firstInstance bool //TODO should be unused&removed in future
+	FirstInstance bool
 	Password      string
 	BindAddress   string
 }
@@ -53,11 +53,10 @@ type Setup struct {
 	ClusterCredential string `kong:"-"`
 	MutableConfigFile string `kong:"-"`
 
-	firstInstance bool `kong:"-"`
-
-	Wizard      bool   `help:"Initialize the setup in interactive mode. All the non interactive flags will be ignored if this is set"`
-	Password    string `help:"Set a custom password for the encrypted secret files. If none is set, a random one will be generated and printed"`
-	BindAddress string `arg optional help:"The binding address to bind service-discoverd daemon"`
+	Wizard        bool   `help:"Initialize the setup in interactive mode. All the non interactive flags will be ignored if this is set"`
+	Password      string `help:"Set a custom password for the encrypted secret files. If none is set, a random one will be generated and printed"`
+	BindAddress   string `arg optional help:"The binding address to bind service-discoverd daemon"`
+	FirstInstance bool   `optional default:"false" help:"Force the setup to behave as this was the first server setup"`
 }
 
 type autoEncrypt struct {
@@ -157,10 +156,6 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 			return err
 		}
 
-		s.firstInstance, err = s.isFirstInstance(d)
-		if err != nil {
-			return err
-		}
 		s.Password = inputs.Password
 		s.BindAddress = inputs.BindAddress
 	} else {
@@ -169,8 +164,16 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 		}
 	}
 
+	//if manually specified do not check it
+	if !s.FirstInstance {
+		s.FirstInstance, err = s.isFirstInstance(d)
+		if err != nil {
+			return err
+		}
+	}
+
 	var out formatter.Formatter
-	if s.firstInstance {
+	if s.FirstInstance {
 		out, err = s.firstSetup(d)
 	} else {
 		out, err = s.importSetup(d)

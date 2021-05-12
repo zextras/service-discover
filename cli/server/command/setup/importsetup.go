@@ -63,8 +63,13 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 	if err != nil {
 		return nil, errors.New("unable to read Zimbra local config")
 	}
+
 	ldapHandler := d.LdapHandler(zimbraLocalConfig)
 	zimbraHostname, err := setup.RetrieveZimbraHostname(zimbraLocalConfig, ldapHandler)
+	if err != nil {
+		return nil, err
+	}
+	err = setup.CheckHostnameAddress(d, zimbraHostname)
 	if err != nil {
 		return nil, err
 	}

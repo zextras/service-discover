@@ -208,7 +208,9 @@ func startConsul(d deps, isServer bool, servers []string, localServer string) *E
 
 
 	// HACK: consul doesn't notify readiness to systemd if the list of servers is empty
-	args = append(args, fmt.Sprintf("-retry-join=%s", localServer))
+	if isServer {
+		args = append(args, fmt.Sprintf("-retry-join=%s", localServer))
+	}
 
 	found := false
 	for _, server := range servers {

@@ -16,11 +16,13 @@ type interactiveDependencies interface {
 	Term() term.Terminal
 	NetInterfaces() ([]net.Interface, error)
 	AddrResolver(n net.Interface) ([]net.Addr, error)
+	LookupIP(s string) ([]net.IP, error)
 }
 
 type businessDependencies interface {
 	NetInterfaces() ([]net.Interface, error)
 	AddrResolver(n net.Interface) ([]net.Addr, error)
+	LookupIP(s string) ([]net.IP, error)
 	LdapHandler(zimbra.LocalConfig) zimbra.LdapHandler
 	LocalConfigLoader(path string) (zimbra.LocalConfig, error)
 	SystemdUnitHandler() (systemd.UnitManager, error)
@@ -50,6 +52,10 @@ func (r realDependencies) NetInterfaces() ([]net.Interface, error) {
 
 func (r realDependencies) AddrResolver(n net.Interface) ([]net.Addr, error) {
 	return n.Addrs()
+}
+
+func (r realDependencies) LookupIP(s string) ([]net.IP, error) {
+	return net.LookupIP(s)
 }
 
 func (r realDependencies) LdapHandler(config zimbra.LocalConfig) zimbra.LdapHandler {

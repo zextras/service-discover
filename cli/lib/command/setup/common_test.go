@@ -2,6 +2,7 @@ package setup
 
 import (
 	"bitbucket.org/zextras/service-discover/cli/lib/test"
+	"errors"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -35,6 +36,28 @@ func (m *mockedNetworkInterfaces) AddrResolver(n net.Interface) ([]net.Addr, err
 func (m *mockedNetworkInterfaces) NetInterfaces() ([]net.Interface, error) {
 	args := m.Called()
 	return args.Get(0).([]net.Interface), args.Error(1)
+}
+
+func (m *mockedNetworkInterfaces) LookupIP(s string) ([]net.IP, error) {
+	ret := m.Called(s)
+
+	var r0 []net.IP
+	if rf, ok := ret.Get(0).(func(string) []net.IP); ok {
+		r0 = rf(s)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]net.IP)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(s)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 func TestCheckValidBindingAddress(t *testing.T) {
@@ -144,6 +167,49 @@ func TestCheckValidBindingAddress(t *testing.T) {
 		)
 		assert.EqualError(t, err, "invalid binding address selected")
 	})
+
+	t.Run("Address resolution failure", func(t *testing.T) {
+		mockDependencies := new(mockedNetworkInterfaces)
+		mockDependencies.On("LookupIP", "address").Return([]net.IP{}, errors.New("random-failure"))
+		err := CheckHostnameAddress(
+			mockDependencies,
+			"address",
+		)
+		assert.EqualError(t, err, "cannot resolve hostname 'address': random-failure")
+	})
+
+	t.Run("Address does not resolve", func(t *testing.T) {
+		mockDependencies := new(mockedNetworkInterfaces)
+		mockDependencies.On("LookupIP", "address").Return([]net.IP{}, nil)
+		err := CheckHostnameAddress(
+			mockDependencies,
+			"address",
+		)
+		assert.EqualError(t, err, "cannot resolve hostname 'address'")
+	})
+
+	t.Run("Address resolve with localhost", func(t *testing.T) {
+		mockDependencies := new(mockedNetworkInterfaces)
+		mockDependencies.On("LookupIP", "address").Return(
+			[]net.IP{net.IPv4(127,0,0,1)},
+			nil,
+		)
+		err := CheckHostnameAddress(
+			mockDependencies,
+			"address",
+		)
+		assert.EqualError(t, err, "hostname 'address' is resolving with loopback address, should resolve with LAN address")
+	})
+
+	t.Run("Address resolve with LAN", func(t *testing.T) {
+		mockDependencies := new(mockedNetworkInterfaces)
+		mockDependencies.On("LookupIP", "address").Return([]net.IP{net.IPv4(1,1,1,1)},nil)
+		err := CheckHostnameAddress(
+			mockDependencies,
+			"address",
+		)
+		assert.NoError(t, err)
+	})
 }
 
 func TestSetup_openClusterCredential(t *testing.T) {
@@ -179,6 +245,18 @@ func TestSaveBindAddressConfiguration(t *testing.T) {
 		defer os.Remove(actualResult.Name())
 
 		assert.NoError(t, SaveBindAddressConfiguration(actualResult.Name(), "127.0.0.1"))
+		actualResultContent, err := ioutil.ReadFile(actualResult.Name())
+		assert.NoError(t, err)
+		assert.Equal(t, `{
+  "bind_addr": "127.0.0.1"
+}`, string(actualResultContent))
+	})
+
+	t.Run("Doesn't write network mask", func(t *testing.T) {
+		actualResult := test.GenerateRandomFile("Should check that the file is correctly written")
+		defer os.Remove(actualResult.Name())
+
+		assert.NoError(t, SaveBindAddressConfiguration(actualResult.Name(), "127.0.0.1/24"))
 		actualResultContent, err := ioutil.ReadFile(actualResult.Name())
 		assert.NoError(t, err)
 		assert.Equal(t, `{

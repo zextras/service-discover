@@ -41,7 +41,7 @@ const (
    },
    "service_prefix":{
       "":{
-         "policy":"read"
+         "policy":"write"
       }
    }
 }`
@@ -52,6 +52,7 @@ const (
 type NetworkInterfaces interface {
 	NetInterfaces() ([]net.Interface, error)
 	AddrResolver(n net.Interface) ([]net.Addr, error)
+	LookupIP(s string) ([]net.IP, error)
 }
 
 type ACLPolicies struct {
@@ -149,6 +150,9 @@ func AddServiceInLDAP(ldap zimbra.LdapHandler, zimbraHostname string) error {
 
 // SaveBindAddressConfiguration adds the bindAddress to the Consul configuration file
 func SaveBindAddressConfiguration(mutableConfig string, bindAddress string) error {
+	if strings.Contains(bindAddress, "/") {
+		bindAddress = strings.Split(bindAddress,"/")[0]
+	}
 	mutableConsulConfig := command.MutableConsulConfig{BindAddress: bindAddress}
 	bs, err := json.MarshalIndent(mutableConsulConfig, "", "  ")
 	if err != nil {
@@ -227,12 +231,28 @@ func SetACLToken(commandCreator func(name string, args ...string) exec.Cmd, toke
 	setupAclCmd := commandCreator(ConsulBin,
 		"acl",
 		"set-agent-token",
-		"agent",
+		"default",
 		token,
 	)
 	if _, err := setupAclCmd.Output(); err != nil {
 		return exec.ErrorFromStderr(err, "unable to set agent token")
 	}
 
+	return nil
+}
+
+func CheckHostnameAddress(d NetworkInterfaces, hostname string) error {
+	addrs, err := d.LookupIP(hostname)
+	if err != nil {
+		return errors.WithMessagef(err,"cannot resolve hostname '%s'", hostname)
+	}
+	if len(addrs) == 0 {
+		return errors.Errorf("cannot resolve hostname '%s'", hostname)
+	}
+	for _, addr := range addrs {
+		if addr.IsLoopback(){
+			return errors.New(fmt.Sprintf("hostname '%s' is resolving with loopback address, should resolve with LAN address", hostname))
+		}
+	}
 	return nil
 }

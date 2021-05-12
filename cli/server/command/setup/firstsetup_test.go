@@ -229,7 +229,7 @@ func mockBusinessDependencies(
    },
    "service_prefix":{
       "":{
-         "policy":"read"
+         "policy":"write"
       }
    }
 }`).
@@ -248,7 +248,7 @@ func mockBusinessDependencies(
 			"/usr/bin/consul",
 			"acl",
 			"set-agent-token",
-			"agent",
+			"default",
 			"secret-token-2",
 		).Return(setTokenCmd).
 		On(
@@ -355,7 +355,7 @@ func createSetup(t *testing.T) (Setup, func()) {
 		MutableConfigFile: tmpDir + "/config/mutable.json",
 
 		Wizard:        true,
-		firstInstance: true,
+		FirstInstance: true,
 		Password:      "password",
 		BindAddress:   "10.0.0.1",
 	}
@@ -416,8 +416,8 @@ func TestFirstSetup_inputs(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, configurations)
 
-		// This will always be false since gatherInputs doesn't take provide firstInstance anymore
-		assert.Equal(t, false, configurations.firstInstance)
+		// This will always be false since gatherInputs doesn't take provide FirstInstance anymore
+		assert.Equal(t, false, configurations.FirstInstance)
 		assert.Equal(t, "10.0.0.1", configurations.BindAddress)
 		assert.Equal(t, "password", configurations.Password)
 		allOut, _ := io.ReadAll(out)
@@ -446,8 +446,8 @@ Specify the binding address for service discovery: `, string(allOut))
 		assert.NoError(t, err)
 		assert.NotNil(t, configurations)
 
-		// This will always be false since gatherInputs doesn't take provide firstInstance anymore
-		assert.Equal(t, false, configurations.firstInstance)
+		// This will always be false since gatherInputs doesn't take provide FirstInstance anymore
+		assert.Equal(t, false, configurations.FirstInstance)
 		assert.Equal(t, "10.0.0.1", configurations.BindAddress)
 		assert.Equal(t, "password", configurations.Password)
 		allOut, _ := io.ReadAll(out)
@@ -501,8 +501,8 @@ Specify the binding address for service discovery: `, string(allOut))
 		assert.NoError(t, err)
 		assert.NotNil(t, configurations)
 
-		// This will always be false since gatherInputs doesn't take provide firstInstance anymore
-		assert.Equal(t, false, configurations.firstInstance)
+		// This will always be false since gatherInputs doesn't take provide FirstInstance anymore
+		assert.Equal(t, false, configurations.FirstInstance)
 		assert.Equal(t, "10.0.0.1", configurations.BindAddress)
 		assert.Equal(t, "password", configurations.Password)
 		allOut, _ := io.ReadAll(out)
@@ -609,6 +609,8 @@ func mockNetwork(network mocked, withoutLocalHost bool, includeSubnet bool) {
 			nil,
 		)
 	}
+
+	network.On("LookupIP", "mailbox-1.example.com").Return([]net.IP{net.IPv4(1,1,1,1)},nil)
 }
 
 func TestSetup_createEncryptedSecret(t *testing.T) {

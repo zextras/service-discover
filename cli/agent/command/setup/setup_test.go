@@ -290,6 +290,7 @@ func TestSetup_setup(t *testing.T) {
 		assert.NoError(t, aclTemplate.Execute(&aclRenderOut, aclTemplateData))
 		aclRenderBs, err := ioutil.ReadAll(&aclRenderOut)
 		assert.NoError(t, err)
+		mockDep.On("LookupIP", "mailbox-1.example.com").Return([]net.IP{net.IPv4(1,1,1,1)},nil)
 		mockDep.On("CreateCommand",
 			"/usr/bin/consul",
 			"tls",
@@ -329,7 +330,7 @@ func TestSetup_setup(t *testing.T) {
 				"/usr/bin/consul",
 				"acl",
 				"set-agent-token",
-				"agent",
+				"default",
 				"secret-token-2",
 			).Return(setTokenCmd).
 			On("NetInterfaces").Return([]net.Interface{
@@ -429,6 +430,7 @@ func TestSetup_setup(t *testing.T) {
 		assert.NoError(t, aclTemplate.Execute(&aclRenderOut, aclTemplateData))
 		aclRenderBs, err := ioutil.ReadAll(&aclRenderOut)
 		assert.NoError(t, err)
+		mockDep.On("LookupIP", "mailbox-1.example.com").Return([]net.IP{net.IPv4(1,1,1,1)},nil)
 		mockDep.On("CreateCommand",
 			"/usr/bin/consul",
 			"tls",
@@ -468,7 +470,7 @@ func TestSetup_setup(t *testing.T) {
 				"/usr/bin/consul",
 				"acl",
 				"set-agent-token",
-				"agent",
+				"default",
 				"secret-token-2",
 			).Return(setTokenCmd).
 			On("NetInterfaces").Return([]net.Interface{

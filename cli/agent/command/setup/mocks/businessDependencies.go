@@ -44,6 +44,29 @@ func (_m *BusinessDependencies) AddrResolver(n net.Interface) ([]net.Addr, error
 	return r0, r1
 }
 
+// LookupIP provides a mock function with given fields: s
+func (_m *BusinessDependencies) LookupIP(s string) ([]net.IP, error) {
+	ret := _m.Called(s)
+
+	var r0 []net.IP
+	if rf, ok := ret.Get(0).(func(string) []net.IP); ok {
+		r0 = rf(s)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]net.IP)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(s)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // CreateCommand provides a mock function with given fields: name, args
 func (_m *BusinessDependencies) CreateCommand(name string, args ...string) exec.Cmd {
 	_va := make([]interface{}, len(args))

@@ -263,7 +263,9 @@ func TestSetup_importSetup(t *testing.T) {
 			&addrStub{ip: "127.0.0.1"},
 			// We don't need any particular data here, just return something it is not the
 			// bind address
-		}, nil)
+		}, nil).On("LookupIP", "mailbox-1.example.com").Return([]net.IP{net.IPv4(1,1,1,1)},nil)
+
+
 		s := &Setup{
 			ConsulConfigDir:   setupFiles.consulConfigDir,
 			ConsulHome:        setupFiles.consulHome,
