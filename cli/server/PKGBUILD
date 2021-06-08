@@ -27,21 +27,16 @@ depends=(
 conflicts=(
   "service-discover-agent"
 )
-sources=(
-  "/repo/"
-)
-hashsums=(
-  "SKIP"
-)
 
 build() {
-  cd "cli/server"
-  go build .
+  cd "${srcdir}"
+  go build ..
 }
 
 package() {
-  install -Dm 755 cli/server/server "${pkgdir}/usr/bin/service-discover"
-  install -Dm 644 cli/server/service-discover.service "${pkgdir}/lib/systemd/system/service-discover.service"
+  cd "${srcdir}"
+  install -Dm 755 server "${pkgdir}/usr/bin/service-discover"
+  install -Dm 644 ../service-discover.service "${pkgdir}/lib/systemd/system/service-discover.service"
 }
 
 postinst:ubuntu() {

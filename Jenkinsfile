@@ -69,30 +69,8 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu bionic m
                     }
                     steps {
                         unstash 'project'
-                        sh 'sudo mkdir /repo/'
-                        sh 'sudo mv * /repo/'
-
-                        sh 'cp /repo/cli/server/PKGBUILD /pacur/'
+                        sh 'sudo cp -r * /tmp'
                         sh 'sudo pacur build ubuntu'
-                        sh 'sudo rm -rf /pacur_build/'
-
-                        sh 'cp /repo/cli/agent/PKGBUILD /pacur/'
-                        sh 'sudo pacur build ubuntu'
-                        sh 'sudo rm -rf /pacur_build/'
-
-                        sh 'cp /repo/service-discoverd/PKGBUILD /pacur/'
-                        sh 'sudo pacur build ubuntu'
-                        sh 'sudo rm -rf /pacur_build/'
-
-                        sh 'mkdir artifacts/'
-                        sh 'sudo cp /pacur/service-discover-server*.deb artifacts/'
-                        sh 'sudo cp /pacur/service-discover-agent*.deb artifacts/'
-                        sh 'sudo cp /pacur/service-discover-daemon*.deb artifacts/'
-                        dir("artifacts/") {
-                            sh 'echo service-discover-server* | sed -E "s#(service-discover-server_[0-9.]*).*#\\0 \\1_amd64.deb#" | xargs mv'
-                            sh 'echo service-discover-agent* | sed -E "s#(service-discover-agent_[0-9.]*).*#\\0 \\1_amd64.deb#" | xargs mv'
-                            sh 'echo service-discover-daemon* | sed -E "s#(service-discover-daemon_[0-9.]*).*#\\0 \\1_amd64.deb#" | xargs mv'
-                        }
                         stash includes: 'artifacts/', name: 'artifacts-deb'
                     }
                     post {
@@ -110,26 +88,12 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu bionic m
                     }
                     steps {
                         unstash 'project'
-                        sh 'sudo mkdir /repo/'
-                        sh 'sudo mv * /repo/'
-
-                        sh 'cp /repo/cli/server/PKGBUILD /pacur/'
+                        sh 'sudo cp -r * /tmp'
                         sh 'sudo pacur build centos'
-
-                        sh 'cp /repo/cli/agent/PKGBUILD /pacur/'
-                        sh 'sudo pacur build centos'
-
-                        sh 'cp /repo/service-discoverd/PKGBUILD /pacur/'
-                        sh 'sudo pacur build centos'
-
-                        sh 'mkdir artifacts/'
-                        sh 'sudo cp /pacur/service-discover-server*.rpm artifacts/'
-                        sh 'sudo cp /pacur/service-discover-agent*.rpm artifacts/'
-                        sh 'sudo cp /pacur/service-discover-daemon*.rpm artifacts/'
                         dir("artifacts/") {
-                            sh 'echo service-discover-server* | sed -E "s#(service-discover-server-[0-9.]*).*#\\0 \\1.x86_64.rpm#" | xargs mv'
-                            sh 'echo service-discover-agent* | sed -E "s#(service-discover-agent-[0-9.]*).*#\\0 \\1.x86_64.rpm#" | xargs mv'
-                            sh 'echo service-discover-daemon* | sed -E "s#(service-discover-daemon-[0-9.]*).*#\\0 \\1.x86_64.rpm#" | xargs mv'
+                            sh 'echo service-discover-server* | sed -E "s#(service-discover-server-[0-9.]*).*#\\0 \\1.x86_64.rpm#" | xargs sudo mv'
+                            sh 'echo service-discover-agent* | sed -E "s#(service-discover-agent-[0-9.]*).*#\\0 \\1.x86_64.rpm#" | xargs sudo mv'
+                            sh 'echo service-discover-daemon* | sed -E "s#(service-discover-daemon-[0-9.]*).*#\\0 \\1.x86_64.rpm#" | xargs sudo mv'
                         }
                         stash includes: 'artifacts/', name: 'artifacts-rpm'
                     }

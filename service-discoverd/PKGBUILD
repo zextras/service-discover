@@ -19,12 +19,6 @@ conflicts=("consul")
 depends=(
   "service-discover-base"
 )
-sources=(
-  "/repo/"
-)
-hashsums=(
-  "SKIP"
-)
 
 postinst:ubuntu() {
     adduser --system --group --home '/var/lib/service-discover/' 'service-discover'
@@ -57,10 +51,11 @@ postrm:centos() {
 }
 
 build() {
-  cd "service-discoverd/"
-  go build .
+  cd "${srcdir}"
+  go build ..
 }
 
 package() {
-  install -Dm 755 service-discoverd/service-discoverd "${pkgdir}/usr/bin/service-discoverd"
+  cd "${srcdir}"
+  install -Dm 755 service-discoverd "${pkgdir}/usr/bin/service-discoverd"
 }
