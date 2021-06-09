@@ -32,10 +32,10 @@ type ldapContext struct {
 }
 
 type ldapCredentials struct {
-	MasterUrl  string
-	ReplicaUrl string
-	Username   string
-	Password   string
+	MasterUrls  []string
+	ReplicaUrls []string
+	Username    string
+	Password    string
 }
 
 //CreateNewHandler Returns a new context to execute ldap queries
@@ -99,8 +99,8 @@ func (context *ldapContext) QueryAllServersWithService(service string) ([]string
 
 func readLdapCredentials(localConfig LocalConfig) ldapCredentials {
 	return ldapCredentials{
-		localConfig.Value(LocalConfigLdapMasterUrl),
-		localConfig.Value(LocalConfigLdapUrl),
+		localConfig.Values(LocalConfigLdapMasterUrl),
+		localConfig.Values(LocalConfigLdapUrl),
 		localConfig.Value(LocalConfigLdapUserDn),
 		localConfig.Value(LocalConfigLdapPassword),
 	}
@@ -110,16 +110,29 @@ func connect(context *ldapContext, writeAccess bool) (ldapConnInterface, error) 
 	var connection ldapConnInterface
 	var err error
 
-	connection, err = context.Connect(context.Credentials.MasterUrl)
-	if err != nil {
-		if writeAccess {
-			//to write we need master
-			return nil, err
+	var urls []string
+	if writeAccess {
+		//to write we need master
+		urls = context.Credentials.MasterUrls
+	} else {
+		//we want to query masters before replicas
+		//to get a more consistent view
+		urls = append(context.Credentials.MasterUrls, context.Credentials.ReplicaUrls...)
+	}
+
+	var lastErr error
+	for _, url := range urls {
+		connection, err = context.Connect(url)
+		if err == nil {
+			break
+		}
+		lastErr = err
+	}
+	if connection == nil {
+		if lastErr == nil {
+			return nil, errors.New("no ldap defined in localconfig")
 		} else {
-			connection, err = context.Connect(context.Credentials.ReplicaUrl)
-			if err != nil {
-				return nil, err
-			}
+			return nil, lastErr
 		}
 	}
 

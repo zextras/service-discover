@@ -39,7 +39,7 @@ func TestLoadLocalConfig(t *testing.T) {
 				},
 				"ldap_master_url": {
 					Text:  "",
-					Value: "ldap://mail.example.com:389",
+					Value: "ldap://mail.example.com:389 ldap://mail2.example.com:389",
 				},
 				"ssl_allow_mismatched_certs": {
 					Text:  "",
@@ -123,7 +123,7 @@ func TestLoadLocalConfig(t *testing.T) {
 				},
 				"ldap_url": {
 					Text:  "",
-					Value: "ldap://mail.example.com:389",
+					Value: "ldap://mail.example.com:389 ldap://mail2.example.com:389",
 				},
 				"antispam_mysql_host": {
 					Text:  "",
@@ -272,7 +272,7 @@ func generateAndPopulateCorrectLocalConfig(testName string) *os.File {
     <value>password</value>
   </key>
   <key name="ldap_master_url">
-    <value>ldap://mail.example.com:389</value>
+    <value>ldap://mail.example.com:389 ldap://mail2.example.com:389</value>
   </key>
   <key name="ssl_allow_mismatched_certs">
     <value>true</value>
@@ -335,7 +335,7 @@ func generateAndPopulateCorrectLocalConfig(testName string) *os.File {
     <value>true</value>
   </key>
   <key name="ldap_url">
-    <value>ldap://mail.example.com:389</value>
+	<value>ldap://mail.example.com:389 ldap://mail2.example.com:389</value>
   </key>
   <key name="antispam_mysql_host">
     <value>127.0.0.1</value>

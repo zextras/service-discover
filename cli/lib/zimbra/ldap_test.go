@@ -38,10 +38,10 @@ func Test_connect(t *testing.T) {
 		got, err := connect(
 			&ldapContext{
 				Credentials: ldapCredentials{
-					MasterUrl:  "ldap://example.com:123",
-					ReplicaUrl: "never use me",
-					Username:   "username",
-					Password:   "password",
+					MasterUrls:  []string{ "ldap://example.com:123" },
+					ReplicaUrls: []string{ "never use me" },
+					Username:    "username",
+					Password:    "password",
 				},
 				Connect: func(url string) (ldapConnInterface, error) {
 					if url == "ldap://example.com:123" {
@@ -63,10 +63,10 @@ func TestEnableDisableService(t *testing.T) {
 	t.Run("replica is not used for writes", func(t *testing.T) {
 		handler := ldapContext{
 			Credentials: ldapCredentials{
-				MasterUrl:  "ldap://example.com:123",
-				ReplicaUrl: "never use me",
-				Username:   "username",
-				Password:   "password",
+				MasterUrls:  []string{ "ldap://example.com:123" },
+				ReplicaUrls: []string{ "never use me" },
+				Username:    "username",
+				Password:    "password",
 			},
 			Connect: func(url string) (ldapConnInterface, error) {
 				if url == "ldap://example.com:123" {
@@ -121,10 +121,10 @@ func TestEnableDisableService(t *testing.T) {
 
 		handler := ldapContext{
 			Credentials: ldapCredentials{
-				MasterUrl:  "ldap://example.com:123",
-				ReplicaUrl: "never use me",
-				Username:   "username",
-				Password:   "password",
+				MasterUrls:  []string{ "ldap://example.com:123" },
+				ReplicaUrls: []string{ "never use me" },
+				Username:    "username",
+				Password:    "password",
 			},
 			Connect: func(url string) (ldapConnInterface, error) {
 				if url == "ldap://example.com:123" {
@@ -179,10 +179,10 @@ func TestEnableDisableService(t *testing.T) {
 
 		handler := ldapContext{
 			Credentials: ldapCredentials{
-				MasterUrl:  "ldap://example.com:123",
-				ReplicaUrl: "never use me",
-				Username:   "username",
-				Password:   "password",
+				MasterUrls:  []string{ "ldap://example.com:123" },
+				ReplicaUrls: []string{ "never use me" },
+				Username:    "username",
+				Password:    "password",
 			},
 			Connect: func(url string) (ldapConnInterface, error) {
 				if url == "ldap://example.com:123" {
@@ -240,10 +240,10 @@ func TestQueryAllServiceDiscoverServers(t *testing.T) {
 
 		handler := ldapContext{
 			Credentials: ldapCredentials{
-				MasterUrl:  "ldap://example.com:123",
-				ReplicaUrl: "never use me",
-				Username:   "username",
-				Password:   "password",
+				MasterUrls:  []string{ "ldap://example.com:123" },
+				ReplicaUrls: []string{ "never use me" },
+				Username:    "username",
+				Password:    "password",
 			},
 			Connect: func(url string) (ldapConnInterface, error) {
 				if url == "ldap://example.com:123" {
@@ -265,10 +265,10 @@ func TestQueryAllServiceDiscoverServers(t *testing.T) {
 	t.Run("both master and replica fails", func(t *testing.T) {
 		handler := ldapContext{
 			Credentials: ldapCredentials{
-				MasterUrl:  "ldap://example.com:123",
-				ReplicaUrl: "never use me",
-				Username:   "username",
-				Password:   "password",
+				MasterUrls:  []string{ "ldap://example.com:123" },
+				ReplicaUrls: []string{ "never use me" },
+				Username:    "username",
+				Password:    "password",
 			},
 			Connect: func(url string) (ldapConnInterface, error) {
 				if url == "ldap://example.com:123" {

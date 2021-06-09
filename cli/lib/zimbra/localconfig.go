@@ -52,6 +52,7 @@ func loadLocalConfig(path string) (*rawLocalConfig, error) {
 // for the desired key.
 type LocalConfig interface {
 	Value(key string) string
+	Values(url string) []string
 	Text(key string) string
 }
 
@@ -82,6 +83,15 @@ func LoadLocalConfig(path string) (LocalConfig, error) {
 // Value perform a value lookup in the Zimbra local configuration
 func (l *indexedLocalConfig) Value(key string) string {
 	return l.localConfigIndex[key].Value
+}
+// Value perform a value lookup in the Zimbra local configuration
+// and extracts one or multiple values, split by a space ' '
+func (l *indexedLocalConfig) Values(key string) []string {
+	values := strings.Split(
+		strings.Trim(l.localConfigIndex[key].Value, " "),
+		" ",
+	)
+	return values
 }
 
 // Text represents an additional description for that key
