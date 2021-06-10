@@ -15,7 +15,8 @@ import (
 type CLI struct {
 	internalCommand.ServerFlags
 
-	Setup setup.Setup `cmd help:"Perform first time setup of the server installation"`
+	Setup       setup.Setup  `cmd help:"Perform first time setup of the server installation"`
+	WizardSetup setup.Wizard `cmd help:"Perform first time setup of the server installation in an interactive way" name:"setup-wizard"`
 
 	Config  command.Config  `cmd help:"Manage service-discover configuration"`
 	Version command.Version `cmd help:"Show the version of this CLI and of the agent running in the host"`
@@ -27,8 +28,10 @@ func main() {
 		config.ApplicationName,
 		config.ApplicationVersion,
 	)
+	s := setup.NewSetup()
 	cli := &CLI{
-		Setup: setup.New(),
+		Setup: s,
+		WizardSetup: setup.NewWizardSetup(&s),
 		Config: cmd.Config(
 			os.Stdout,
 			config.AgentName,

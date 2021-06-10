@@ -86,7 +86,6 @@ type mocked interface {
 	On(methodName string, arguments ...interface{}) *mock.Call
 }
 
-//	TODO		name: "First setup without rootUid",
 func TestFirstSetup_business(t *testing.T) {
 	t.Run("Complete all setup tasks", func(t *testing.T) {
 		var cleanups = make([]func(), 0)
@@ -354,7 +353,6 @@ func createSetup(t *testing.T) (Setup, func()) {
 		ClusterCredential: tmpDir + "/config/credentials.tar.pgp",
 		MutableConfigFile: tmpDir + "/config/mutable.json",
 
-		Wizard:        true,
 		FirstInstance: true,
 		Password:      "password",
 		BindAddress:   "10.0.0.1",
@@ -610,7 +608,7 @@ func mockNetwork(network mocked, withoutLocalHost bool, includeSubnet bool) {
 		)
 	}
 
-	network.On("LookupIP", "mailbox-1.example.com").Return([]net.IP{net.IPv4(1,1,1,1)},nil)
+	network.On("LookupIP", "mailbox-1.example.com").Return([]net.IP{net.IPv4(1, 1, 1, 1)}, nil)
 }
 
 func TestSetup_createEncryptedSecret(t *testing.T) {

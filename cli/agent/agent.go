@@ -15,8 +15,9 @@ import (
 type CLI struct {
 	internalCommand.AgentFlags
 
-	Setup setup.Setup `cmd help:"Run first time setup for an agent node"`
-	Config  command.Config  `cmd help:"Manage service-discover configuration"`
+	Setup setup.Setup        `cmd help:"Run first time setup for an agent node"`
+	SetupWizard setup.Wizard `cmd help:"Run first time setup for an agent node in an interactive way" name:"setup-wizard"`
+	Config  command.Config   `cmd help:"Manage service-discover configuration"`
 
 	Version command.Version `cmd help:"Show the version of this CLI and of the agent running in the host"`
 	Help    command.Help    `cmd help:"Print the program help"`
@@ -27,8 +28,10 @@ func main() {
 		config.ApplicationName,
 		config.ApplicationVersion,
 	)
+	s := setup.New()
 	cli := &CLI{
-		Setup: setup.New(),
+		Setup: s,
+		SetupWizard: setup.NewWizardSetup(&s),
 		Config: cmd.Config(
 			os.Stdout,
 			config.AgentName,

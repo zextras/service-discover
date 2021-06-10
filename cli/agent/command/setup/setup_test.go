@@ -44,9 +44,8 @@ func TestSetup_preRun(t *testing.T) {
 		missingConsul.On("Run").Return(errors.New(expectedErrorOutput))
 		mockedDep := new(mocks.BusinessDependencies)
 		mockedDep.On("CreateCommand", setup.ConsulBin, "version").Return(missingConsul)
-		s := &Setup{}
 		assert.EqualError(t,
-			s.preRun(mockedDep),
+			preRun("", mockedDep),
 			fmt.Sprintf("unable to execute consul binary: %s", expectedErrorOutput),
 		)
 	})
@@ -60,9 +59,8 @@ func TestSetup_preRun(t *testing.T) {
 			Return(missingConsul).
 			On("GetuidSyscall").
 			Return(42)
-		s := &Setup{}
 		assert.EqualError(t,
-			s.preRun(mockedDep),
+			preRun("", mockedDep),
 			"this command must be executed as root",
 		)
 	})
@@ -77,11 +75,8 @@ func TestSetup_preRun(t *testing.T) {
 			Return(missingConsul).
 			On("GetuidSyscall").
 			Return(0)
-		s := &Setup{
-			ClusterCredential: clusterCredentialPath,
-		}
 		assert.EqualError(t,
-			s.preRun(mockedDep),
+			preRun(clusterCredentialPath, mockedDep),
 			fmt.Sprintf(
 				"cannot find Cluster credential in %s, please copy the file from the existing server",
 				clusterCredentialPath,
@@ -100,10 +95,7 @@ func TestSetup_preRun(t *testing.T) {
 			Return(missingConsul).
 			On("GetuidSyscall").
 			Return(0)
-		s := &Setup{
-			ClusterCredential: clusterCredential.Name(),
-		}
-		assert.NoError(t, s.preRun(mockedDep))
+		assert.NoError(t, preRun(clusterCredential.Name(), mockedDep))
 	})
 }
 
@@ -290,7 +282,7 @@ func TestSetup_setup(t *testing.T) {
 		assert.NoError(t, aclTemplate.Execute(&aclRenderOut, aclTemplateData))
 		aclRenderBs, err := ioutil.ReadAll(&aclRenderOut)
 		assert.NoError(t, err)
-		mockDep.On("LookupIP", "mailbox-1.example.com").Return([]net.IP{net.IPv4(1,1,1,1)},nil)
+		mockDep.On("LookupIP", "mailbox-1.example.com").Return([]net.IP{net.IPv4(1, 1, 1, 1)}, nil)
 		mockDep.On("CreateCommand",
 			"/usr/bin/consul",
 			"tls",
@@ -430,7 +422,7 @@ func TestSetup_setup(t *testing.T) {
 		assert.NoError(t, aclTemplate.Execute(&aclRenderOut, aclTemplateData))
 		aclRenderBs, err := ioutil.ReadAll(&aclRenderOut)
 		assert.NoError(t, err)
-		mockDep.On("LookupIP", "mailbox-1.example.com").Return([]net.IP{net.IPv4(1,1,1,1)},nil)
+		mockDep.On("LookupIP", "mailbox-1.example.com").Return([]net.IP{net.IPv4(1, 1, 1, 1)}, nil)
 		mockDep.On("CreateCommand",
 			"/usr/bin/consul",
 			"tls",

@@ -206,7 +206,7 @@ func gatherInputs(d interactiveDependencies) (*setupConfiguration, error) {
 	}, nil
 }
 
-func (s *Setup) preRun(d businessDependencies) error {
+func preRun(clusterCredentialPath string, d businessDependencies) error {
 	// We need to check that the executable is in $PATH
 	cmd := d.CreateCommand(setup.ConsulBin, "version")
 	err := cmd.Run()
@@ -218,7 +218,7 @@ func (s *Setup) preRun(d businessDependencies) error {
 		return errors.New("this command must be executed as root")
 	}
 
-	clusterCredentialFile, err := setup.OpenClusterCredential(s.ClusterCredential)
+	clusterCredentialFile, err := setup.OpenClusterCredential(clusterCredentialPath)
 	if err != nil {
 		return err
 	}
@@ -239,26 +239,13 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 		ui: &ui,
 	}
 
-	err = s.preRun(&d)
+	err = preRun(s.ClusterCredential, &d)
 	if err != nil {
 		return err
 	}
 
-	if s.Wizard {
-		if commonFlags.Format != formatter.PlainFormatOutput {
-			return errors.New("only plain formatting is supported when in wizard mode")
-		}
-		inputs, err := gatherInputs(d)
-		if err != nil {
-			return err
-		}
-
-		s.Password = inputs.Password
-		s.BindAddress = inputs.BindAddress
-	} else {
-		if s.Password == "" && s.BindAddress == "" {
-			return errors.New("missing arguments")
-		}
+	if s.Password == "" && s.BindAddress == "" {
+		return errors.New("missing arguments")
 	}
 
 	out, err := s.setup(&d)

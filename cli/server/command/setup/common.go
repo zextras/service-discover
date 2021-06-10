@@ -31,7 +31,7 @@ type setupConfiguration struct {
 	BindAddress   string
 }
 
-func New() Setup {
+func NewSetup() Setup {
 	return Setup{
 		ConsulConfigDir:   config.ConsulHome,
 		ConsulHome:        config.ConsulHome,
@@ -53,7 +53,6 @@ type Setup struct {
 	ClusterCredential string `kong:"-"`
 	MutableConfigFile string `kong:"-"`
 
-	Wizard        bool   `help:"Initialize the setup in interactive mode. All the non interactive flags will be ignored if this is set"`
 	Password      string `help:"Set a custom password for the encrypted secret files. If none is set, a random one will be generated and printed"`
 	BindAddress   string `arg optional help:"The binding address to bind service-discoverd daemon"`
 	FirstInstance bool   `optional default:"false" help:"Force the setup to behave as this was the first server setup"`
@@ -142,26 +141,13 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 		ui: &ui,
 	}
 
-	err = s.preRun(d)
+	err = preRun(d)
 	if err != nil {
 		return err
 	}
 
-	if s.Wizard {
-		if commonFlags.Format != formatter.PlainFormatOutput {
-			return errors.New("only plain formatting is supported when in wizard mode")
-		}
-		inputs, err := gatherInputs(d)
-		if err != nil {
-			return err
-		}
-
-		s.Password = inputs.Password
-		s.BindAddress = inputs.BindAddress
-	} else {
-		if s.Password == "" && s.BindAddress == "" {
-			return errors.New("missing arguments")
-		}
+	if s.Password == "" && s.BindAddress == "" {
+		return errors.New("missing arguments")
 	}
 
 	//if manually specified do not check it
@@ -182,13 +168,11 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 		return err
 	}
 
-	if !s.Wizard {
-		render, err := formatter.Render(out, commonFlags.Format)
-		if err != nil {
-			return err
-		}
-		fmt.Fprint(d.Writer(), render)
+	render, err := formatter.Render(out, commonFlags.Format)
+	if err != nil {
+		return err
 	}
+	fmt.Fprint(d.Writer(), render)
 	return nil
 }
 
@@ -210,7 +194,7 @@ func (s *Setup) isFirstInstance(d businessDependencies) (bool, error) {
 	}
 }
 
-func (s *Setup) preRun(d businessDependencies) error {
+func preRun(d businessDependencies) error {
 	// We need to check that the executable is in $PATH
 	cmd := d.CreateCommand(consulBin, "version")
 	err := cmd.Run()
