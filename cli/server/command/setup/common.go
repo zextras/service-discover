@@ -2,7 +2,6 @@ package setup
 
 import (
 	"bitbucket.org/zextras/service-discover/cli/lib/command"
-	"bitbucket.org/zextras/service-discover/cli/lib/command/setup"
 	"bitbucket.org/zextras/service-discover/cli/lib/formatter"
 	"bitbucket.org/zextras/service-discover/cli/lib/systemd"
 	"bitbucket.org/zextras/service-discover/cli/lib/term"
@@ -177,7 +176,7 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 }
 
 func (s *Setup) isFirstInstance(d businessDependencies) (bool, error) {
-	_, err := setup.OpenClusterCredential(s.ClusterCredential)
+	_, err := command.OpenClusterCredential(s.ClusterCredential)
 	if err != nil {
 		zimbraLocalConfig, err := zimbra.LoadLocalConfig(s.LocalConfigPath)
 		if err != nil {
@@ -262,7 +261,7 @@ func (s *Setup) enableServiceDiscoverd(d businessDependencies) error {
 }
 
 func wizardBindAddressSelection(d interactiveDependencies) (string, error) {
-	networks, err := setup.NonLoopbackInterfaces(d)
+	networks, err := command.NonLoopbackInterfaces(d)
 	if err != nil {
 		return "", err
 	}
@@ -282,7 +281,7 @@ func wizardBindAddressSelection(d interactiveDependencies) (string, error) {
 
 	term.MustWrite(fmt.Fprintf(d.Term(), "Specify the binding address for service discovery: "))
 	bindingAddress := term.MustRead(d.Term().ReadLine())
-	err = setup.CheckValidBindingAddress(d, networks, bindingAddress)
+	err = command.CheckValidBindingAddress(d, networks, bindingAddress)
 	if err != nil {
 		return "", err
 	}

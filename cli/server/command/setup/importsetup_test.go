@@ -1,7 +1,7 @@
 package setup
 
 import (
-	setup2 "bitbucket.org/zextras/service-discover/cli/lib/command/setup"
+	"bitbucket.org/zextras/service-discover/cli/lib/command"
 	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
 	mocks3 "bitbucket.org/zextras/service-discover/cli/lib/exec/mocks"
 	mocks4 "bitbucket.org/zextras/service-discover/cli/lib/systemd/mocks"
@@ -219,7 +219,7 @@ func TestSetup_importSetup(t *testing.T) {
 		stat, err := consulFileConfig.Stat()
 		assert.NoError(t, err)
 
-		assert.NoError(t, tarWriter.AddFile(consulFileConfig, stat, setup2.ConsulCA, config.ConsulHome))
+		assert.NoError(t, tarWriter.AddFile(consulFileConfig, stat, command.ConsulCA, config.ConsulHome))
 		assert.NoError(t, tarWriter.Close())
 		_, err = s.importSetup(businessDep)
 		assert.EqualError(
@@ -297,13 +297,13 @@ func TestSetup_importSetup(t *testing.T) {
 		assert.NoError(t, tarWriter.AddFile(
 			consulFileConfig,
 			consulFileConfigStat,
-			setup2.ConsulCA,
+			command.ConsulCA,
 			setupFiles.consulHome+"/",
 		))
 		assert.NoError(t, tarWriter.AddFile(
 			consulAclBootstrap,
 			consulAclBootstrapStat,
-			setup2.ConsulAclBootstrap,
+			command.ConsulAclBootstrap,
 			"/",
 		))
 		assert.NoError(t, tarWriter.Close())

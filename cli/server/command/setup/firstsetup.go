@@ -1,7 +1,7 @@
 package setup
 
 import (
-	"bitbucket.org/zextras/service-discover/cli/lib/command/setup"
+	"bitbucket.org/zextras/service-discover/cli/lib/command"
 	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
 	exec2 "bitbucket.org/zextras/service-discover/cli/lib/exec"
 	"bitbucket.org/zextras/service-discover/cli/lib/formatter"
@@ -21,11 +21,11 @@ import (
 // firstSetup specifically handles the command sent by the final user in a non-interactive way. This will print
 // as less as possible and it is intended to be used in with power users or from other programs
 func (s *Setup) firstSetup(d businessDependencies) (formatter.Formatter, error) {
-	networks, err := setup.NonLoopbackInterfaces(d)
+	networks, err := command.NonLoopbackInterfaces(d)
 	if err != nil {
 		return nil, err
 	}
-	if err := setup.CheckValidBindingAddress(d, networks, s.BindAddress); err != nil {
+	if err := command.CheckValidBindingAddress(d, networks, s.BindAddress); err != nil {
 		return nil, err
 	}
 	err = s.performSetup(d, &setupConfiguration{
@@ -53,11 +53,11 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 		return errors.New(fmt.Sprintf("unable to read Zimbra local config: %s", err))
 	}
 	ldapHandler := d.LdapHandler(zimbraLocalConfig)
-	zimbraHostname, err := setup.RetrieveZimbraHostname(zimbraLocalConfig, ldapHandler)
+	zimbraHostname, err := command.RetrieveZimbraHostname(zimbraLocalConfig, ldapHandler)
 	if err != nil {
 		return err
 	}
-	err = setup.CheckHostnameAddress(d, zimbraHostname)
+	err = command.CheckHostnameAddress(d, zimbraHostname)
 	if err != nil {
 		return err
 	}
@@ -75,11 +75,11 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 		return errors.New(fmt.Sprintf("unable to save generated configuration file in %s: %s", s.ConsulHome, err))
 	}
 
-	if err := setup.SaveBindAddressConfiguration(s.MutableConfigFile, inputs.BindAddress); err != nil {
+	if err := command.SaveBindAddressConfiguration(s.MutableConfigFile, inputs.BindAddress); err != nil {
 		return err
 	}
 
-	if err := setup.AddServiceInLDAP(ldapHandler, zimbraHostname); err != nil {
+	if err := command.AddServiceInLDAP(ldapHandler, zimbraHostname); err != nil {
 		return err
 	}
 	err = systemd.StartSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit)
@@ -90,7 +90,7 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 	if err != nil {
 		return err
 	}
-	aclBootstrapUnmarshal := &setup.ACLTokenCreation{}
+	aclBootstrapUnmarshal := &command.ACLTokenCreation{}
 	err = json.Unmarshal(aclBootstrapJson, aclBootstrapUnmarshal)
 	if err != nil {
 		return errors.WithMessage(
@@ -98,19 +98,19 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 			"unable to decode ACL bootstrap response from Consul",
 		)
 	}
-	serverToken, err := setup.CreateACLToken(
+	serverToken, err := command.CreateACLToken(
 		d.CreateCommand,
-		setup.Server,
+		command.Server,
 		zimbraHostname,
 		aclBootstrapUnmarshal.SecretID,
 	)
 	if err != nil {
 		return err
 	}
-	if err := setup.SetACLToken(d.CreateCommand, serverToken, aclBootstrapUnmarshal.SecretID); err != nil {
+	if err := command.SetACLToken(d.CreateCommand, serverToken, aclBootstrapUnmarshal.SecretID); err != nil {
 		return err
 	}
-	aclFile, err := ioutil.TempFile("", setup.ConsulAclBootstrap)
+	aclFile, err := ioutil.TempFile("", command.ConsulAclBootstrap)
 	if err != nil {
 		return err
 	}
@@ -118,7 +118,7 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 	if err = ioutil.WriteFile(aclFile.Name(), aclBootstrapJson, 0600); err != nil {
 		return err
 	}
-	gossipKeyFile, err := ioutil.TempFile("", setup.GossipKey)
+	gossipKeyFile, err := ioutil.TempFile("", command.GossipKey)
 	if err != nil {
 		return err
 	}
@@ -127,10 +127,10 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 		return err
 	}
 	filesToCompress := map[string]string{
-		setup.GossipKey:                        gossipKeyFile.Name(),
-		setup.ConsulAclBootstrap:               aclFile.Name(),
-		s.ConsulHome + "/" + setup.ConsulCA:    s.ConsulHome + "/" + setup.ConsulCA,
-		s.ConsulHome + "/" + setup.ConsulCAKey: s.ConsulHome + "/" + setup.ConsulCAKey,
+		command.GossipKey:                        gossipKeyFile.Name(),
+		command.ConsulAclBootstrap:               aclFile.Name(),
+		s.ConsulHome + "/" + command.ConsulCA:    s.ConsulHome + "/" + command.ConsulCA,
+		s.ConsulHome + "/" + command.ConsulCAKey: s.ConsulHome + "/" + command.ConsulCAKey,
 	}
 
 	if err = s.createEncryptedSecret(filesToCompress, inputs.Password); err != nil {
@@ -259,14 +259,14 @@ func (s *Setup) generateKeys(d businessDependencies, zimbraHostname string) (*se
 			DownPolicy:             "extend-cache",
 		},
 		AutoEncrypt:             autoEncrypt{AllowTLS: true},
-		CaFile:                  s.ConsulHome + "/" + setup.ConsulCA,
-		CertFile:                s.ConsulHome + "/" + setup.ConsulServerCertificate,
+		CaFile:                  s.ConsulHome + "/" + command.ConsulCA,
+		CertFile:                s.ConsulHome + "/" + command.ConsulServerCertificate,
 		DataDir:                 s.ConsulData,
 		EnableLocalScriptChecks: true,
 		Encrypt:                 gossipKey,
-		KeyFile:                 s.ConsulHome + "/" + setup.ConsulServerCertificateKey,
+		KeyFile:                 s.ConsulHome + "/" + command.ConsulServerCertificateKey,
 		LogLevel:                defaultLogLevel,
-		NodeName:                setup.ConsulNodeName(setup.Server, zimbraHostname),
+		NodeName:                command.ConsulNodeName(command.Server, zimbraHostname),
 		Server:                  true,
 		VerifyIncoming:          true,
 		VerifyOutgoing:          true,

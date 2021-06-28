@@ -1,7 +1,7 @@
 package setup
 
 import (
-	commonSetup "bitbucket.org/zextras/service-discover/cli/lib/command/setup"
+	"bitbucket.org/zextras/service-discover/cli/lib/command"
 	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
 	"bitbucket.org/zextras/service-discover/cli/lib/exec"
 	mocks4 "bitbucket.org/zextras/service-discover/cli/lib/exec/mocks"
@@ -141,11 +141,11 @@ func TestFirstSetup_business(t *testing.T) {
 
 		// Note: we use relative path since the tarball will not have absolute paths.
 		expectedFileList := make([]string, 0)
-		caFileNameRel, _ := filepath.Rel("/", setup.ConsulHome+"/"+commonSetup.ConsulCA)
-		caKeyFileNameRel, _ := filepath.Rel("/", setup.ConsulHome+"/"+commonSetup.ConsulCAKey)
+		caFileNameRel, _ := filepath.Rel("/", setup.ConsulHome+"/"+command.ConsulCA)
+		caKeyFileNameRel, _ := filepath.Rel("/", setup.ConsulHome+"/"+command.ConsulCAKey)
 
-		expectedFileList = append(expectedFileList, commonSetup.GossipKey)
-		expectedFileList = append(expectedFileList, commonSetup.ConsulAclBootstrap)
+		expectedFileList = append(expectedFileList, command.GossipKey)
+		expectedFileList = append(expectedFileList, command.ConsulAclBootstrap)
 		expectedFileList = append(expectedFileList, caKeyFileNameRel)
 		expectedFileList = append(expectedFileList, caFileNameRel)
 		assert.Equal(

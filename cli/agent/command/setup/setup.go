@@ -3,7 +3,6 @@ package setup
 import (
 	"bitbucket.org/zextras/service-discover/cli/agent/config"
 	"bitbucket.org/zextras/service-discover/cli/lib/command"
-	"bitbucket.org/zextras/service-discover/cli/lib/command/setup"
 	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
 	"bitbucket.org/zextras/service-discover/cli/lib/exec"
 	"bitbucket.org/zextras/service-discover/cli/lib/formatter"
@@ -179,23 +178,24 @@ func gatherInputs(d interactiveDependencies) (*setupConfiguration, error) {
 			d.Term(),
 			"%s %s%s",
 			n.Name,
-			setup.AddrsToSingleString(&addrs, ", "),
+			command.AddrsToSingleString(&addrs, ", "),
 			term.LineBreak,
 		))
 	}
 
 	term.MustWrite(fmt.Fprint(d.Term(), "Specify the binding address for service discovery: "))
 	bindingAddress := term.MustRead(d.Term().ReadLine())
-	err = setup.CheckValidBindingAddress(d, networks, bindingAddress)
+	err = command.CheckValidBindingAddress(d, networks, bindingAddress)
 	if err != nil {
 		return nil, err
 	}
 
 	pass, err := d.Term().ReadPassword("Insert the cluster credential password: ")
 	if err != nil {
-		if ok := err.(*term.NotATerminalError); ok != nil {
+		switch err.(type) {
+		case term.NotATerminalError:
 			pass = term.MustRead(d.Term().ReadLine())
-		} else {
+		default:
 			return nil, err
 		}
 	}
@@ -208,7 +208,7 @@ func gatherInputs(d interactiveDependencies) (*setupConfiguration, error) {
 
 func preRun(clusterCredentialPath string, d businessDependencies) error {
 	// We need to check that the executable is in $PATH
-	cmd := d.CreateCommand(setup.ConsulBin, "version")
+	cmd := d.CreateCommand(command.ConsulBin, "version")
 	err := cmd.Run()
 	if err != nil {
 		return errors.New(fmt.Sprintf("unable to execute consul binary: %s", err))
@@ -218,7 +218,7 @@ func preRun(clusterCredentialPath string, d businessDependencies) error {
 		return errors.New("this command must be executed as root")
 	}
 
-	clusterCredentialFile, err := setup.OpenClusterCredential(clusterCredentialPath)
+	clusterCredentialFile, err := command.OpenClusterCredential(clusterCredentialPath)
 	if err != nil {
 		return err
 	}
@@ -268,7 +268,7 @@ func (s *Setup) createTLSCertificate(d businessDependencies, caFile *os.File, ca
 	err := exec.InPath(
 		// FIXME idea: what if we try to pass the caFile by pipe instead of passing a file?
 		// we save I/O and speed up the whole stuff 🤙
-		d.CreateCommand(setup.ConsulBin,
+		d.CreateCommand(command.ConsulBin,
 			"tls",
 			"cert",
 			"create",
@@ -287,14 +287,14 @@ func (s *Setup) createTLSCertificate(d businessDependencies, caFile *os.File, ca
 }
 
 func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
-	networks, err := setup.NonLoopbackInterfaces(d)
+	networks, err := command.NonLoopbackInterfaces(d)
 	if err != nil {
 		return nil, err
 	}
-	if err := setup.CheckValidBindingAddress(d, networks, s.BindAddress); err != nil {
+	if err := command.CheckValidBindingAddress(d, networks, s.BindAddress); err != nil {
 		return nil, err
 	}
-	clusterCredentialFile, err := setup.OpenClusterCredential(s.ClusterCredential)
+	clusterCredentialFile, err := command.OpenClusterCredential(s.ClusterCredential)
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("unable to open %s: %s", s.ClusterCredential, err))
 	}
@@ -305,19 +305,19 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 	}
 	// We calculate the path relative to the root (i.e. without the "/" at the beginning) since this should not be
 	// included in standard tarballs
-	caPath, err := filepath.Rel("/", filepath.Join(s.ConsulHome, setup.ConsulCA))
+	caPath, err := filepath.Rel("/", filepath.Join(s.ConsulHome, command.ConsulCA))
 	if err != nil {
 		return nil, err
 	}
-	caKeyPath, err := filepath.Rel("/", filepath.Join(s.ConsulHome, setup.ConsulCAKey))
+	caKeyPath, err := filepath.Rel("/", filepath.Join(s.ConsulHome, command.ConsulCAKey))
 	if err != nil {
 		return nil, err
 	}
-	extractedFiles, err := credentialsEncrypter.ReadFiles(credReader, caPath, caKeyPath, setup.GossipKey, setup.ConsulAclBootstrap)
+	extractedFiles, err := credentialsEncrypter.ReadFiles(credReader, caPath, caKeyPath, command.GossipKey, command.ConsulAclBootstrap)
 	if err != nil {
 		return nil, err
 	}
-	caFile, err := os.Create(s.ConsulHome + "/" + setup.ConsulCA)
+	caFile, err := os.Create(s.ConsulHome + "/" + command.ConsulCA)
 	if err != nil {
 		return nil, err
 	}
@@ -346,12 +346,12 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 		return nil, err
 	}
 	ldapHandler := d.LdapHandler(zimbraLocalConfig)
-	zimbraHostname, err := setup.RetrieveZimbraHostname(zimbraLocalConfig, ldapHandler)
+	zimbraHostname, err := command.RetrieveZimbraHostname(zimbraLocalConfig, ldapHandler)
 	if err != nil {
 		return nil, err
 	}
 
-	err = setup.CheckHostnameAddress(d, zimbraHostname)
+	err = command.CheckHostnameAddress(d, zimbraHostname)
 	if err != nil {
 		return nil, err
 	}
@@ -363,14 +363,14 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 			DownPolicy:             "extend-cache",
 			EnableTokenPersistence: true,
 		},
-		CaFile:                  s.ConsulHome + "/" + setup.ConsulCA,
-		CertFile:                s.ConsulHome + "/" + setup.ConsulAgentCertificate,
+		CaFile:                  s.ConsulHome + "/" + command.ConsulCA,
+		CertFile:                s.ConsulHome + "/" + command.ConsulAgentCertificate,
 		DataDir:                 s.ConsulData,
 		EnableLocalScriptChecks: true,
-		Encrypt:                 string(extractedFiles[setup.GossipKey]),
-		KeyFile:                 s.ConsulHome + "/" + setup.ConsulAgentCertificateKey,
+		Encrypt:                 string(extractedFiles[command.GossipKey]),
+		KeyFile:                 s.ConsulHome + "/" + command.ConsulAgentCertificateKey,
 		LogLevel:                defaultLogLevel,
-		NodeName:                setup.ConsulNodeName(setup.Agent, zimbraHostname),
+		NodeName:                command.ConsulNodeName(command.Agent, zimbraHostname),
 		Server:                  false,
 		VerifyIncoming:          true,
 		VerifyOutgoing:          true,
@@ -387,23 +387,23 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 		return nil, err
 	}
 
-	if err := setup.SaveBindAddressConfiguration(s.MutableConfigFile, s.BindAddress); err != nil {
+	if err := command.SaveBindAddressConfiguration(s.MutableConfigFile, s.BindAddress); err != nil {
 		return nil, err
 	}
 
 	if err := systemd.StartSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit); err != nil {
 		return nil, errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
 	}
-	aclBootstrapToken := setup.ACLTokenCreation{}
-	if err := json.Unmarshal(extractedFiles[setup.ConsulAclBootstrap], &aclBootstrapToken); err != nil {
+	aclBootstrapToken := command.ACLTokenCreation{}
+	if err := json.Unmarshal(extractedFiles[command.ConsulAclBootstrap], &aclBootstrapToken); err != nil {
 		return nil, errors.WithMessagef(err, "unable to decode ACL Bootstrap token")
 	}
 
-	token, err := setup.CreateACLToken(d.CreateCommand, setup.Agent, zimbraHostname, aclBootstrapToken.SecretID)
+	token, err := command.CreateACLToken(d.CreateCommand, command.Agent, zimbraHostname, aclBootstrapToken.SecretID)
 	if err != nil {
 		return nil, errors.WithMessage(err, "unable to create ACL policy for this agent")
 	}
-	err = setup.SetACLToken(d.CreateCommand, token, aclBootstrapToken.SecretID)
+	err = command.SetACLToken(d.CreateCommand, token, aclBootstrapToken.SecretID)
 	if err != nil {
 		return nil, err
 	}

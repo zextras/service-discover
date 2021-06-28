@@ -78,7 +78,7 @@ func (t *terminal) Close() error {
 }
 
 // New returns a new terminal with the given reader and writer functions.
-func New(reader *os.File, writer *os.File, prompt string) (Terminal, error) {
+func New(reader *os.File, writer io.Writer, prompt string) (Terminal, error) {
 	stdIn := int(reader.Fd())
 	res := &terminal{
 		stdIn: stdIn,

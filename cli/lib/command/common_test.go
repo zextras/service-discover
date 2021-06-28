@@ -1,4 +1,4 @@
-package setup
+package command
 
 import (
 	"bitbucket.org/zextras/service-discover/cli/lib/test"

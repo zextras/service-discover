@@ -1,8 +1,6 @@
 module bitbucket.org/zextras/service-discover/cli/lib/zimbra
 
-replace (
-	bitbucket.org/zextras/service-discover/cli/lib/test => ./../test
-)
+replace bitbucket.org/zextras/service-discover/cli/lib/test => ./../test
 
 go 1.16
 

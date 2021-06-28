@@ -28,6 +28,16 @@ func (c *Command) Version(writer io.Writer, agentName string) Version {
 	}
 }
 
+// BootstrapToken generates a BootstrapToken structure that can is ready to be integrated as CLI command
+func (c *Command) BootstrapToken(writer io.Writer, agentName string) BootstrapToken {
+	return BootstrapToken{
+		*c,
+		writer,
+		agentName,
+		false,
+	}
+}
+
 // Help generates a Help command that open up the man pages on unix compatible machines. The command will always be
 // "man <applicationName>"
 func (c *Command) Help() Help {

@@ -3,8 +3,8 @@ targets=(
   "ubuntu"
 )
 pkgname="service-discover-server"
-pkgver="0.1.0"
-pkgrel="1"
+pkgver="0.1.1"
+pkgrel="0"
 pkgdesc="Service discover server cli"
 pkgdesclong=(
   "Service discover server cli"
@@ -64,7 +64,7 @@ postinst:centos() {
   if [ -d /run/systemd/system ]; then
     systemctl daemon-reload >/dev/null 2>&1 || :
   fi
-  echo "Installed, you must now run service-discover setup --wizard."
+  echo "Installed, run service-discover setup-wizard on first installation."
 }
 
 prerm:ubuntu() {

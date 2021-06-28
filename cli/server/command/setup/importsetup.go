@@ -1,7 +1,7 @@
 package setup
 
 import (
-	"bitbucket.org/zextras/service-discover/cli/lib/command/setup"
+	"bitbucket.org/zextras/service-discover/cli/lib/command"
 	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
 	"bitbucket.org/zextras/service-discover/cli/lib/exec"
 	"bitbucket.org/zextras/service-discover/cli/lib/formatter"
@@ -18,16 +18,16 @@ import (
 // importSetup refers to the run performed on a non-first cluster instance in a non-interactive way.
 // The output returned is always empty
 func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error) {
-	clusterCredential, err := setup.OpenClusterCredential(s.ClusterCredential)
+	clusterCredential, err := command.OpenClusterCredential(s.ClusterCredential)
 	if err != nil {
 		return nil, err
 	}
 
-	networks, err := setup.NonLoopbackInterfaces(d)
+	networks, err := command.NonLoopbackInterfaces(d)
 	if err != nil {
 		return nil, err
 	}
-	if err := setup.CheckValidBindingAddress(d, networks, s.BindAddress); err != nil {
+	if err := command.CheckValidBindingAddress(d, networks, s.BindAddress); err != nil {
 		return nil, err
 	}
 
@@ -37,7 +37,7 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 	}
 	// We calculate the path relative to the root (i.e. without the "/" at the beginning) since this should not be
 	// included in standard tarballs
-	caFullPath, err := filepath.Rel("/", filepath.Join(s.ConsulHome, setup.ConsulCA))
+	caFullPath, err := filepath.Rel("/", filepath.Join(s.ConsulHome, command.ConsulCA))
 	if err != nil {
 		return nil, err
 	}
@@ -65,18 +65,18 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 	}
 
 	ldapHandler := d.LdapHandler(zimbraLocalConfig)
-	zimbraHostname, err := setup.RetrieveZimbraHostname(zimbraLocalConfig, ldapHandler)
+	zimbraHostname, err := command.RetrieveZimbraHostname(zimbraLocalConfig, ldapHandler)
 	if err != nil {
 		return nil, err
 	}
-	err = setup.CheckHostnameAddress(d, zimbraHostname)
+	err = command.CheckHostnameAddress(d, zimbraHostname)
 	if err != nil {
 		return nil, err
 	}
-	if err := setup.SaveBindAddressConfiguration(s.MutableConfigFile, s.BindAddress); err != nil {
+	if err := command.SaveBindAddressConfiguration(s.MutableConfigFile, s.BindAddress); err != nil {
 		return nil, err
 	}
-	if err := setup.AddServiceInLDAP(ldapHandler, zimbraHostname); err != nil {
+	if err := command.AddServiceInLDAP(ldapHandler, zimbraHostname); err != nil {
 		return nil, err
 	}
 

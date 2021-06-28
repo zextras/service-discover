@@ -1,7 +1,6 @@
-package setup
+package command
 
 import (
-	"bitbucket.org/zextras/service-discover/cli/lib/command"
 	"bitbucket.org/zextras/service-discover/cli/lib/exec"
 	"bitbucket.org/zextras/service-discover/cli/lib/zimbra"
 	"bytes"
@@ -153,7 +152,7 @@ func SaveBindAddressConfiguration(mutableConfig string, bindAddress string) erro
 	if strings.Contains(bindAddress, "/") {
 		bindAddress = strings.Split(bindAddress,"/")[0]
 	}
-	mutableConsulConfig := command.MutableConsulConfig{BindAddress: bindAddress}
+	mutableConsulConfig := MutableConsulConfig{BindAddress: bindAddress}
 	bs, err := json.MarshalIndent(mutableConsulConfig, "", "  ")
 	if err != nil {
 		return err

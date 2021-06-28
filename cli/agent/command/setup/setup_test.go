@@ -2,7 +2,7 @@ package setup
 
 import (
 	"bitbucket.org/zextras/service-discover/cli/agent/command/setup/mocks"
-	"bitbucket.org/zextras/service-discover/cli/lib/command/setup"
+	"bitbucket.org/zextras/service-discover/cli/lib/command"
 	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
 	mocks2 "bitbucket.org/zextras/service-discover/cli/lib/exec/mocks"
 	mocks4 "bitbucket.org/zextras/service-discover/cli/lib/systemd/mocks"
@@ -43,7 +43,7 @@ func TestSetup_preRun(t *testing.T) {
 		missingConsul := new(mocks2.Cmd)
 		missingConsul.On("Run").Return(errors.New(expectedErrorOutput))
 		mockedDep := new(mocks.BusinessDependencies)
-		mockedDep.On("CreateCommand", setup.ConsulBin, "version").Return(missingConsul)
+		mockedDep.On("CreateCommand", command.ConsulBin, "version").Return(missingConsul)
 		assert.EqualError(t,
 			preRun("", mockedDep),
 			fmt.Sprintf("unable to execute consul binary: %s", expectedErrorOutput),
@@ -55,7 +55,7 @@ func TestSetup_preRun(t *testing.T) {
 		missingConsul.On("Run").Return(nil)
 		mockedDep := new(mocks.BusinessDependencies)
 		mockedDep.
-			On("CreateCommand", setup.ConsulBin, "version").
+			On("CreateCommand", command.ConsulBin, "version").
 			Return(missingConsul).
 			On("GetuidSyscall").
 			Return(42)
@@ -71,7 +71,7 @@ func TestSetup_preRun(t *testing.T) {
 		missingConsul.On("Run").Return(nil)
 		mockedDep := new(mocks.BusinessDependencies)
 		mockedDep.
-			On("CreateCommand", setup.ConsulBin, "version").
+			On("CreateCommand", command.ConsulBin, "version").
 			Return(missingConsul).
 			On("GetuidSyscall").
 			Return(0)
@@ -91,7 +91,7 @@ func TestSetup_preRun(t *testing.T) {
 		missingConsul.On("Run").Return(nil)
 		mockedDep := new(mocks.BusinessDependencies)
 		mockedDep.
-			On("CreateCommand", setup.ConsulBin, "version").
+			On("CreateCommand", command.ConsulBin, "version").
 			Return(missingConsul).
 			On("GetuidSyscall").
 			Return(0)
@@ -214,9 +214,9 @@ func TestSetup_setup(t *testing.T) {
 			ConsulHome:        consulHome,
 		}
 		_, err = s.setup(mockDep)
-		expectedCaPath, _ := filepath.Rel("/", path.Join(consulHome, setup.ConsulCA))
-		expectedCaKeyPath, _ := filepath.Rel("/", path.Join(consulHome, setup.ConsulCAKey))
-		missingFiles := " " + expectedCaPath + " " + expectedCaKeyPath + " " + setup.GossipKey + " " + setup.ConsulAclBootstrap
+		expectedCaPath, _ := filepath.Rel("/", path.Join(consulHome, command.ConsulCA))
+		expectedCaKeyPath, _ := filepath.Rel("/", path.Join(consulHome, command.ConsulCAKey))
+		missingFiles := " " + expectedCaPath + " " + expectedCaKeyPath + " " + command.GossipKey + " " + command.ConsulAclBootstrap
 		assert.EqualError(
 			t,
 			err,
@@ -248,16 +248,16 @@ func TestSetup_setup(t *testing.T) {
 		defer os.RemoveAll(consulHome)
 		writer, err := credentialsEncrypter.NewWriter(clusterCredential, []byte("password"))
 		assert.NoError(t, err)
-		dumbCaContent, caStat := test.CreateDumbFile([]byte("Test"), setup.ConsulCA)
-		assert.NoError(t, writer.AddFile(dumbCaContent, caStat, setup.ConsulCA, consulHome+"/"))
-		dumbGossipKeyContent, gossipStat := test.CreateDumbFile([]byte("Gossip-test"), setup.GossipKey)
-		assert.NoError(t, writer.AddFile(dumbGossipKeyContent, gossipStat, setup.GossipKey, "/"))
-		dumbCaKeyContent, caKeyStat := test.CreateDumbFile([]byte("Gossip-test"), setup.ConsulCAKey)
-		assert.NoError(t, writer.AddFile(dumbCaKeyContent, caKeyStat, setup.ConsulCAKey, consulHome+"/"))
+		dumbCaContent, caStat := test.CreateDumbFile([]byte("Test"), command.ConsulCA)
+		assert.NoError(t, writer.AddFile(dumbCaContent, caStat, command.ConsulCA, consulHome+"/"))
+		dumbGossipKeyContent, gossipStat := test.CreateDumbFile([]byte("Gossip-test"), command.GossipKey)
+		assert.NoError(t, writer.AddFile(dumbGossipKeyContent, gossipStat, command.GossipKey, "/"))
+		dumbCaKeyContent, caKeyStat := test.CreateDumbFile([]byte("Gossip-test"), command.ConsulCAKey)
+		assert.NoError(t, writer.AddFile(dumbCaKeyContent, caKeyStat, command.ConsulCAKey, consulHome+"/"))
 		dumbAclContent, aclStat := test.CreateDumbFile([]byte(`{
   "SecretID": "secret-token"
-}`), setup.ConsulAclBootstrap)
-		assert.NoError(t, writer.AddFile(dumbAclContent, aclStat, setup.ConsulAclBootstrap, "/"))
+}`), command.ConsulAclBootstrap)
+		assert.NoError(t, writer.AddFile(dumbAclContent, aclStat, command.ConsulAclBootstrap, "/"))
 		assert.NoError(t, writer.Close())
 		mockDep := new(mocks.BusinessDependencies)
 		certificateDaysFlag := fmt.Sprintf("-days=%d", certificateExpiration)
@@ -277,7 +277,7 @@ func TestSetup_setup(t *testing.T) {
 		aclTemplateData := struct {
 			ZimbraHostname string
 		}{ZimbraHostname: "agent-mailbox-1-example-com"}
-		aclTemplate := template.Must(template.New("acl").Parse(setup.AclPolicyTemplateText))
+		aclTemplate := template.Must(template.New("acl").Parse(command.AclPolicyTemplateText))
 		aclRenderOut := bytes.Buffer{}
 		assert.NoError(t, aclTemplate.Execute(&aclRenderOut, aclTemplateData))
 		aclRenderBs, err := ioutil.ReadAll(&aclRenderOut)
@@ -388,16 +388,16 @@ func TestSetup_setup(t *testing.T) {
 		defer os.RemoveAll(consulHome)
 		writer, err := credentialsEncrypter.NewWriter(clusterCredential, []byte("password"))
 		assert.NoError(t, err)
-		dumbCaContent, caStat := test.CreateDumbFile([]byte("Test"), setup.ConsulCA)
-		assert.NoError(t, writer.AddFile(dumbCaContent, caStat, setup.ConsulCA, consulHome+"/"))
-		dumbGossipKeyContent, gossipStat := test.CreateDumbFile([]byte("Gossip-test"), setup.GossipKey)
-		assert.NoError(t, writer.AddFile(dumbGossipKeyContent, gossipStat, setup.GossipKey, "/"))
+		dumbCaContent, caStat := test.CreateDumbFile([]byte("Test"), command.ConsulCA)
+		assert.NoError(t, writer.AddFile(dumbCaContent, caStat, command.ConsulCA, consulHome+"/"))
+		dumbGossipKeyContent, gossipStat := test.CreateDumbFile([]byte("Gossip-test"), command.GossipKey)
+		assert.NoError(t, writer.AddFile(dumbGossipKeyContent, gossipStat, command.GossipKey, "/"))
 		dumbAclContent, aclStat := test.CreateDumbFile([]byte(`{
   "SecretID": "secret-token"
-}`), setup.ConsulAclBootstrap)
-		assert.NoError(t, writer.AddFile(dumbAclContent, aclStat, setup.ConsulAclBootstrap, "/"))
-		dumbCaKeyContent, caKeyStat := test.CreateDumbFile([]byte("Gossip-test"), setup.GossipKey)
-		assert.NoError(t, writer.AddFile(dumbCaKeyContent, caKeyStat, setup.ConsulCAKey, consulHome+"/"))
+}`), command.ConsulAclBootstrap)
+		assert.NoError(t, writer.AddFile(dumbAclContent, aclStat, command.ConsulAclBootstrap, "/"))
+		dumbCaKeyContent, caKeyStat := test.CreateDumbFile([]byte("Gossip-test"), command.GossipKey)
+		assert.NoError(t, writer.AddFile(dumbCaKeyContent, caKeyStat, command.ConsulCAKey, consulHome+"/"))
 		assert.NoError(t, writer.Close())
 		mockDep := new(mocks.BusinessDependencies)
 		certificateDaysFlag := fmt.Sprintf("-days=%d", certificateExpiration)
@@ -417,7 +417,7 @@ func TestSetup_setup(t *testing.T) {
 		aclTemplateData := struct {
 			ZimbraHostname string
 		}{ZimbraHostname: "agent-mailbox-1-example-com"}
-		aclTemplate := template.Must(template.New("acl").Parse(setup.AclPolicyTemplateText))
+		aclTemplate := template.Must(template.New("acl").Parse(command.AclPolicyTemplateText))
 		aclRenderOut := bytes.Buffer{}
 		assert.NoError(t, aclTemplate.Execute(&aclRenderOut, aclTemplateData))
 		aclRenderBs, err := ioutil.ReadAll(&aclRenderOut)

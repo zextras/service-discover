@@ -1,12 +1,6 @@
 module bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter
 
-replace (
-	bitbucket.org/zextras/service-discover/cli/lib/command => ./../command
-	bitbucket.org/zextras/service-discover/cli/lib/formatter => ./../formatter
-	bitbucket.org/zextras/service-discover/cli/lib/parser => ./../parser
-	bitbucket.org/zextras/service-discover/cli/lib/test => ./../test
-	bitbucket.org/zextras/service-discover/cli/lib/zimbra => ./../zimbra
-)
+replace bitbucket.org/zextras/service-discover/cli/lib/test => ./../test
 
 go 1.15
 
