@@ -3,7 +3,7 @@ targets=(
   "ubuntu"
 )
 pkgname="service-discover-agent"
-pkgver="0.1.1"
+pkgver="0.1.2"
 pkgrel="0"
 pkgdesc="Service discover agent cli"
 pkgdesclong=(
@@ -57,7 +57,7 @@ postinst:ubuntu() {
   	fi
   fi
   # End automatically added section
-  echo "Installed, you must now run service-discover setup --wizard."
+  echo "Installed, run service-discover setup-wizard on first installation."
 }
 
 postinst:centos() {

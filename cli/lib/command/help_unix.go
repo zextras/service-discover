@@ -20,7 +20,7 @@ func (h *Help) Run(ctx *GlobalCommonFlags) error {
 	manCmd.Stdout = &out
 	err := manCmd.Run()
 	if err != nil {
-		return errors.New("Impossible to detect man package in this system. " +
+		return errors.New("unable to detect man package in this system. " +
 			"Please install it in order to see detailed manual instructions")
 	}
 	args := make([]string, 1)

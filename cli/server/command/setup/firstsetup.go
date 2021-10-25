@@ -170,7 +170,7 @@ func (s *Setup) createEncryptedSecret(filesToCompress map[string]string, passwor
 			return errors.New(fmt.Sprintf("unable to stat() provided %s: %s", file.Name(), err))
 		}
 		if err = encWriter.AddFile(bufio.NewReader(file), stat, name, "/"); err != nil {
-			return errors.New(fmt.Sprintf("error while creating secret credentials: impossible to include %s: %s", path, err))
+			return errors.New(fmt.Sprintf("error while creating secret credentials: unable to include %s: %s", path, err))
 		}
 	}
 

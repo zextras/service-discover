@@ -10,6 +10,6 @@ const (
 	ConsulData             = ConsulHome + "/data"
 	ConsulConfig           = "/etc/zextras/service-discover"
 	ConsultFileConfig      = ConsulConfig + "/main.json"
-	LocalConfigPath        = "/opt/zimbra/conf/localconfig.xml"
+	LocalConfigPath        = "/opt/zextras/conf/localconfig.xml"
 	ClusterCredential      = ConsulConfig + "/cluster-credentials.tar.gpg"
 )

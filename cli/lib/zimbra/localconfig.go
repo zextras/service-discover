@@ -12,7 +12,7 @@ const LocalConfigLdapUrl = "ldap_url"
 const LocalConfigLdapUserDn = "zimbra_ldap_userdn"
 const LocalConfigLdapPassword = "zimbra_ldap_password"
 const LocalConfigServerHostname = "zimbra_server_hostname"
-const LocalConfigPath = "/opt/zimbra/conf/localconfig.xml"
+const LocalConfigPath = "/opt/zextras/conf/localconfig.xml"
 
 // rawKey represents an entry in the Zimbra local config
 type rawKey struct {
@@ -38,7 +38,7 @@ func loadLocalConfig(path string) (*rawLocalConfig, error) {
 	zimbraLocalConfig := &rawLocalConfig{}
 	localConfigBytes, err := ioutil.ReadFile(path)
 	if err != nil {
-		return nil, errors.New("impossible to parse Zimbra local config at: " + path)
+		return nil, errors.New("unable to parse Zimbra local config at: " + path)
 	}
 	err = xml.Unmarshal(localConfigBytes, zimbraLocalConfig)
 	if err != nil {

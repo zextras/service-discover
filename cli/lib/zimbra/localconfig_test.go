@@ -47,7 +47,7 @@ func TestLoadLocalConfig(t *testing.T) {
 				},
 				"zimbra_java_home": {
 					Text:  "",
-					Value: "/opt/zimbra/common/lib/jvm/java",
+					Value: "/opt/zextras/common/lib/jvm/java",
 				},
 				"ldap_port": {
 					Text:  "",
@@ -55,7 +55,7 @@ func TestLoadLocalConfig(t *testing.T) {
 				},
 				"mailboxd_keystore": {
 					Text:  "",
-					Value: "/opt/zimbra/mailboxd/etc/keystore",
+					Value: "/opt/zextras/mailboxd/etc/keystore",
 				},
 				"zimbra_ldap_password": {
 					Text:  "",
@@ -67,7 +67,7 @@ func TestLoadLocalConfig(t *testing.T) {
 				},
 				"mailboxd_truststore": {
 					Text:  "",
-					Value: "/opt/zimbra/common/lib/jvm/java/lib/security/cacerts",
+					Value: "/opt/zextras/common/lib/jvm/java/lib/security/cacerts",
 				},
 				"av_notify_user": {
 					Text:  "",
@@ -75,7 +75,7 @@ func TestLoadLocalConfig(t *testing.T) {
 				},
 				"mailboxd_directory": {
 					Text:  "",
-					Value: "/opt/zimbra/mailboxd",
+					Value: "/opt/zextras/mailboxd",
 				},
 				"av_notify_domain": {
 					Text:  "",
@@ -155,7 +155,7 @@ func TestLoadLocalConfig(t *testing.T) {
 				},
 				"mailboxd_java_options": {
 					Text:  "",
-					Value: "-server -Dhttps.protocols=TLSv1,TLSv1.1,TLSv1.2 -Djdk.tls.client.protocols=TLSv1,TLSv1.1,TLSv1.2 -Djava.awt.headless=true -Dsun.net.inetaddr.ttl=${networkaddress_cache_ttl} -Dorg.apache.jasper.compiler.disablejsr199=true -XX:+UseG1GC -XX:SoftRefLRUPolicyMSPerMB=1 -XX:+UnlockExperimentalVMOptions -XX:G1NewSizePercent=15 -XX:G1MaxNewSizePercent=45 -XX:-OmitStackTraceInFastThrow -verbose:gc -Xlog:gc*=info,safepoint=info:file=/opt/zimbra/log/gc.log:time:filecount=20,filesize=10m -Djava.net.preferIPv4Stack=true -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005 -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=5000 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false",
+					Value: "-server -Dhttps.protocols=TLSv1,TLSv1.1,TLSv1.2 -Djdk.tls.client.protocols=TLSv1,TLSv1.1,TLSv1.2 -Djava.awt.headless=true -Dsun.net.inetaddr.ttl=${networkaddress_cache_ttl} -Dorg.apache.jasper.compiler.disablejsr199=true -XX:+UseG1GC -XX:SoftRefLRUPolicyMSPerMB=1 -XX:+UnlockExperimentalVMOptions -XX:G1NewSizePercent=15 -XX:G1MaxNewSizePercent=45 -XX:-OmitStackTraceInFastThrow -verbose:gc -Xlog:gc*=info,safepoint=info:file=/opt/zextras/log/gc.log:time:filecount=20,filesize=10m -Djava.net.preferIPv4Stack=true -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005 -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=5000 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false",
 				},
 				"ldap_is_master": {
 					Text:  "",
@@ -278,13 +278,13 @@ func generateAndPopulateCorrectLocalConfig(testName string) *os.File {
     <value>true</value>
   </key>
   <key name="zimbra_java_home">
-    <value>/opt/zimbra/common/lib/jvm/java</value>
+    <value>/opt/zextras/common/lib/jvm/java</value>
   </key>
   <key name="ldap_port">
     <value>389</value>
   </key>
   <key name="mailboxd_keystore">
-    <value>/opt/zimbra/mailboxd/etc/keystore</value>
+    <value>/opt/zextras/mailboxd/etc/keystore</value>
   </key>
   <key name="zimbra_ldap_password">
     <value>password</value>
@@ -293,13 +293,13 @@ func generateAndPopulateCorrectLocalConfig(testName string) *os.File {
     <value>password</value>
   </key>
   <key name="mailboxd_truststore">
-    <value>/opt/zimbra/common/lib/jvm/java/lib/security/cacerts</value>
+    <value>/opt/zextras/common/lib/jvm/java/lib/security/cacerts</value>
   </key>
   <key name="av_notify_user">
     <value>admin@mail.example.com</value>
   </key>
   <key name="mailboxd_directory">
-    <value>/opt/zimbra/mailboxd</value>
+    <value>/opt/zextras/mailboxd</value>
   </key>
   <key name="av_notify_domain">
     <value>mail.example.com</value>
@@ -359,7 +359,7 @@ func generateAndPopulateCorrectLocalConfig(testName string) *os.File {
     <value>zimbra</value>
   </key>
   <key name="mailboxd_java_options">
-    <value>-server -Dhttps.protocols=TLSv1,TLSv1.1,TLSv1.2 -Djdk.tls.client.protocols=TLSv1,TLSv1.1,TLSv1.2 -Djava.awt.headless=true -Dsun.net.inetaddr.ttl=${networkaddress_cache_ttl} -Dorg.apache.jasper.compiler.disablejsr199=true -XX:+UseG1GC -XX:SoftRefLRUPolicyMSPerMB=1 -XX:+UnlockExperimentalVMOptions -XX:G1NewSizePercent=15 -XX:G1MaxNewSizePercent=45 -XX:-OmitStackTraceInFastThrow -verbose:gc -Xlog:gc*=info,safepoint=info:file=/opt/zimbra/log/gc.log:time:filecount=20,filesize=10m -Djava.net.preferIPv4Stack=true -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005 -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=5000 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false</value>
+    <value>-server -Dhttps.protocols=TLSv1,TLSv1.1,TLSv1.2 -Djdk.tls.client.protocols=TLSv1,TLSv1.1,TLSv1.2 -Djava.awt.headless=true -Dsun.net.inetaddr.ttl=${networkaddress_cache_ttl} -Dorg.apache.jasper.compiler.disablejsr199=true -XX:+UseG1GC -XX:SoftRefLRUPolicyMSPerMB=1 -XX:+UnlockExperimentalVMOptions -XX:G1NewSizePercent=15 -XX:G1MaxNewSizePercent=45 -XX:-OmitStackTraceInFastThrow -verbose:gc -Xlog:gc*=info,safepoint=info:file=/opt/zextras/log/gc.log:time:filecount=20,filesize=10m -Djava.net.preferIPv4Stack=true -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005 -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=5000 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false</value>
   </key>
   <key name="ldap_is_master">
     <value>true</value>
