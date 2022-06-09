@@ -5,6 +5,7 @@ import (
 	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
 	exec2 "bitbucket.org/zextras/service-discover/cli/lib/exec"
 	"bitbucket.org/zextras/service-discover/cli/lib/formatter"
+	"bitbucket.org/zextras/service-discover/cli/lib/permissions"
 	"bitbucket.org/zextras/service-discover/cli/lib/systemd"
 	"bitbucket.org/zextras/service-discover/cli/lib/zimbra"
 	"bufio"
@@ -62,7 +63,17 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 		return err
 	}
 
-	consulConfigFile, err := s.generateKeys(d, zimbraHostname)
+	err = s.generateCertificationAuthority(d)
+	if err != nil {
+		return err
+	}
+
+	gossipKey, err := generateGossipKey()
+	if err != nil {
+		return err
+	}
+
+	consulConfigFile, err := s.generateCertificateAndConfig(d, zimbraHostname, gossipKey)
 	if err != nil {
 		return err
 	}
@@ -70,21 +81,29 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 	if err != nil {
 		return err
 	}
-	// FIXME the ownership of the file should be fixed! + 0600 perm should be used
-	if err := ioutil.WriteFile(s.ConsulFileConfig, consulFileBytes, os.FileMode(0644)); err != nil {
+	if err := ioutil.WriteFile(s.ConsulFileConfig, consulFileBytes, os.FileMode(0600)); err != nil {
 		return errors.New(fmt.Sprintf("unable to save generated configuration file in %s: %s", s.ConsulHome, err))
+	}
+
+	err = permissions.SetStrictPermissions(d, s.ConsulFileConfig)
+	if err != nil {
+		return err
 	}
 
 	if err := command.SaveBindAddressConfiguration(s.MutableConfigFile, inputs.BindAddress); err != nil {
 		return err
 	}
 
+	err = permissions.SetStrictPermissions(d, s.MutableConfigFile)
+	if err != nil {
+		return err
+	}
+
 	if err := command.AddServiceInLDAP(ldapHandler, zimbraHostname); err != nil {
 		return err
 	}
-	err = systemd.StartSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit)
-	if err != nil {
-		return err
+	if err := systemd.StartSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit); err != nil {
+		return errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
 	}
 	aclBootstrapJson, err := s.createACLBootstrapToken(d)
 	if err != nil {
@@ -134,6 +153,10 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 	}
 
 	if err = s.createEncryptedSecret(filesToCompress, inputs.Password); err != nil {
+		return err
+	}
+
+	if err = ioutil.WriteFile(s.ConsulHome+"/password", []byte(s.Password), 0400); err != nil {
 		return err
 	}
 
@@ -218,9 +241,7 @@ func (s *Setup) createACLBootstrapToken(d businessDependencies) ([]byte, error) 
 	}
 }
 
-// generateKeys creates the TLS certificates for consul and finally it generates the gossip key. This ensure secure
-// communications inside Consul
-func (s *Setup) generateKeys(d businessDependencies, zimbraHostname string) (*setupConfig, error) {
+func (s *Setup) generateCertificationAuthority(d businessDependencies) error {
 	certificateDaysFlag := fmt.Sprintf("-days=%d", certificateExpiration)
 	err := exec2.InPath(
 		d.CreateCommand(consulBin,
@@ -232,48 +253,18 @@ func (s *Setup) generateKeys(d businessDependencies, zimbraHostname string) (*se
 		s.ConsulHome,
 	)
 	if err != nil {
-		return nil, exec2.ErrorFromStderr(err, "unable to create a valid CA with Consul")
-	}
-	err = exec2.InPath(
-		d.CreateCommand(consulBin,
-			"tls",
-			"cert",
-			"create",
-			certificateDaysFlag,
-			"-server"),
-		s.ConsulHome,
-	)
-	if err != nil {
-		return nil, errors.New("unable to create a valid certificate with Consul")
-	}
-	gossipKey, err := generateGossipKey()
-	if err != nil {
-		return nil, err
+		return exec2.ErrorFromStderr(err, "unable to create a valid CA with Consul")
 	}
 
-	consulConfigFile := &setupConfig{
-		AclConfig: aclConfig{
-			Enabled:                true,
-			EnableTokenPersistence: true,
-			DefaultPolicy:          "deny",
-			DownPolicy:             "extend-cache",
-		},
-		AutoEncrypt:             autoEncrypt{AllowTLS: true},
-		CaFile:                  s.ConsulHome + "/" + command.ConsulCA,
-		CertFile:                s.ConsulHome + "/" + command.ConsulServerCertificate,
-		DataDir:                 s.ConsulData,
-		EnableLocalScriptChecks: true,
-		Encrypt:                 gossipKey,
-		KeyFile:                 s.ConsulHome + "/" + command.ConsulServerCertificateKey,
-		LogLevel:                defaultLogLevel,
-		NodeName:                command.ConsulNodeName(command.Server, zimbraHostname),
-		Server:                  true,
-		VerifyIncoming:          true,
-		VerifyOutgoing:          true,
-		VerifyServerHostname:    true,
-		UiConfig:                uiConfig{Enabled: true},
-		Ports:                   portsConfig{Grpc: 8502},
-		Connect:                 connectConfig{Enabled: true},
+	err = permissions.SetStrictPermissions(d, s.ConsulHome+"/consul-agent-ca-key.pem")
+	if err != nil {
+		return err
 	}
-	return consulConfigFile, nil
+
+	err = permissions.SetStrictPermissions(d, s.ConsulHome+"/consul-agent-ca.pem")
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

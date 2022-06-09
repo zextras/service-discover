@@ -38,7 +38,7 @@ func loadLocalConfig(path string) (*rawLocalConfig, error) {
 	zimbraLocalConfig := &rawLocalConfig{}
 	localConfigBytes, err := ioutil.ReadFile(path)
 	if err != nil {
-		return nil, errors.New("unable to parse Zimbra local config at: " + path)
+		return nil, errors.New("unable to parse local config at: " + path)
 	}
 	err = xml.Unmarshal(localConfigBytes, zimbraLocalConfig)
 	if err != nil {
@@ -77,6 +77,21 @@ func LoadLocalConfig(path string) (LocalConfig, error) {
 		}
 	}
 
+	requiredFields := []string{
+		LocalConfigLdapMasterUrl,
+		LocalConfigLdapUrl,
+		LocalConfigLdapUserDn,
+		LocalConfigLdapPassword,
+		LocalConfigServerHostname,
+	}
+
+	for _, field := range requiredFields {
+		_, present := localConfigIndex[field]
+		if !present {
+			return nil, errors.New("carbonio is not correctly initialized, please run carbonio-bootstrap (missing required field '" + field + "' in localconfig)")
+		}
+	}
+
 	return &indexedLocalConfig{localConfigIndex: localConfigIndex}, nil
 }
 
@@ -84,6 +99,7 @@ func LoadLocalConfig(path string) (LocalConfig, error) {
 func (l *indexedLocalConfig) Value(key string) string {
 	return l.localConfigIndex[key].Value
 }
+
 // Value perform a value lookup in the Zimbra local configuration
 // and extracts one or multiple values, split by a space ' '
 func (l *indexedLocalConfig) Values(key string) []string {

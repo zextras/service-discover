@@ -44,7 +44,22 @@ func (s *Wizard) Run(commonFlags *command.GlobalCommonFlags) error {
 	if commonFlags.Format != formatter.PlainFormatOutput {
 		return errors.New("only plain formatting is supported when in wizard mode")
 	}
-	inputs, err := gatherInputs(d)
+
+	//if manually specified do not check it
+	if !s.FirstInstance {
+		s.FirstInstance, err = s.originalSetup.isFirstInstance(d)
+		if err != nil {
+			return err
+		}
+	}
+
+	if s.FirstInstance {
+		term.MustWrite(ui.WriteString("Setup of first service-discover server instance\r\n"))
+	} else {
+		term.MustWrite(ui.WriteString("Setup of secondary service-discover server instance\r\n"))
+	}
+
+	inputs, err := gatherInputs(d, s.FirstInstance)
 	if err != nil {
 		return err
 	}
@@ -56,14 +71,6 @@ func (s *Wizard) Run(commonFlags *command.GlobalCommonFlags) error {
 	s.originalSetup.Password = s.Password
 	s.originalSetup.BindAddress = s.BindAddress
 	s.originalSetup.FirstInstance = s.FirstInstance
-
-	//if manually specified do not check it
-	if !s.FirstInstance {
-		s.FirstInstance, err = s.originalSetup.isFirstInstance(d)
-		if err != nil {
-			return err
-		}
-	}
 
 	if s.FirstInstance {
 		_, err = s.originalSetup.firstSetup(d)

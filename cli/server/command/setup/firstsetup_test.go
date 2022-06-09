@@ -9,6 +9,7 @@ import (
 	"bitbucket.org/zextras/service-discover/cli/lib/term/mocks"
 	mocks5 "bitbucket.org/zextras/service-discover/cli/lib/zimbra/mocks"
 	mocks2 "bitbucket.org/zextras/service-discover/cli/server/command/setup/mocks"
+	"os/user"
 	"syscall"
 
 	"bitbucket.org/zextras/service-discover/cli/lib/test"
@@ -299,9 +300,25 @@ func mockBusinessDependencies(
 			"-format",
 			"json",
 		),
+	).On(
+		"LookupUser", "service-discover").Return(&user.User{
+		Uid:      "1234",
+		Gid:      "0",
+		Username: "service-discover",
+		Name:     "service-discover",
+		HomeDir:  "/var/lib/service-discover",
+	}, nil).On(
+		"LookupGroup", "service-discover").Return(&user.Group{
+		Gid:  "123456",
+		Name: "service-discover",
+	}, nil).On("Chown", mock.AnythingOfType("string"), 1234, 123456).Return(
+		nil,
+	).On("Chmod", mock.AnythingOfType("string"), os.FileMode(0600)).Return(
+		nil,
 	).On("SystemdUnitHandler").Return(mockSystemdUnit, nil).
 		On("LocalConfigLoader", setup.LocalConfigPath).Return(mockLocalConfig).
 		On("LdapHandler", mock.Anything).Return(mockLdapHandler)
+
 	mockSystemdUnit.On("EnableUnitFiles", []string{"service-discover.service"}, false, false).Return(
 		false, nil, nil,
 	).On("StartUnit", "service-discover.service", "replace", mock.Anything).Return(
@@ -410,7 +427,7 @@ func TestFirstSetup_inputs(t *testing.T) {
 		mockDependencies.On("Term").Return(mockTerm)
 		mockNetwork(mockDependencies, false, false)
 
-		configurations, err := gatherInputs(mockDependencies)
+		configurations, err := gatherInputs(mockDependencies, true)
 		assert.NoError(t, err)
 		assert.NotNil(t, configurations)
 
@@ -440,7 +457,7 @@ Specify the binding address for service discovery: `, string(allOut))
 		mockDependencies.On("Term").Return(mockTerm)
 		mockNetwork(mockDependencies, true, false)
 
-		configurations, err := gatherInputs(mockDependencies)
+		configurations, err := gatherInputs(mockDependencies, true)
 		assert.NoError(t, err)
 		assert.NotNil(t, configurations)
 
@@ -470,7 +487,7 @@ Specify the binding address for service discovery: `, string(allOut))
 		mockDependencies.On("Term").Return(mockTerm)
 		mockNetwork(mockDependencies, true, false)
 
-		configurations, err := gatherInputs(mockDependencies)
+		configurations, err := gatherInputs(mockDependencies, true)
 		assert.EqualError(t, err, "invalid binding address selected")
 		assert.Nil(t, configurations)
 		allOut, _ := io.ReadAll(out)
@@ -495,7 +512,7 @@ Specify the binding address for service discovery: `, string(allOut))
 		mockDependencies.On("Term").Return(mockTerm)
 		mockNetwork(mockDependencies, true, true)
 
-		configurations, err := gatherInputs(mockDependencies)
+		configurations, err := gatherInputs(mockDependencies, true)
 		assert.NoError(t, err)
 		assert.NotNil(t, configurations)
 

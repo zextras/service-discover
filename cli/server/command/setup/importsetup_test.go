@@ -10,15 +10,48 @@ import (
 	"bitbucket.org/zextras/service-discover/cli/lib/zimbra/mocks"
 	mocks2 "bitbucket.org/zextras/service-discover/cli/server/command/setup/mocks"
 	"bitbucket.org/zextras/service-discover/cli/server/config"
+	"bytes"
 	"fmt"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"io/fs"
 	"io/ioutil"
 	"net"
 	"os"
+	native_exec "os/exec"
+	"os/user"
+	"syscall"
 	"testing"
+	"time"
 )
+
+type FakeFileStat struct {
+	size int64
+}
+
+func (f FakeFileStat) Name() string {
+	panic("implement me")
+}
+
+func (f FakeFileStat) Size() int64 {
+	return f.size
+}
+
+func (f FakeFileStat) Mode() fs.FileMode {
+	return fs.FileMode(0600)
+}
+
+func (f FakeFileStat) ModTime() time.Time {
+	return time.Now()
+}
+
+func (f FakeFileStat) IsDir() bool {
+	return false
+}
+
+func (f FakeFileStat) Sys() interface{} {
+	panic("implement me")
+}
 
 func TestSetup_importSetup(t *testing.T) {
 	t.Parallel()
@@ -94,6 +127,8 @@ func TestSetup_importSetup(t *testing.T) {
 		setupFiles, cleanup := setup("Test cluster credentials is required")
 		defer cleanup()
 		businessDep := new(mocks2.BusinessDependencies)
+		setupNetwork(businessDep)
+		setupLdapMock(businessDep)
 		s := &Setup{
 			ConsulConfigDir:   setupFiles.consulConfigDir,
 			ConsulHome:        setupFiles.consulHome,
@@ -102,6 +137,7 @@ func TestSetup_importSetup(t *testing.T) {
 			ConsulFileConfig:  setupFiles.consulFileConfig,
 			ClusterCredential: setupFiles.clusterCredentials,
 			MutableConfigFile: setupFiles.mutableConfigFile,
+			BindAddress:       "127.0.0.1",
 		}
 		assert.NoError(t, os.Remove(setupFiles.clusterCredentials))
 		_, err := s.importSetup(businessDep)
@@ -119,34 +155,7 @@ func TestSetup_importSetup(t *testing.T) {
 		setupFiles, cleanup := setup("Wrong binding address")
 		defer cleanup()
 		businessDep := new(mocks2.BusinessDependencies)
-		businessDep.On("NetInterfaces").Return([]net.Interface{
-			{
-				Index:        1, // Read GoDoc about net.Interface if you're puzzled by this
-				MTU:          42,
-				Name:         "lo",
-				HardwareAddr: []byte("00:00:00:00:00:00"),
-				Flags:        0,
-			},
-			{
-				Index:        1, // Read GoDoc about net.Interface if you're puzzled by this
-				MTU:          42,
-				Name:         "eno0",
-				HardwareAddr: []byte("78:bc:e6:2f:8a:d7"),
-				Flags:        0,
-			},
-			{
-				Index:        1,
-				MTU:          42,
-				Name:         "eno1",
-				HardwareAddr: []byte("c6:f4:44:4f:9a:07"),
-				Flags:        0,
-			},
-		}, nil).
-			On("AddrResolver", mock.AnythingOfType("net.Interface")).Return([]net.Addr{
-			&addrStub{ip: "127.0.0.1"},
-			// We don't need any particular data here, just return something it is not the
-			// bind address
-		}, nil)
+		setupNetwork(businessDep)
 		s := &Setup{
 			ConsulConfigDir:   setupFiles.consulConfigDir,
 			ConsulHome:        setupFiles.consulHome,
@@ -169,34 +178,8 @@ func TestSetup_importSetup(t *testing.T) {
 		setupFiles, cleanup := setup("Wrong cluster credentials password")
 		defer cleanup()
 		businessDep := new(mocks2.BusinessDependencies)
-		businessDep.On("NetInterfaces").Return([]net.Interface{
-			{
-				Index:        1, // Read GoDoc about net.Interface if you're puzzled by this
-				MTU:          42,
-				Name:         "lo",
-				HardwareAddr: []byte("00:00:00:00:00:00"),
-				Flags:        0,
-			},
-			{
-				Index:        1, // Read GoDoc about net.Interface if you're puzzled by this
-				MTU:          42,
-				Name:         "eno0",
-				HardwareAddr: []byte("78:bc:e6:2f:8a:d7"),
-				Flags:        0,
-			},
-			{
-				Index:        1,
-				MTU:          42,
-				Name:         "eno1",
-				HardwareAddr: []byte("c6:f4:44:4f:9a:07"),
-				Flags:        0,
-			},
-		}, nil).
-			On("AddrResolver", mock.AnythingOfType("net.Interface")).Return([]net.Addr{
-			&addrStub{ip: "127.0.0.1"},
-			// We don't need any particular data here, just return something it is not the
-			// bind address
-		}, nil)
+		setupNetwork(businessDep)
+		setupLdapMock(businessDep)
 		s := &Setup{
 			ConsulConfigDir:   setupFiles.consulConfigDir,
 			ConsulHome:        setupFiles.consulHome,
@@ -236,35 +219,8 @@ func TestSetup_importSetup(t *testing.T) {
 		setupFiles, cleanup := setup("Run with correct configuration and flags")
 		defer cleanup()
 		businessDep := new(mocks2.BusinessDependencies)
-		businessDep.On("NetInterfaces").Return([]net.Interface{
-			{
-				Index:        1, // Read GoDoc about net.Interface if you're puzzled by this
-				MTU:          42,
-				Name:         "lo",
-				HardwareAddr: []byte("00:00:00:00:00:00"),
-				Flags:        0,
-			},
-			{
-				Index:        1, // Read GoDoc about net.Interface if you're puzzled by this
-				MTU:          42,
-				Name:         "eno0",
-				HardwareAddr: []byte("78:bc:e6:2f:8a:d7"),
-				Flags:        0,
-			},
-			{
-				Index:        1,
-				MTU:          42,
-				Name:         "eno1",
-				HardwareAddr: []byte("c6:f4:44:4f:9a:07"),
-				Flags:        0,
-			},
-		}, nil).
-			On("AddrResolver", mock.AnythingOfType("net.Interface")).Return([]net.Addr{
-			&addrStub{ip: "127.0.0.1"},
-			// We don't need any particular data here, just return something it is not the
-			// bind address
-		}, nil).On("LookupIP", "mailbox-1.example.com").Return([]net.IP{net.IPv4(1,1,1,1)},nil)
-
+		setupNetwork(businessDep)
+		setupBusinessDeps(businessDep)
 
 		s := &Setup{
 			ConsulConfigDir:   setupFiles.consulConfigDir,
@@ -281,36 +237,35 @@ func TestSetup_importSetup(t *testing.T) {
 		assert.NoError(t, err)
 		tarWriter, err := credentialsEncrypter.NewWriter(clusterCredential, []byte("password"))
 		assert.NoError(t, err)
-		assert.NoError(t, ioutil.WriteFile(setupFiles.consulFileConfig, []byte("Test"), os.FileMode(0644)))
-		assert.NoError(t, ioutil.WriteFile(setupFiles.consulCAKeyFile, []byte("Test"), os.FileMode(0644)))
-		assert.NoError(t, ioutil.WriteFile(setupFiles.consulCertificate, []byte("Test"), os.FileMode(0644)))
-		assert.NoError(t, ioutil.WriteFile(setupFiles.consulAclBootstrap, []byte("Test"), os.FileMode(0644)))
-		consulFileConfig, err := os.Open(setupFiles.consulFileConfig)
-		assert.NoError(t, err)
-		consulAclBootstrap, err := os.Open(setupFiles.consulAclBootstrap)
-		assert.NoError(t, err)
-		consulFileConfigStat, err := consulFileConfig.Stat()
-		assert.NoError(t, err)
-		consulAclBootstrapStat, err := consulAclBootstrap.Stat()
-		assert.NoError(t, err)
 
 		assert.NoError(t, tarWriter.AddFile(
-			consulFileConfig,
-			consulFileConfigStat,
+			bytes.NewBuffer([]byte("Test")),
+			&FakeFileStat{size: 4},
 			command.ConsulCA,
 			setupFiles.consulHome+"/",
 		))
 		assert.NoError(t, tarWriter.AddFile(
-			consulAclBootstrap,
-			consulAclBootstrapStat,
+			bytes.NewBuffer([]byte("Test")),
+			&FakeFileStat{size: 4},
+			command.ConsulCAKey,
+			setupFiles.consulHome+"/",
+		))
+		assert.NoError(t, tarWriter.AddFile(
+			bytes.NewBuffer([]byte("{\"blabla\": \"123\",\"SecretID\": \"c182a76b-d26f-92fb-de9b-2f828e8730bd\"}")),
+			&FakeFileStat{size: 68},
 			command.ConsulAclBootstrap,
+			"/",
+		))
+		assert.NoError(t, tarWriter.AddFile(
+			bytes.NewBuffer([]byte("random")),
+			&FakeFileStat{size: 6},
+			command.GossipKey,
 			"/",
 		))
 		assert.NoError(t, tarWriter.Close())
 
 		tlsCertCreateMock := new(mocks3.Cmd)
 		tlsCertCreateMock.On("Output").Return([]byte("random"), nil)
-
 		businessDep.On("CreateCommand",
 			"/usr/bin/consul",
 			"tls",
@@ -318,17 +273,97 @@ func TestSetup_importSetup(t *testing.T) {
 			"create",
 			fmt.Sprintf("-days=%d", certificateExpiration),
 			"-server",
-			"-ca",
-			mock.AnythingOfType("string"),
 		).Return(tlsCertCreateMock)
 
-		ldapMockHandler := new(mocks.LdapHandler)
-		ldapMockHandler.On("CheckServerAvailability", true).Return(nil)
-		ldapMockHandler.
-			On("AddService", "mailbox-1.example.com", zimbra.ServiceDiscoverServiceName).
-			Return(nil)
-		businessDep.On("LdapHandler", mock.Anything).Return(ldapMockHandler)
+		tokenCreateMock := new(mocks3.Cmd)
+		tokenCreateMock.On("Output").Return([]byte(`{
+		  "SecretID": "secret-token-2"
+		}`), nil)
+
+		setTokenCmd := new(mocks3.Cmd)
+		setTokenCmd.On("Output").Return(make([]byte, 0), nil)
+		businessDep.On("CreateCommand",
+			"/usr/bin/consul",
+			"acl",
+			"set-agent-token",
+			"default",
+			"secret-token-2",
+		).Return(setTokenCmd)
+		aclPolicyCreateMock := new(mocks3.Cmd)
+		aclPolicyCreateMock.On("Output").Return([]byte("something"), nil)
+		businessDep.On("CreateCommand",
+			"/usr/bin/consul",
+			"acl",
+			"policy",
+			"create",
+			"-name",
+			"server-mailbox-1-example-com",
+			"-rules",
+			`{
+   "node":{
+      "server-mailbox-1-example-com":{
+         "policy":"write"
+      }
+   },
+   "node_prefix":{
+      "":{
+         "policy":"read"
+      }
+   },
+   "service_prefix":{
+      "":{
+         "policy":"write"
+      }
+   }
+}`).Return(aclPolicyCreateMock, nil).
+			On("CreateCommand",
+				"/usr/bin/consul",
+				"acl",
+				"token",
+				"create",
+				"-policy-name",
+				"server-mailbox-1-example-com",
+				"-format",
+				"json").
+			Return(tokenCreateMock)
+
+		var cleanups = make([]func(), 0)
+		defer func() {
+			for _, f := range cleanups {
+				f()
+			}
+		}()
+		setupLdapMock(businessDep)
 		systemdUnitMock := new(mocks4.UnitManager)
+		systemdUnitMock.On("StartUnit", "service-discover.service", "replace", mock.Anything).Return(
+			0, nil,
+		).Run(func(args mock.Arguments) {
+			ch := args.Get(2).(chan<- string)
+
+			cmd := native_exec.Command(
+				"/usr/bin/consul",
+				"agent",
+				"-dev", //otherwise it takes up to 10 seconds to boostrap
+				"-config-dir",
+				s.ConsulConfigDir,
+				"-server",
+				"-bind",
+				"127.0.0.1", //otherwise test address will be used
+			)
+			err := cmd.Start()
+			if err != nil {
+				panic(err)
+			}
+
+			cleanups = append(cleanups, func() {
+				err := syscall.Kill(cmd.Process.Pid, syscall.SIGTERM)
+				if err != nil {
+					panic(err)
+				}
+			})
+			time.Sleep(250 * time.Millisecond)
+			ch <- "done"
+		})
 		systemdUnitMock.On("EnableUnitFiles", []string{"service-discover.service"}, false, false).Return(false, nil, nil)
 		systemdUnitMock.On("Close").Return(nil)
 		businessDep.On("SystemdUnitHandler").Return(systemdUnitMock, nil)
@@ -338,82 +373,65 @@ func TestSetup_importSetup(t *testing.T) {
 	})
 }
 
-func TestCreateTLSCertificate(t *testing.T) {
-	t.Parallel()
+func setupLdapMock(businessDep *mocks2.BusinessDependencies) {
+	ldapMockHandler := new(mocks.LdapHandler)
+	ldapMockHandler.On("CheckServerAvailability", true).Return(nil)
+	ldapMockHandler.
+		On("AddService", "mailbox-1.example.com", zimbra.ServiceDiscoverServiceName).
+		Return(nil)
+	businessDep.On("LdapHandler", mock.Anything).Return(ldapMockHandler)
+}
 
-	type setupData struct {
-		consulHome string
-		caFile     string
-	}
-	setup := func(name string) (*setupData, func()) {
-		consulFile := test.GenerateRandomFile(name)
-		consulHome := test.GenerateRandomFolder(name)
+func setupBusinessDeps(businessDep *mocks2.BusinessDependencies) {
+	businessDep.On(
+		"LookupUser", "service-discover").Return(&user.User{
+		Uid:      "1234",
+		Gid:      "0",
+		Username: "service-discover",
+		Name:     "service-discover",
+		HomeDir:  "/var/lib/service-discover",
+	}, nil).On(
+		"LookupGroup", "service-discover").Return(&user.Group{
+		Gid:  "123456",
+		Name: "service-discover",
+	}, nil).On("Chown", mock.AnythingOfType("string"), 1234, 123456).Return(
+		nil,
+	).On("Chmod", mock.AnythingOfType("string"), os.FileMode(0600)).Return(
+		nil,
+	)
+}
+func setupNetwork(businessDep *mocks2.BusinessDependencies) {
+	businessDep.On("NetInterfaces").Return([]net.Interface{
+		{
+			Index:        1, // Read GoDoc about net.Interface if you're puzzled by this
+			MTU:          42,
+			Name:         "lo",
+			HardwareAddr: []byte("00:00:00:00:00:00"),
+			Flags:        0,
+		},
+		{
+			Index:        1, // Read GoDoc about net.Interface if you're puzzled by this
+			MTU:          42,
+			Name:         "eno0",
+			HardwareAddr: []byte("78:bc:e6:2f:8a:d7"),
+			Flags:        0,
+		},
+		{
+			Index:        1,
+			MTU:          42,
+			Name:         "eno1",
+			HardwareAddr: []byte("c6:f4:44:4f:9a:07"),
+			Flags:        0,
+		},
+	}, nil).
+		On("AddrResolver", mock.AnythingOfType("net.Interface")).Return([]net.Addr{
+		&addrStub{ip: "127.0.0.1"},
+		// We don't need any particular data here, just return something it is not the
+		// bind address
+	}, nil)
 
-		return &setupData{
-				consulHome: consulHome,
-				caFile:     consulFile.Name(),
-			},
-			func() {
-				err := os.RemoveAll(consulFile.Name())
-				err = os.RemoveAll(consulHome)
-				if err != nil {
-					panic(err)
-				}
-			}
-	}
-
-	t.Run("Works correctly", func(t *testing.T) {
-		setupData, cleanup := setup("Works correctly")
-		defer cleanup()
-		mockCmd := new(mocks3.Cmd)
-		mockCmd.On("Output").Return([]byte("random"), nil)
-		businessDep := new(mocks2.BusinessDependencies)
-		certificateDaysFlag := fmt.Sprintf("-days=%d", certificateExpiration)
-		businessDep.On("CreateCommand",
-			"/usr/bin/consul",
-			"tls",
-			"cert",
-			"create",
-			certificateDaysFlag,
-			"-server",
-			"-ca",
-			setupData.caFile,
-		).Return(mockCmd)
-		s := Setup{
-			ConsulHome: setupData.consulHome,
-		}
-		file, err := os.Create(setupData.caFile)
-		assert.NoError(t, err)
-		assert.NoError(t, s.createTLSCertificate(businessDep, file))
-	})
-
-	t.Run("Error should propagate if command fails", func(t *testing.T) {
-		setupData, cleanup := setup("Works correctly")
-		defer cleanup()
-		mockCmd := new(mocks3.Cmd)
-		expectedErrorMessage := "this is an error"
-		mockCmd.On("Output").Return(nil, errors.New(expectedErrorMessage))
-		businessDep := new(mocks2.BusinessDependencies)
-		certificateDaysFlag := fmt.Sprintf("-days=%d", certificateExpiration)
-		businessDep.On("CreateCommand",
-			"/usr/bin/consul",
-			"tls",
-			"cert",
-			"create",
-			certificateDaysFlag,
-			"-server",
-			"-ca",
-			setupData.caFile,
-		).Return(mockCmd)
-		s := Setup{
-			ConsulHome: setupData.consulHome,
-		}
-		file, err := os.Create(setupData.caFile)
-		assert.NoError(t, err)
-		assert.EqualError(
-			t,
-			s.createTLSCertificate(businessDep, file),
-			fmt.Sprintf("unable to generate correct CA certificate: %s", expectedErrorMessage),
-		)
-	})
+	businessDep.On("LookupIP", "mailbox-1.example.com").Return(
+		[]net.IP{net.IPv4(1, 1, 1, 1)},
+		nil,
+	)
 }

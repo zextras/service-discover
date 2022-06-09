@@ -2,7 +2,9 @@ package setup
 
 import (
 	"bitbucket.org/zextras/service-discover/cli/lib/command"
+	"bitbucket.org/zextras/service-discover/cli/lib/exec"
 	"bitbucket.org/zextras/service-discover/cli/lib/formatter"
+	"bitbucket.org/zextras/service-discover/cli/lib/permissions"
 	"bitbucket.org/zextras/service-discover/cli/lib/systemd"
 	"bitbucket.org/zextras/service-discover/cli/lib/term"
 	"bitbucket.org/zextras/service-discover/cli/lib/zimbra"
@@ -13,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -115,13 +118,22 @@ func (n *nonInteractiveOutput) JsonRender() (string, error) {
 	return formatter.DefaultJsonRender(n)
 }
 
-func gatherInputs(d interactiveDependencies) (*setupConfiguration, error) {
+func gatherInputs(d interactiveDependencies, firstInstance bool) (*setupConfiguration, error) {
 	bindAddress, err := wizardBindAddressSelection(d)
 	if err != nil {
 		return nil, err
 	}
 
-	password := term.MustRead(d.Term().ReadPassword("Create the cluster credentials password (will be used for setups): "))
+	var password string
+	if firstInstance {
+		firstPassword := term.MustRead(d.Term().ReadPassword("Create the cluster credentials password (will be used for setups): "))
+		password = term.MustRead(d.Term().ReadPassword("Type the credential password again: "))
+		if password != firstPassword {
+			return nil, errors.New("passwords do not match")
+		}
+	} else {
+		password = term.MustRead(d.Term().ReadPassword("Insert the cluster credential password: "))
+	}
 
 	return &setupConfiguration{
 		Password:    password,
@@ -205,7 +217,10 @@ func preRun(d businessDependencies) error {
 		return errors.New("this command must be executed as root")
 	}
 
-	//TODO: check if already present in LDAP or second setup
+	_, err = os.Stat(config.ConsultFileConfig)
+	if err == nil {
+		return errors.New(fmt.Sprintf("setup of service-discover already perfomed, manually reset and try again."))
+	}
 
 	return nil
 }
@@ -286,4 +301,58 @@ func wizardBindAddressSelection(d interactiveDependencies) (string, error) {
 		return "", err
 	}
 	return bindingAddress, nil
+}
+
+// generateCertificateAndConfig creates the TLS certificates for consul and finally it generates the gossip key. This ensure secure
+// communications inside Consul
+func (s *Setup) generateCertificateAndConfig(d businessDependencies, zimbraHostname string, gossipKey string) (*setupConfig, error) {
+	certificateDaysFlag := fmt.Sprintf("-days=%d", certificateExpiration)
+	err := exec.InPath(
+		d.CreateCommand(consulBin,
+			"tls",
+			"cert",
+			"create",
+			certificateDaysFlag,
+			"-server"),
+		s.ConsulHome,
+	)
+	if err != nil {
+		return nil, errors.New("unable to create a valid certificate with Consul")
+	}
+
+	err = permissions.SetStrictPermissions(d, filepath.Join(s.ConsulHome, command.ConsulServerCertificateKey))
+	if err != nil {
+		return nil, err
+	}
+
+	err = permissions.SetStrictPermissions(d, filepath.Join(s.ConsulHome, command.ConsulServerCertificate))
+	if err != nil {
+		return nil, err
+	}
+
+	consulConfigFile := &setupConfig{
+		AclConfig: aclConfig{
+			Enabled:                true,
+			EnableTokenPersistence: true,
+			DefaultPolicy:          "deny",
+			DownPolicy:             "extend-cache",
+		},
+		AutoEncrypt:             autoEncrypt{AllowTLS: true},
+		CaFile:                  s.ConsulHome + "/" + command.ConsulCA,
+		CertFile:                s.ConsulHome + "/" + command.ConsulServerCertificate,
+		DataDir:                 s.ConsulData,
+		EnableLocalScriptChecks: true,
+		Encrypt:                 gossipKey,
+		KeyFile:                 s.ConsulHome + "/" + command.ConsulServerCertificateKey,
+		LogLevel:                defaultLogLevel,
+		NodeName:                command.ConsulNodeName(command.Server, zimbraHostname),
+		Server:                  true,
+		VerifyIncoming:          true,
+		VerifyOutgoing:          true,
+		VerifyServerHostname:    true,
+		UiConfig:                uiConfig{Enabled: true},
+		Ports:                   portsConfig{Grpc: 8502},
+		Connect:                 connectConfig{Enabled: true},
+	}
+	return consulConfigFile, nil
 }

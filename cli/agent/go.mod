@@ -8,6 +8,7 @@ replace (
 	bitbucket.org/zextras/service-discover/cli/lib/exec => ./../lib/exec
 	bitbucket.org/zextras/service-discover/cli/lib/formatter => ./../lib/formatter
 	bitbucket.org/zextras/service-discover/cli/lib/parser => ./../lib/parser
+	bitbucket.org/zextras/service-discover/cli/lib/permissions => ./../lib/permissions
 	bitbucket.org/zextras/service-discover/cli/lib/systemd => ./../lib/systemd
 	bitbucket.org/zextras/service-discover/cli/lib/term => ./../lib/term
 	bitbucket.org/zextras/service-discover/cli/lib/test => ./../lib/test
@@ -20,6 +21,7 @@ require (
 	bitbucket.org/zextras/service-discover/cli/lib/exec v0.0.0-00010101000000-000000000000
 	bitbucket.org/zextras/service-discover/cli/lib/formatter v0.0.0-00010101000000-000000000000
 	bitbucket.org/zextras/service-discover/cli/lib/parser v0.0.0-00010101000000-000000000000
+	bitbucket.org/zextras/service-discover/cli/lib/permissions v0.0.0-00010101000000-000000000000
 	bitbucket.org/zextras/service-discover/cli/lib/systemd v0.0.0-00010101000000-000000000000
 	bitbucket.org/zextras/service-discover/cli/lib/term v0.0.0-00010101000000-000000000000
 	bitbucket.org/zextras/service-discover/cli/lib/test v0.0.0-00010101000000-000000000000

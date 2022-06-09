@@ -6,6 +6,7 @@ import (
 	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
 	"bitbucket.org/zextras/service-discover/cli/lib/exec"
 	"bitbucket.org/zextras/service-discover/cli/lib/formatter"
+	"bitbucket.org/zextras/service-discover/cli/lib/permissions"
 	"bitbucket.org/zextras/service-discover/cli/lib/systemd"
 	"bitbucket.org/zextras/service-discover/cli/lib/term"
 	"bitbucket.org/zextras/service-discover/cli/lib/zimbra"
@@ -17,6 +18,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 )
@@ -56,6 +58,10 @@ type businessDependencies interface {
 	SystemdUnitHandler() (systemd.UnitManager, error)
 	CreateCommand(name string, args ...string) exec.Cmd
 	GetuidSyscall() int
+	LookupUser(name string) (*user.User, error)
+	LookupGroup(name string) (*user.Group, error)
+	Chown(path string, userUid int, groupUid int) error
+	Chmod(path string, mode os.FileMode) error
 }
 
 type realDependencies struct {
@@ -96,6 +102,22 @@ func (r realDependencies) CreateCommand(name string, args ...string) exec.Cmd {
 
 func (r realDependencies) GetuidSyscall() int {
 	return os.Getuid()
+}
+
+func (r realDependencies) LookupUser(name string) (*user.User, error) {
+	return user.Lookup(name)
+}
+
+func (r realDependencies) LookupGroup(name string) (*user.Group, error) {
+	return user.LookupGroup(name)
+}
+
+func (r realDependencies) Chown(path string, userUid int, groupUid int) error {
+	return os.Chown(path, userUid, groupUid)
+}
+
+func (r realDependencies) Chmod(path string, mode os.FileMode) error {
+	return os.Chmod(path, mode)
 }
 
 type setupConfiguration struct {
@@ -224,7 +246,10 @@ func preRun(clusterCredentialPath string, d businessDependencies) error {
 	}
 	defer clusterCredentialFile.Close()
 
-	//TODO: check if already present in LDAP or second setup
+	_, err = os.Stat(config.ConsultFileConfig)
+	if err == nil {
+		return errors.New(fmt.Sprintf("setup of service-discover already perfomed, manually reset and try again."))
+	}
 
 	return nil
 }
@@ -283,6 +308,16 @@ func (s *Setup) createTLSCertificate(d businessDependencies, caFile *os.File, ca
 	if err != nil {
 		return exec.ErrorFromStderr(err, "unable to generate correct CA certificate")
 	}
+
+	err = permissions.SetStrictPermissions(d, filepath.Join(s.ConsulHome, command.ConsulAgentCertificate))
+	if err != nil {
+		return err
+	}
+
+	err = permissions.SetStrictPermissions(d, filepath.Join(s.ConsulHome, command.ConsulAgentCertificateKey))
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -321,7 +356,12 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := ioutil.WriteFile(caFile.Name(), extractedFiles[caPath], os.FileMode(0644)); err != nil {
+	if err := ioutil.WriteFile(caFile.Name(), extractedFiles[caPath], os.FileMode(0600)); err != nil {
+		return nil, err
+	}
+
+	err = permissions.SetStrictPermissions(d, caFile.Name())
+	if err != nil {
 		return nil, err
 	}
 
@@ -330,13 +370,19 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 		return nil, err
 	}
 	defer os.Remove(caKeyFile.Name())
-	if err := ioutil.WriteFile(caKeyFile.Name(), extractedFiles[caKeyPath], os.FileMode(0644)); err != nil {
+	if err := ioutil.WriteFile(caKeyFile.Name(), extractedFiles[caKeyPath], os.FileMode(0600)); err != nil {
+		return nil, err
+	}
+
+	err = permissions.SetStrictPermissions(d, caKeyFile.Name())
+	if err != nil {
 		return nil, err
 	}
 
 	if err := s.createTLSCertificate(d, caFile, caKeyFile); err != nil {
 		return nil, err
 	}
+
 	if err := os.Remove(caKeyFile.Name()); err != nil {
 		return nil, errors.WithMessage(err, "cannot remove secret "+caKeyFile.Name()+" please remove it manually")
 	}
@@ -387,7 +433,17 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 		return nil, err
 	}
 
+	err = permissions.SetStrictPermissions(d, s.ConsulFileConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := command.SaveBindAddressConfiguration(s.MutableConfigFile, s.BindAddress); err != nil {
+		return nil, err
+	}
+
+	err = permissions.SetStrictPermissions(d, s.MutableConfigFile)
+	if err != nil {
 		return nil, err
 	}
 
@@ -421,9 +477,10 @@ func writeSetupConfig(consulAgentConfig *setupConfig, destination string) error 
 	if err != nil {
 		return err
 	}
-	// FIXME the ownership of the file should be fixed! + 0600 perm should be used
-	if err := ioutil.WriteFile(destination, consulAgentBs, os.FileMode(0644)); err != nil {
+
+	if err := ioutil.WriteFile(destination, consulAgentBs, os.FileMode(0600)); err != nil {
 		return errors.WithMessagef(err, "unable to save generated configuration file in %s", destination)
 	}
+
 	return err
 }

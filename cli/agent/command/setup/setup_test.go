@@ -18,6 +18,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"os/user"
 	"path"
 	"path/filepath"
 	"testing"
@@ -260,6 +261,22 @@ func TestSetup_setup(t *testing.T) {
 		assert.NoError(t, writer.AddFile(dumbAclContent, aclStat, command.ConsulAclBootstrap, "/"))
 		assert.NoError(t, writer.Close())
 		mockDep := new(mocks.BusinessDependencies)
+		mockDep.On(
+			"LookupUser", "service-discover").Return(&user.User{
+			Uid:      "1234",
+			Gid:      "0",
+			Username: "service-discover",
+			Name:     "service-discover",
+			HomeDir:  "/var/lib/service-discover",
+		}, nil).On(
+			"LookupGroup", "service-discover").Return(&user.Group{
+			Gid:  "123456",
+			Name: "service-discover",
+		}, nil).On(
+			"Chown", mock.AnythingOfType("string"), 1234, 123456,
+		).Return(nil).On("Chmod", mock.AnythingOfType("string"), os.FileMode(0600)).Return(
+			nil,
+		)
 		certificateDaysFlag := fmt.Sprintf("-days=%d", certificateExpiration)
 		tlsCaCreateCmd := new(mocks2.Cmd)
 		tlsCaCreateCmd.On("Output").Return(make([]byte, 0), nil)
@@ -400,6 +417,22 @@ func TestSetup_setup(t *testing.T) {
 		assert.NoError(t, writer.AddFile(dumbCaKeyContent, caKeyStat, command.ConsulCAKey, consulHome+"/"))
 		assert.NoError(t, writer.Close())
 		mockDep := new(mocks.BusinessDependencies)
+		mockDep.On(
+			"LookupUser", "service-discover").Return(&user.User{
+			Uid:      "1234",
+			Gid:      "0",
+			Username: "service-discover",
+			Name:     "service-discover",
+			HomeDir:  "/var/lib/service-discover",
+		}, nil).On(
+			"LookupGroup", "service-discover").Return(&user.Group{
+			Gid:  "123456",
+			Name: "service-discover",
+		}, nil).On(
+			"Chown", mock.AnythingOfType("string"), 1234, 123456,
+		).Return(nil).On("Chmod", mock.AnythingOfType("string"), os.FileMode(0600)).Return(
+			nil,
+		)
 		certificateDaysFlag := fmt.Sprintf("-days=%d", certificateExpiration)
 		tlsCaCreateCmd := new(mocks2.Cmd)
 		tlsCaCreateCmd.On("Output").Return(make([]byte, 0), nil)

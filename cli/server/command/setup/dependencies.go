@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/user"
 )
 
 type interactiveDependencies interface {
@@ -28,6 +29,10 @@ type businessDependencies interface {
 	SystemdUnitHandler() (systemd.UnitManager, error)
 	CreateCommand(name string, args ...string) exec.Cmd
 	GetuidSyscall() int
+	LookupUser(name string) (*user.User, error)
+	LookupGroup(name string) (*user.Group, error)
+	Chown(path string, userUid int, groupUid int) error
+	Chmod(path string, mode os.FileMode) error
 }
 
 type realDependencies struct {
@@ -76,4 +81,20 @@ func (r realDependencies) CreateCommand(name string, args ...string) exec.Cmd {
 
 func (r realDependencies) GetuidSyscall() int {
 	return os.Getuid()
+}
+
+func (r realDependencies) LookupUser(name string) (*user.User, error) {
+	return user.Lookup(name)
+}
+
+func (r realDependencies) LookupGroup(name string) (*user.Group, error) {
+	return user.LookupGroup(name)
+}
+
+func (r realDependencies) Chown(path string, userUid int, groupUid int) error {
+	return os.Chown(path, userUid, groupUid)
+}
+
+func (r realDependencies) Chmod(path string, mode os.FileMode) error {
+	return os.Chmod(path, mode)
 }

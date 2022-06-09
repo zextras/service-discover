@@ -4,6 +4,7 @@ import (
 	"bitbucket.org/zextras/service-discover/cli/lib/exec"
 	"bitbucket.org/zextras/service-discover/cli/lib/zimbra"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
@@ -12,6 +13,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 )
 
 type ConsulRole = string
@@ -150,14 +152,14 @@ func AddServiceInLDAP(ldap zimbra.LdapHandler, zimbraHostname string) error {
 // SaveBindAddressConfiguration adds the bindAddress to the Consul configuration file
 func SaveBindAddressConfiguration(mutableConfig string, bindAddress string) error {
 	if strings.Contains(bindAddress, "/") {
-		bindAddress = strings.Split(bindAddress,"/")[0]
+		bindAddress = strings.Split(bindAddress, "/")[0]
 	}
 	mutableConsulConfig := MutableConsulConfig{BindAddress: bindAddress}
 	bs, err := json.MarshalIndent(mutableConsulConfig, "", "  ")
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(mutableConfig, bs, os.FileMode(0644))
+	return ioutil.WriteFile(mutableConfig, bs, os.FileMode(0600))
 }
 
 // ConsulNodeName allows you to retrieve the Consul node name based on the hostname and its role
@@ -189,34 +191,44 @@ func CreateACLToken(
 		return "", err
 	}
 
-	policyCreationCmd := commandCreator(ConsulBin,
-		"acl",
-		"policy",
-		"create",
-		"-name",
-		agentPolicyName,
-		"-rules",
-		string(aclPolicyBs),
-	)
-	_, _ = policyCreationCmd.Output()
-
-	// TODO: this will force token re-creation, that could be avoided. This is only a tidying up.
-	tokenCreationCmd := commandCreator(ConsulBin,
-		"acl",
-		"token",
-		"create",
-		"-policy-name",
-		agentPolicyName,
-		"-format",
-		"json",
-	)
-	tokenCmdResp, err := tokenCreationCmd.Output()
-	if err != nil {
-		return "", exec.ErrorFromStderr(err, "unable to create ACL token for policy "+agentPolicyName)
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
 	token := ACLTokenCreation{}
-	if err := json.Unmarshal(tokenCmdResp, &token); err != nil {
-		return "", errors.WithMessage(err, "unable to decode response from consul agent")
+	for {
+		policyCreationCmd := commandCreator(ConsulBin,
+			"acl",
+			"policy",
+			"create",
+			"-name",
+			agentPolicyName,
+			"-rules",
+			string(aclPolicyBs),
+		)
+		_, _ = policyCreationCmd.Output()
+
+		tokenCreationCmd := commandCreator(ConsulBin,
+			"acl",
+			"token",
+			"create",
+			"-policy-name",
+			agentPolicyName,
+			"-format",
+			"json",
+		)
+		tokenCmdResp, err := tokenCreationCmd.Output()
+		if err != nil {
+			select {
+			case <-time.After(time.Second):
+				continue
+			case <-ctx.Done():
+				return "", exec.ErrorFromStderr(err, "unable to create ACL token for policy "+agentPolicyName)
+			}
+		}
+
+		if err := json.Unmarshal(tokenCmdResp, &token); err != nil {
+			return "", errors.WithMessage(err, "unable to decode response from consul agent")
+		}
+		break
 	}
 
 	return token.SecretID, nil
@@ -243,13 +255,13 @@ func SetACLToken(commandCreator func(name string, args ...string) exec.Cmd, toke
 func CheckHostnameAddress(d NetworkInterfaces, hostname string) error {
 	addrs, err := d.LookupIP(hostname)
 	if err != nil {
-		return errors.WithMessagef(err,"cannot resolve hostname '%s'", hostname)
+		return errors.WithMessagef(err, "cannot resolve hostname '%s'", hostname)
 	}
 	if len(addrs) == 0 {
 		return errors.Errorf("cannot resolve hostname '%s'", hostname)
 	}
 	for _, addr := range addrs {
-		if addr.IsLoopback(){
+		if addr.IsLoopback() {
 			return errors.New(fmt.Sprintf("hostname '%s' is resolving with loopback address, should resolve with LAN address", hostname))
 		}
 	}
