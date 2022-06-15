@@ -3,8 +3,8 @@ targets=(
   "ubuntu"
 )
 pkgname="service-discover-server"
-pkgver="0.1.2"
-pkgrel="0"
+pkgver="0.1.5"
+pkgrel="1"
 pkgdesc="Service discover server cli"
 pkgdesclong=(
   "Service discover server cli"
