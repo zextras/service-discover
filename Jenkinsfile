@@ -19,7 +19,7 @@ pipeline {
         stage('Setup') {
             steps {
                 sh '''
-sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu bionic main" > /etc/apt/sources.list.d/zextras.list'
+sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal main" > /etc/apt/sources.list.d/zextras.list'
 '''
                 sh 'sudo apt-get update && sudo apt-get install -y service-discover-base'
             }
@@ -59,10 +59,10 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu bionic m
         }
         stage('Build deb/rpm') {
             parallel {
-                stage('Ubuntu 16.04') {
+                stage('Ubuntu 20.04') {
                     agent {
                         node {
-                            label 'pacur-agent-ubuntu-16.04-v1'
+                            label 'pacur-agent-ubuntu-20.04-v1'
                         }
                     }
                     steps {
@@ -78,10 +78,10 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu bionic m
                     }
                 }
 
-                stage('Centos 7') {
+                stage('Rocky 8') {
                     agent {
                         node {
-                            label 'pacur-agent-centos-7-v1'
+                            label 'pacur-agent-rocky-8-v1'
                         }
                     }
                     steps {
@@ -124,31 +124,31 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu bionic m
                             {
                                 "pattern": "artifacts/service-discover-server*.deb",
                                 "target": "ubuntu-playground/pool/",
-                                "props": "deb.distribution=xenial;deb.distribution=bionic;deb.distribution=focal;deb.component=main;deb.architecture=amd64"
+                                "props": "centos8deb.distribution=focal;deb.component=main;deb.architecture=amd64"
                             },
                             {
                                 "pattern": "artifacts/service-discover-agent*.deb",
                                 "target": "ubuntu-playground/pool/",
-                                "props": "deb.distribution=xenial;deb.distribution=bionic;deb.distribution=focal;deb.component=main;deb.architecture=amd64"
+                                "props": "centos8deb.distribution=focal;deb.component=main;deb.architecture=amd64"
                             },
                             {
                                 "pattern": "artifacts/service-discover-daemon*.deb",
                                 "target": "ubuntu-playground/pool/",
-                                "props": "deb.distribution=xenial;deb.distribution=bionic;deb.distribution=focal;deb.component=main;deb.architecture=amd64"
+                                "props": "centos8deb.distribution=focal;deb.component=main;deb.architecture=amd64"
                             },
                              {
                                 "pattern": "artifacts/(service-discover-server)-(*).rpm",
-                                "target": "centos7-playground/zextras/{1}/{1}-{2}.rpm",
+                                "target": "centos8-playground/zextras/{1}/{1}-{2}.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
                                 "pattern": "artifacts/(service-discover-agent)-(*).rpm",
-                                "target": "centos7-playground/zextras/{1}/{1}-{2}.rpm",
+                                "target": "centos8-playground/zextras/{1}/{1}-{2}.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
                                 "pattern": "artifacts/(service-discover-daemon)-(*).rpm",
-                                "target": "centos7-playground/zextras/{1}/{1}-{2}.rpm",
+                                "target": "centos8-playground/zextras/{1}/{1}-{2}.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
@@ -193,17 +193,17 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu bionic m
                             {
                                 "pattern": "artifacts/service-discover-server*.deb",
                                 "target": "ubuntu-rc/pool/",
-                                "props": "deb.distribution=xenial;deb.distribution=bionic;deb.distribution=focal;deb.component=main;deb.architecture=amd64"
+                                "props": "centos8deb.distribution=focal;deb.component=main;deb.architecture=amd64"
                             },
                             {
                                 "pattern": "artifacts/service-discover-agent*.deb",
                                 "target": "ubuntu-rc/pool/",
-                                "props": "deb.distribution=xenial;deb.distribution=bionic;deb.distribution=focal;deb.component=main;deb.architecture=amd64"
+                                "props": "centos8deb.distribution=focal;deb.component=main;deb.architecture=amd64"
                             },
                             {
                                 "pattern": "artifacts/service-discover-daemon*.deb",
                                 "target": "ubuntu-rc/pool/",
-                                "props": "deb.distribution=xenial;deb.distribution=bionic;deb.distribution=focal;deb.component=main;deb.architecture=amd64"
+                                "props": "centos8deb.distribution=focal;deb.component=main;deb.architecture=amd64"
                             }
                         ]
                     }"""
@@ -220,43 +220,6 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu bionic m
                             'failFast'           : true
                     ]
                     Artifactory.addInteractivePromotion server: server, promotionConfig: config, displayName: "Ubuntu Promotion to Release"
-                    server.publishBuildInfo buildInfo
-
-                    //centos7
-                    buildInfo = Artifactory.newBuildInfo()
-                    buildInfo.name += "-centos7"
-                    uploadSpec= """{
-                        "files": [
-                            {
-                                "pattern": "artifacts/(service-discover-server)-(*).rpm",
-                                "target": "centos7-rc/zextras/{1}/{1}-{2}.rpm",
-                                "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
-                            },
-                            {
-                                "pattern": "artifacts/(service-discover-agent)-(*).rpm",
-                                "target": "centos7-rc/zextras/{1}/{1}-{2}.rpm",
-                                "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
-                            },
-                            {
-                                "pattern": "artifacts/(service-discover-daemon)-(*).rpm",
-                                "target": "centos7-rc/zextras/{1}/{1}-{2}.rpm",
-                                "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
-                            }
-                        ]
-                    }"""
-                    server.upload spec: uploadSpec, buildInfo: buildInfo, failNoOp: false
-                    config = [
-                            'buildName'          : buildInfo.name,
-                            'buildNumber'        : buildInfo.number,
-                            'sourceRepo'         : 'centos7-rc',
-                            'targetRepo'         : 'centos7-release',
-                            'comment'            : 'Do not change anything! Just press the button',
-                            'status'             : 'Released',
-                            'includeDependencies': false,
-                            'copy'               : true,
-                            'failFast'           : true
-                    ]
-                    Artifactory.addInteractivePromotion server: server, promotionConfig: config, displayName: "Centos7 Promotion to Release"
                     server.publishBuildInfo buildInfo
 
                     //centos8
