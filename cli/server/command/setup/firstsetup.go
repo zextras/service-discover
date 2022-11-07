@@ -51,7 +51,7 @@ func (s *Setup) firstSetup(d businessDependencies) (formatter.Formatter, error) 
 func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration) error {
 	zimbraLocalConfig, err := zimbra.LoadLocalConfig(s.LocalConfigPath)
 	if err != nil {
-		return errors.New(fmt.Sprintf("unable to read Zimbra local config: %s", err))
+		return err
 	}
 	ldapHandler := d.LdapHandler(zimbraLocalConfig)
 	zimbraHostname, err := command.RetrieveZimbraHostname(zimbraLocalConfig, ldapHandler)

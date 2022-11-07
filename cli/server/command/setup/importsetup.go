@@ -28,7 +28,7 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 
 	zimbraLocalConfig, err := zimbra.LoadLocalConfig(s.LocalConfigPath)
 	if err != nil {
-		return nil, errors.New("unable to read Zimbra local config")
+		return nil, err
 	}
 
 	ldapHandler := d.LdapHandler(zimbraLocalConfig)

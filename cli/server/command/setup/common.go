@@ -192,7 +192,7 @@ func (s *Setup) isFirstInstance(d businessDependencies) (bool, error) {
 	if err != nil {
 		zimbraLocalConfig, err := zimbra.LoadLocalConfig(s.LocalConfigPath)
 		if err != nil {
-			return false, errors.New(fmt.Sprintf("unable to read Zimbra local config: %s", err))
+			return false, err
 		}
 		ldapHandler := d.LdapHandler(zimbraLocalConfig)
 		servers, err := ldapHandler.QueryAllServersWithService(zimbra.ServiceDiscoverServiceName)

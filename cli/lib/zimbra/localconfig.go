@@ -88,7 +88,7 @@ func LoadLocalConfig(path string) (LocalConfig, error) {
 	for _, field := range requiredFields {
 		_, present := localConfigIndex[field]
 		if !present {
-			return nil, errors.New("carbonio is not correctly initialized, please run carbonio-bootstrap (missing required field '" + field + "' in localconfig)")
+			return nil, errors.New("Carbonio is not correctly initialized, please run carbonio-bootstrap (missing required field '" + field + "' in localconfig)")
 		}
 	}
 
