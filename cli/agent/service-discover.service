@@ -1,6 +1,6 @@
 [Unit]
 Description=Service discover agent for Zextras
-Documentation=https://docs.zextras.com/zextras-suite-documentation/latest/docs.html
+Documentation=https://docs.zextras.com/
 Requires=network-online.target
 After=network-online.target
 
