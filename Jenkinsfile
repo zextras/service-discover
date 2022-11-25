@@ -124,17 +124,17 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                             {
                                 "pattern": "artifacts/service-discover-server*.deb",
                                 "target": "ubuntu-playground/pool/",
-                                "props": "centos8deb.distribution=focal;deb.component=main;deb.architecture=amd64"
+                                "props": "deb.distribution=focal;deb.component=main;deb.architecture=amd64"
                             },
                             {
                                 "pattern": "artifacts/service-discover-agent*.deb",
                                 "target": "ubuntu-playground/pool/",
-                                "props": "centos8deb.distribution=focal;deb.component=main;deb.architecture=amd64"
+                                "props": "deb.distribution=focal;deb.component=main;deb.architecture=amd64"
                             },
                             {
                                 "pattern": "artifacts/service-discover-daemon*.deb",
                                 "target": "ubuntu-playground/pool/",
-                                "props": "centos8deb.distribution=focal;deb.component=main;deb.architecture=amd64"
+                                "props": "deb.distribution=focal;deb.component=main;deb.architecture=amd64"
                             },
                              {
                                 "pattern": "artifacts/(service-discover-server)-(*).rpm",
@@ -193,17 +193,17 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                             {
                                 "pattern": "artifacts/service-discover-server*.deb",
                                 "target": "ubuntu-rc/pool/",
-                                "props": "centos8deb.distribution=focal;deb.component=main;deb.architecture=amd64"
+                                "props": "deb.distribution=focal;deb.component=main;deb.architecture=amd64"
                             },
                             {
                                 "pattern": "artifacts/service-discover-agent*.deb",
                                 "target": "ubuntu-rc/pool/",
-                                "props": "centos8deb.distribution=focal;deb.component=main;deb.architecture=amd64"
+                                "props": "deb.distribution=focal;deb.component=main;deb.architecture=amd64"
                             },
                             {
                                 "pattern": "artifacts/service-discover-daemon*.deb",
                                 "target": "ubuntu-rc/pool/",
-                                "props": "centos8deb.distribution=focal;deb.component=main;deb.architecture=amd64"
+                                "props": "deb.distribution=focal;deb.component=main;deb.architecture=amd64"
                             }
                         ]
                     }"""
