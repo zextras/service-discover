@@ -1,12 +1,18 @@
 package command
 
 import (
+	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
+	"bitbucket.org/zextras/service-discover/cli/lib/carbonio/mocks"
 	"bitbucket.org/zextras/service-discover/cli/lib/test"
+	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/go-ldap/ldap/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"io/ioutil"
+	"github.com/testcontainers/testcontainers-go"
+	"math/rand"
 	"net"
 	"os"
 	"testing"
@@ -44,10 +50,8 @@ func (m *mockedNetworkInterfaces) LookupIP(s string) ([]net.IP, error) {
 	var r0 []net.IP
 	if rf, ok := ret.Get(0).(func(string) []net.IP); ok {
 		r0 = rf(s)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]net.IP)
-		}
+	} else if ret.Get(0) != nil {
+		r0 = ret.Get(0).([]net.IP)
 	}
 
 	var r1 error
@@ -101,7 +105,7 @@ func TestCheckValidBindingAddress(t *testing.T) {
 			[]net.Interface{
 				networkInterface,
 			},
-			"192.168.1.2", //random one, it doesn't really matter
+			"192.168.1.2", // random one, it doesn't really matter
 		)
 		assert.EqualError(t, err, "invalid binding address selected")
 	})
@@ -191,7 +195,7 @@ func TestCheckValidBindingAddress(t *testing.T) {
 	t.Run("Address resolve with localhost", func(t *testing.T) {
 		mockDependencies := new(mockedNetworkInterfaces)
 		mockDependencies.On("LookupIP", "address").Return(
-			[]net.IP{net.IPv4(127,0,0,1)},
+			[]net.IP{net.IPv4(127, 0, 0, 1)},
 			nil,
 		)
 		err := CheckHostnameAddress(
@@ -203,7 +207,7 @@ func TestCheckValidBindingAddress(t *testing.T) {
 
 	t.Run("Address resolve with LAN", func(t *testing.T) {
 		mockDependencies := new(mockedNetworkInterfaces)
-		mockDependencies.On("LookupIP", "address").Return([]net.IP{net.IPv4(1,1,1,1)},nil)
+		mockDependencies.On("LookupIP", "address").Return([]net.IP{net.IPv4(1, 1, 1, 1)}, nil)
 		err := CheckHostnameAddress(
 			mockDependencies,
 			"address",
@@ -223,7 +227,7 @@ func TestSetup_openClusterCredential(t *testing.T) {
 			t,
 			err,
 			fmt.Sprintf(
-				"cannot find Cluster credential in %s, please copy the file from the existing server",
+				"cannot find Cluster credential in %s, please copy the file from the existing server or upload it to LDAP",
 				nonExistingFile.Name(),
 			),
 		)
@@ -245,7 +249,7 @@ func TestSaveBindAddressConfiguration(t *testing.T) {
 		defer os.Remove(actualResult.Name())
 
 		assert.NoError(t, SaveBindAddressConfiguration(actualResult.Name(), "127.0.0.1"))
-		actualResultContent, err := ioutil.ReadFile(actualResult.Name())
+		actualResultContent, err := os.ReadFile(actualResult.Name())
 		assert.NoError(t, err)
 		assert.Equal(t, `{
   "bind_addr": "127.0.0.1"
@@ -257,10 +261,121 @@ func TestSaveBindAddressConfiguration(t *testing.T) {
 		defer os.Remove(actualResult.Name())
 
 		assert.NoError(t, SaveBindAddressConfiguration(actualResult.Name(), "127.0.0.1/24"))
-		actualResultContent, err := ioutil.ReadFile(actualResult.Name())
+		actualResultContent, err := os.ReadFile(actualResult.Name())
 		assert.NoError(t, err)
 		assert.Equal(t, `{
   "bind_addr": "127.0.0.1"
 }`, string(actualResultContent))
+	})
+}
+
+func TestCredentialsFromAndToLDAP(t *testing.T) {
+	t.Run("should upload the value to LDAP", func(t *testing.T) {
+		uploadFile := test.GenerateRandomFile("fakeCredentials*.tar")
+		defer func(name string) {
+			if err := os.Remove(name); err != nil {
+				t.Error(err)
+			}
+		}(uploadFile.Name())
+		randomContent := make([]byte, 4096000) // 4 MB random byte array to simulate random binary content
+		_, err := rand.Read(randomContent)
+		assert.NoError(t, err)
+		err = os.WriteFile(uploadFile.Name(), randomContent, 0777)
+		assert.NoError(t, err)
+		ldapContainer, containerCtx := test.SpinUpCarbonioLdap(t, test.PUBLIC_IMAGE_ADDRESS, test.RELEASE_22110)
+		defer func(ldapContainer testcontainers.Container, ctx context.Context) {
+			if err := ldapContainer.Terminate(ctx); err != nil {
+				t.Error(err)
+			}
+		}(ldapContainer, containerCtx)
+
+		ldapIp, err := ldapContainer.ContainerIP(containerCtx)
+		assert.NoError(t, err)
+
+		masterUrl := fmt.Sprintf("ldap://%s:%s", ldapIp, "389")
+
+		mockedLocalConfig := new(mocks.LocalConfig)
+		mockedLocalConfig.On("Values", carbonio.LocalConfigLdapMasterUrl).Return([]string{masterUrl}).On("Values", carbonio.LocalConfigLdapUrl).Return([]string{}).On("Value", carbonio.LocalConfigLdapUserDn).Return("uid=zimbra,cn=admins,cn=zimbra").On("Value", carbonio.LocalConfigLdapPassword).Return("password")
+
+		ldapHandler := carbonio.CreateNewHandler(mockedLocalConfig)
+
+		err = UploadCredentialsToLDAP(ldapHandler, uploadFile.Name())
+		assert.NoError(t, err)
+
+		// Try to download the content and check that it is the same
+		ldapConnection, err := ldap.DialURL(masterUrl)
+		assert.NoError(t, err)
+		err = ldapConnection.Bind("uid=zimbra,cn=admins,cn=zimbra", "password")
+		assert.NoError(t, err)
+
+		result, err := ldapConnection.Search(ldap.NewSearchRequest(
+			carbonio.LdapConfigBaseDn,
+			ldap.ScopeWholeSubtree,
+			ldap.ScopeBaseObject,
+			1,
+			600,
+			false,
+			"("+carbonio.AttrCarbonioCredentials+"=*)",
+			[]string{
+				carbonio.AttrCarbonioCredentials,
+			},
+			[]ldap.Control{},
+		))
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(result.Entries), "Expected exactly 1 result from ldap")
+
+		entry := result.Entries[0]
+
+		encodedContent := entry.GetAttributeValue(carbonio.AttrCarbonioCredentials)
+		decodedContent, err := base64.StdEncoding.DecodeString(encodedContent)
+		assert.NoError(t, err)
+		assert.Equal(t, randomContent, decodedContent, "The downloaded content doesn't match the uploaded one")
+	})
+
+	t.Run("should download the value from LDAP", func(t *testing.T) {
+		randomContent := make([]byte, 4096000) // 4 MB random byte array to simulate random binary content
+		_, err := rand.Read(randomContent)
+		assert.NoError(t, err)
+		ldapContainer, containerCtx := test.SpinUpCarbonioLdap(t, test.PUBLIC_IMAGE_ADDRESS, test.RELEASE_22110)
+		defer func(ldapContainer testcontainers.Container, ctx context.Context) {
+			if err := ldapContainer.Terminate(ctx); err != nil {
+				t.Error(err)
+			}
+		}(ldapContainer, containerCtx)
+
+		ldapIp, err := ldapContainer.ContainerIP(containerCtx)
+		assert.NoError(t, err)
+
+		masterUrl := fmt.Sprintf("ldap://%s:%s", ldapIp, "389")
+		// Try to download the content and check that it is the same
+		ldapConnection, err := ldap.DialURL(masterUrl)
+		assert.NoError(t, err)
+		err = ldapConnection.Bind("uid=zimbra,cn=admins,cn=zimbra", "password")
+		assert.NoError(t, err)
+
+		expectedEncoded := base64.StdEncoding.EncodeToString(randomContent)
+		modRequest := ldap.NewModifyRequest(carbonio.LdapConfigBaseDn, []ldap.Control{})
+		modRequest.Replace(carbonio.AttrCarbonioCredentials, []string{expectedEncoded})
+		err = ldapConnection.Modify(modRequest)
+		assert.NoError(t, err)
+
+		mockedLocalConfig := new(mocks.LocalConfig)
+		mockedLocalConfig.On("Values", carbonio.LocalConfigLdapMasterUrl).Return([]string{masterUrl}).On("Values", carbonio.LocalConfigLdapUrl).Return([]string{}).On("Value", carbonio.LocalConfigLdapUserDn).Return("uid=zimbra,cn=admins,cn=zimbra").On("Value", carbonio.LocalConfigLdapPassword).Return("password")
+
+		ldapHandler := carbonio.CreateNewHandler(mockedLocalConfig)
+
+		downloadedContent := test.GenerateRandomFile("testDownloadLdap*.tar")
+		defer func(name string) {
+			if err := os.Remove(name); err != nil {
+				t.Error(err)
+			}
+		}(downloadedContent.Name())
+		err = DownloadCredentialsFromLDAP(ldapHandler, downloadedContent.Name())
+		assert.NoError(t, err)
+
+		gotContent, err := os.ReadFile(downloadedContent.Name())
+		assert.NoError(t, err)
+
+		assert.Equal(t, randomContent, gotContent, "The downloaded content doesn't match the desired one")
 	})
 }

@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
 echo Y #(agree license)
-echo Y #(use zimbra repo)
+echo Y #(use carbonio repo)
 echo Y #(ldap)
 echo Y #(logger)
 echo Y #(mta)
 echo N #(dns-cache)
 echo Y #(smtp)
-echo Y #(zimbra store)
+echo Y #(carbonio store)
 echo N #(apache)
 echo N #(aspell)
 echo Y #(memcached)
@@ -26,4 +26,4 @@ echo a #apply
 echo Yes #save
 echo # save config
 echo Yes #system will be modified
-echo "No" #zimbra notify
+echo "No" #carbonio notify

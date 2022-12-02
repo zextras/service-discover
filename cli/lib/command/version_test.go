@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"github.com/stretchr/testify/assert"
 	"io"
-	"io/ioutil"
 	"testing"
 )
 
@@ -57,7 +56,7 @@ agent version: N/A
 				agentName: tt.fields.AgentName,
 			}
 			assert.Nil(t, v.Run(tt.args.globalFlags))
-			byteOut, err := ioutil.ReadAll(&buffer)
+			byteOut, err := io.ReadAll(&buffer)
 			assert.Nil(t, err)
 			assert.Equal(t, tt.assertion, string(byteOut))
 		})

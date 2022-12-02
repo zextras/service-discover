@@ -60,13 +60,14 @@ func (v *GetConfig) Run(globalFlags *GlobalCommonFlags) error {
 	}
 
 	config := MutableConsulConfig{}
-	err = json.Unmarshal(data, &config)
+	if err := json.Unmarshal(data, &config); err != nil {
+		return err
+	}
 	output := &getConfigOutput{}
 
 	switch v.Config {
 	case "bind-address":
 		output.BindAddress = config.BindAddress
-		break
 	default:
 		return errors.New("unknown configuration '" + v.Config + "'")
 	}
@@ -74,7 +75,7 @@ func (v *GetConfig) Run(globalFlags *GlobalCommonFlags) error {
 	if err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(v.writer, out)
+	_, err = fmt.Fprint(v.writer, out)
 	return err
 }
 
@@ -95,19 +96,23 @@ func (v *SetConfig) Run(_globalFlags *GlobalCommonFlags) error {
 	}
 
 	config := MutableConsulConfig{}
-	err = json.Unmarshal(data, &config)
+	if err = json.Unmarshal(data, &config); err != nil {
+		return err
+	}
 
 	switch v.Config {
 	case "bind-address":
 		config.BindAddress = v.Value
-		break
 	default:
 		return errors.New("unknown configuration '" + v.Config + "'")
 	}
 
-	data, _ = json.MarshalIndent(&config, "", "  ")
-	err = v.WriteFile(ConsulMutableConfigFile, data, 0644)
+	data, err = json.MarshalIndent(&config, "", "  ")
 	if err != nil {
+		return err
+	}
+
+	if err = v.WriteFile(ConsulMutableConfigFile, data, 0644); err != nil {
 		return errors.New("unable to write " + ConsulMutableConfigFile + ": " + err.Error())
 	}
 
@@ -145,6 +150,6 @@ func (v *ListConfig) Run(globalFlags *GlobalCommonFlags) error {
 	if err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(v.writer, out)
+	_, err = fmt.Fprint(v.writer, out)
 	return err
 }

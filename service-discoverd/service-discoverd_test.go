@@ -1,9 +1,10 @@
 package main
 
 import (
-	"bitbucket.org/zextras/service-discover/cli/lib/zimbra"
+	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
 	"errors"
 	"github.com/stretchr/testify/mock"
+	"io"
 	"os/user"
 	"testing"
 )
@@ -49,28 +50,32 @@ func (m *mockDependencies) Setgid(gid int) (err error) {
 	return args.Error(0)
 }
 
-func (m *mockDependencies) Exec(argv0 string, argv []string, envv []string) (err error) {
-	args := m.Called(argv0, argv, envv)
+func (m *mockDependencies) Exec(argv0 string, argv []string, env []string) (err error) {
+	args := m.Called(argv0, argv, env)
 	return args.Error(0)
 }
 
-func (m *mockDependencies) LoadLocalConfig() (zimbra.LocalConfig, error) {
+func (m *mockDependencies) LoadLocalConfig() (carbonio.LocalConfig, error) {
 	args := m.Called()
 	localConfig := args.Get(0)
 	if localConfig == nil {
 		return nil, args.Error(1)
 	}
-	return localConfig.(zimbra.LocalConfig), nil
+	return localConfig.(carbonio.LocalConfig), nil
 }
 
-func (m *mockDependencies) CreateNewHandler(localConfig zimbra.LocalConfig) zimbra.LdapHandler {
+func (m *mockDependencies) CreateNewHandler(localConfig carbonio.LocalConfig) carbonio.LdapHandler {
 	args := m.Called(localConfig)
-	return args.Get(0).(zimbra.LdapHandler)
+	return args.Get(0).(carbonio.LdapHandler)
 }
 
 func (m *mockDependencies) Value(key string) string {
 	args := m.Called(key)
 	return args.String(0)
+}
+
+func (m *mockDependencies) Values(url string) []string {
+	panic("should not be used")
 }
 
 func (m *mockDependencies) Text(key string) string {
@@ -92,6 +97,14 @@ func (m *mockDependencies) QueryAllServersWithService(service string) ([]string,
 	return _servers.([]string), args.Error(1)
 }
 func (m *mockDependencies) CheckServerAvailability(write bool) error {
+	panic("should not be used")
+}
+
+func (m *mockDependencies) UploadBinary(reader io.Reader, dn string, attribute string) error {
+	panic("should not be used")
+}
+
+func (m *mockDependencies) DownloadBinary(dn string, attribute string) ([]byte, error) {
 	panic("should not be used")
 }
 
@@ -254,7 +267,7 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 				"-bootstrap-expect", "2",
 				"-config-dir", "/etc/zextras/service-discover/",
 				"-server",
-				"-retry-join=local-hostname", //hack
+				"-retry-join=local-hostname", // hack
 				"-retry-join=remote-hostname-1",
 				"-retry-join=remote-hostname-2",
 			},
@@ -308,7 +321,7 @@ func setupMock(mockDependencies *mockDependencies, isServer bool) {
 				"-bootstrap-expect", "2",
 				"-config-dir", "/etc/zextras/service-discover/",
 				"-server",
-				"-retry-join=local-hostname",  //hack
+				"-retry-join=local-hostname", // hack
 				"-retry-join=remote-hostname-1",
 				"-retry-join=remote-hostname-2",
 			},
@@ -330,7 +343,7 @@ func setupMock(mockDependencies *mockDependencies, isServer bool) {
 				"/usr/bin/consul",
 				"agent",
 				"-config-dir", "/etc/zextras/service-discover/",
-				"-retry-join=local-hostname",  //hack
+				// "-retry-join=local-hostname", // FIXME ask to @Baldo if this entry should be there or not
 				"-retry-join=remote-hostname-1",
 				"-retry-join=remote-hostname-2",
 			},

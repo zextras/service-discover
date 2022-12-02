@@ -68,7 +68,6 @@ func TestWriter(t *testing.T) {
 	type fields struct {
 	}
 	type args struct {
-		reader   io.Reader
 		password string
 	}
 	tests := []struct {

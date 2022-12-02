@@ -1,13 +1,12 @@
 package setup
 
 import (
+	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
 	"bitbucket.org/zextras/service-discover/cli/lib/command"
 	"bitbucket.org/zextras/service-discover/cli/lib/exec"
 	"bitbucket.org/zextras/service-discover/cli/lib/formatter"
 	"bitbucket.org/zextras/service-discover/cli/lib/permissions"
-	"bitbucket.org/zextras/service-discover/cli/lib/systemd"
 	"bitbucket.org/zextras/service-discover/cli/lib/term"
-	"bitbucket.org/zextras/service-discover/cli/lib/zimbra"
 	"bitbucket.org/zextras/service-discover/cli/server/config"
 	"crypto/rand"
 	"encoding/base64"
@@ -161,7 +160,7 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 		return errors.New("missing arguments")
 	}
 
-	//if manually specified do not check it
+	// if manually specified do not check it
 	if !s.FirstInstance {
 		s.FirstInstance, err = s.isFirstInstance(d)
 		if err != nil {
@@ -190,12 +189,12 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 func (s *Setup) isFirstInstance(d businessDependencies) (bool, error) {
 	_, err := command.OpenClusterCredential(s.ClusterCredential)
 	if err != nil {
-		zimbraLocalConfig, err := zimbra.LoadLocalConfig(s.LocalConfigPath)
+		zimbraLocalConfig, err := carbonio.LoadLocalConfig(s.LocalConfigPath)
 		if err != nil {
 			return false, err
 		}
 		ldapHandler := d.LdapHandler(zimbraLocalConfig)
-		servers, err := ldapHandler.QueryAllServersWithService(zimbra.ServiceDiscoverServiceName)
+		servers, err := ldapHandler.QueryAllServersWithService(carbonio.ServiceDiscoverServiceName)
 		if err != nil {
 			return false, err
 		}
@@ -219,7 +218,7 @@ func preRun(d businessDependencies) error {
 
 	_, err = os.Stat(config.ConsultFileConfig)
 	if err == nil {
-		return errors.New(fmt.Sprintf("setup of service-discover already perfomed, manually reset and try again."))
+		return errors.New("setup of service-discover already performed, manually reset and try again.")
 	}
 
 	return nil
@@ -243,36 +242,10 @@ func generateGossipKey() (string, error) {
 		return "", errors.New(fmt.Sprintf("error reading random data: %s", err))
 	}
 	if n != 32 {
-		return "", errors.New(fmt.Sprintf("couldn't read enough entropy. Generate more entropy!"))
+		return "", errors.New("couldn't read enough entropy. Generate more entropy!")
 	}
 
 	return base64.StdEncoding.EncodeToString(key), nil
-}
-
-// retrieveZimbraHostname returns the zimbra.LocalConfigServerHostname value, but only after checking that the
-// LDAP server is up
-func (s *Setup) retrieveZimbraHostname(localConfig zimbra.LocalConfig, ldapHandler zimbra.LdapHandler) (string, error) {
-	err := ldapHandler.CheckServerAvailability(true)
-	if err != nil {
-		return "", errors.New("unable to connect to ldap: " + err.Error())
-	}
-	return localConfig.Value(zimbra.LocalConfigServerHostname), nil
-}
-
-func (s *Setup) addServiceInLDAP(ldap zimbra.LdapHandler, zimbraHostname string) error {
-	err := ldap.AddService(zimbraHostname, zimbra.ServiceDiscoverServiceName)
-	if err != nil {
-		return errors.New("cannot add service in ldap: " + err.Error())
-	}
-	return nil
-}
-
-func (s *Setup) enableServiceDiscoverd(d businessDependencies) error {
-	err := systemd.EnableSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit)
-	if err != nil {
-		return errors.New(fmt.Sprintf("unable to enable %s unit: %s", serviceDiscoverUnit, err))
-	}
-	return nil
 }
 
 func wizardBindAddressSelection(d interactiveDependencies) (string, error) {

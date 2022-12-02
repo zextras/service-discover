@@ -1,13 +1,12 @@
 package setup
 
 import (
+	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
+	mocks2 "bitbucket.org/zextras/service-discover/cli/lib/carbonio/mocks"
 	"bitbucket.org/zextras/service-discover/cli/lib/test"
-	"bitbucket.org/zextras/service-discover/cli/lib/zimbra"
-	mocks2 "bitbucket.org/zextras/service-discover/cli/lib/zimbra/mocks"
 	"bitbucket.org/zextras/service-discover/cli/server/command/setup/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"io/ioutil"
 	"os"
 	"testing"
 )
@@ -22,7 +21,7 @@ func TestSetup_isFirstInstance(t *testing.T) {
 	setup := func(t *testing.T, name string) (*testData, func()) {
 		localConfig := test.GenerateRandomFile(name)
 		clusterCredentials := test.GenerateRandomFile(name)
-		assert.NoError(t, ioutil.WriteFile(
+		assert.NoError(t, os.WriteFile(
 			localConfig.Name(),
 			test.GenerateLocalConfig(
 				t,
@@ -64,7 +63,7 @@ func TestSetup_isFirstInstance(t *testing.T) {
 		}
 		mockDep := new(mocks.BusinessDependencies)
 		mockLdap := new(mocks2.LdapHandler)
-		mockLdap.On("QueryAllServersWithService", zimbra.ServiceDiscoverServiceName).
+		mockLdap.On("QueryAllServersWithService", carbonio.ServiceDiscoverServiceName).
 			Return([]string{}, nil)
 		mockDep.On("LdapHandler", mock.Anything).Return(mockLdap)
 		got, err := s.isFirstInstance(mockDep)
@@ -86,7 +85,7 @@ func TestSetup_isFirstInstance(t *testing.T) {
 		}
 		mockDep := new(mocks.BusinessDependencies)
 		mockLdap := new(mocks2.LdapHandler)
-		mockLdap.On("QueryAllServersWithService", zimbra.ServiceDiscoverServiceName).
+		mockLdap.On("QueryAllServersWithService", carbonio.ServiceDiscoverServiceName).
 			Return([]string{"mail2.example.com"}, nil)
 		mockDep.On("LdapHandler", mock.Anything).Return(mockLdap)
 		got, err := s.isFirstInstance(mockDep)
@@ -108,7 +107,7 @@ func TestSetup_isFirstInstance(t *testing.T) {
 		}
 		mockDep := new(mocks.BusinessDependencies)
 		mockLdap := new(mocks2.LdapHandler)
-		mockLdap.On("QueryAllServersWithService", zimbra.ServiceDiscoverServiceName).
+		mockLdap.On("QueryAllServersWithService", carbonio.ServiceDiscoverServiceName).
 			Return([]string{"mail2.example.com"}, nil)
 		mockDep.On("LdapHandler", mock.Anything).Return(mockLdap)
 		got, err := s.isFirstInstance(mockDep)

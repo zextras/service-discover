@@ -1,16 +1,15 @@
 package setup
 
 import (
+	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
 	"bitbucket.org/zextras/service-discover/cli/lib/command"
 	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
 	"bitbucket.org/zextras/service-discover/cli/lib/formatter"
 	"bitbucket.org/zextras/service-discover/cli/lib/permissions"
 	"bitbucket.org/zextras/service-discover/cli/lib/systemd"
-	"bitbucket.org/zextras/service-discover/cli/lib/zimbra"
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 )
@@ -26,7 +25,7 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 		return nil, err
 	}
 
-	zimbraLocalConfig, err := zimbra.LoadLocalConfig(s.LocalConfigPath)
+	zimbraLocalConfig, err := carbonio.LoadLocalConfig(s.LocalConfigPath)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +70,7 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 		return nil, err
 	}
 
-	if err := ioutil.WriteFile("/"+caFullPath, extractedFiles[caFullPath], os.FileMode(0600)); err != nil {
+	if err := os.WriteFile("/"+caFullPath, extractedFiles[caFullPath], os.FileMode(0600)); err != nil {
 		return nil, err
 	}
 
@@ -80,7 +79,7 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 		return nil, err
 	}
 
-	if err := ioutil.WriteFile("/"+caKeyFullPath, extractedFiles[caKeyFullPath], os.FileMode(0600)); err != nil {
+	if err := os.WriteFile("/"+caKeyFullPath, extractedFiles[caKeyFullPath], os.FileMode(0600)); err != nil {
 		return nil, err
 	}
 	defer os.Remove("/" + caKeyFullPath)
@@ -94,7 +93,7 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 	if err != nil {
 		return nil, err
 	}
-	if err := ioutil.WriteFile(s.ConsulFileConfig, consulFileBytes, os.FileMode(0600)); err != nil {
+	if err := os.WriteFile(s.ConsulFileConfig, consulFileBytes, os.FileMode(0600)); err != nil {
 		return nil, errors.New(fmt.Sprintf("unable to save generated configuration file in %s: %s", s.ConsulHome, err))
 	}
 
@@ -139,7 +138,7 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 		return nil, err
 	}
 
-	if err = ioutil.WriteFile(s.ConsulHome+"/password", []byte(s.Password), 0400); err != nil {
+	if err = os.WriteFile(s.ConsulHome+"/password", []byte(s.Password), 0400); err != nil {
 		return nil, err
 	}
 

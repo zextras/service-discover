@@ -32,7 +32,7 @@ func TestExecInPath(t *testing.T) {
 		assert.EqualError(
 			t,
 			InPath(mockCmd, existingFolder),
-			fmt.Sprint("this is an error message"),
+			"this is an error message",
 		)
 	})
 

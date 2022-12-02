@@ -2,7 +2,6 @@ package credentialsEncrypter
 
 import (
 	"archive/tar"
-	"errors"
 	"fmt"
 	"golang.org/x/crypto/openpgp"
 	"golang.org/x/crypto/openpgp/armor"
@@ -84,13 +83,13 @@ func (e *Writer) AddFile(reader io.Reader, stat os.FileInfo, customFilename stri
 func NewWriter(writer io.Writer, passphrase []byte) (*Writer, error) {
 	armorWriter, err := armor.Encode(writer, "PGP MESSAGE", nil)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("failure while encrypting the secret credentials: %s", err))
+		return nil, fmt.Errorf("failure while encrypting the secret credentials: %s", err)
 	}
 	openGpgWriter, err := openpgp.SymmetricallyEncrypt(armorWriter, passphrase, nil, &packet.Config{
 		DefaultCipher: packet.CipherAES256,
 	})
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("unable to encrypt the stream using PGP: %s", err))
+		return nil, fmt.Errorf("unable to encrypt the stream using PGP: %s", err)
 	}
 	tarWriter := tar.NewWriter(openGpgWriter)
 	return &Writer{

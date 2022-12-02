@@ -1,15 +1,15 @@
 package command
 
 import (
+	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
 	"bitbucket.org/zextras/service-discover/cli/lib/exec"
-	"bitbucket.org/zextras/service-discover/cli/lib/zimbra"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
 	"html/template"
-	"io/ioutil"
+	"io"
 	"net"
 	"os"
 	"strings"
@@ -27,7 +27,7 @@ const (
 	ConsulAgentCertificateKey  = "dc1-client-consul-0-key.pem"
 	ConsulAclBootstrap         = "consul-acl-secret.json"
 	GossipKey                  = "gossip-key"
-	ConsulHttpToken            = "CONSUL_HTTP_TOKEN"
+	ConsulHttpToken            = "CONSUL_HTTP_TOKEN" // #nosec
 	ConsulBin                  = "/usr/bin/consul"
 	AclPolicyTemplateText      = `{
    "node":{
@@ -75,15 +75,15 @@ type ACLTokenCreation struct {
 
 // OpenClusterCredential checks that the given path, s.ClusterCredential exists and it is readable
 func OpenClusterCredential(clusterCredential string) (*os.File, error) {
-	clusterCredentialFile, err := os.Open(clusterCredential)
+	clusterCredentialFile, err := os.Open(clusterCredential) // #nosec
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, errors.New(fmt.Sprintf(
-				"cannot find Cluster credential in %s, please copy the file from the existing server",
+				"cannot find Cluster credential in %s, please copy the file from the existing server or upload it to LDAP",
 				clusterCredential,
 			))
 		} else {
-			return nil, err
+			return nil, errors.WithMessage(err, "unable to open cluster credential file. Is it corrupted?")
 		}
 	}
 	return clusterCredentialFile, nil
@@ -131,18 +131,49 @@ func NonLoopbackInterfaces(d NetworkInterfaces) ([]net.Interface, error) {
 	return networks, nil
 }
 
-// RetrieveZimbraHostname returns the zimbra.LocalConfigServerHostname value, but only after checking that the
-// LDAP server is up
-func RetrieveZimbraHostname(localConfig zimbra.LocalConfig, ldapHandler zimbra.LdapHandler) (string, error) {
-	err := ldapHandler.CheckServerAvailability(true)
-	if err != nil {
-		return "", errors.New("unable to connect to ldap: " + err.Error())
+// UploadCredentialsToLDAP uploads the credentials tarball file into LDAP
+func UploadCredentialsToLDAP(ldapHandler carbonio.LdapHandler, credentials string) error {
+	if err := ldapHandler.CheckServerAvailability(true); err != nil {
+		return errors.WithMessage(err, "unable to connect to ldap")
 	}
-	return localConfig.Value(zimbra.LocalConfigServerHostname), nil
+
+	file, err := os.Open(credentials) // #nosec
+	if err != nil {
+		return errors.WithMessage(err, "unable to read credentials file")
+	}
+
+	if err := ldapHandler.UploadBinary(file, carbonio.LdapConfigBaseDn, carbonio.AttrCarbonioCredentials); err != nil {
+		return errors.WithMessage(err, "unable to upload data to ldap")
+	}
+	return nil
 }
 
-func AddServiceInLDAP(ldap zimbra.LdapHandler, zimbraHostname string) error {
-	err := ldap.AddService(zimbraHostname, zimbra.ServiceDiscoverServiceName)
+// DownloadCredentialsFromLDAP downloads the credentials from ldap and puts them into the given destination
+func DownloadCredentialsFromLDAP(ldapHandler carbonio.LdapHandler, destination string) error {
+	if err := ldapHandler.CheckServerAvailability(false); err != nil {
+		return errors.WithMessage(err, "unable to connect to ldap")
+	}
+
+	content, err := ldapHandler.DownloadBinary(carbonio.LdapConfigBaseDn, carbonio.AttrCarbonioCredentials)
+	if err != nil {
+		return errors.WithMessage(err, "unable to download data from ldap")
+	}
+
+	return os.WriteFile(destination, content, 0600)
+}
+
+// RetrieveZimbraHostname returns the zimbra.LocalConfigServerHostname value, but only after checking that the
+// LDAP server is up
+func RetrieveZimbraHostname(localConfig carbonio.LocalConfig, ldapHandler carbonio.LdapHandler) (string, error) {
+	err := ldapHandler.CheckServerAvailability(true)
+	if err != nil {
+		return "", errors.WithMessage(err, "unable to connect to ldap")
+	}
+	return localConfig.Value(carbonio.LocalConfigServerHostname), nil
+}
+
+func AddServiceInLDAP(ldap carbonio.LdapHandler, zimbraHostname string) error {
+	err := ldap.AddService(zimbraHostname, carbonio.ServiceDiscoverServiceName)
 	if err != nil {
 		return errors.New("cannot add service in ldap: " + err.Error())
 	}
@@ -159,12 +190,12 @@ func SaveBindAddressConfiguration(mutableConfig string, bindAddress string) erro
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(mutableConfig, bs, os.FileMode(0600))
+	return os.WriteFile(mutableConfig, bs, os.FileMode(0600))
 }
 
 // ConsulNodeName allows you to retrieve the Consul node name based on the hostname and its role
 func ConsulNodeName(prefix ConsulRole, hostname string) string {
-	return strings.Replace(fmt.Sprintf("%s-%s", prefix, hostname), ".", "-", -1)
+	return strings.ReplaceAll(fmt.Sprintf("%s-%s", prefix, hostname), ".", "-")
 }
 
 func CreateACLToken(
@@ -186,7 +217,7 @@ func CreateACLToken(
 	if err := aclPolicyTemplate.Execute(&aclPolicyRenderBuffer, templateRender); err != nil {
 		return "", err
 	}
-	aclPolicyBs, err := ioutil.ReadAll(&aclPolicyRenderBuffer)
+	aclPolicyBs, err := io.ReadAll(&aclPolicyRenderBuffer)
 	if err != nil {
 		return "", err
 	}

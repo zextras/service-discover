@@ -1,9 +1,8 @@
-package zimbra
+package carbonio
 
 import (
 	"bitbucket.org/zextras/service-discover/cli/lib/test"
 	"github.com/stretchr/testify/assert"
-	"io/ioutil"
 	"os"
 	"testing"
 )
@@ -248,7 +247,7 @@ func TestLoadLocalConfig(t *testing.T) {
 
 func generateWrongLocalConfig(testName string) *os.File {
 	tmpFile := test.GenerateRandomFile(testName)
-	if err := ioutil.WriteFile(tmpFile.Name(), []byte("surely this is not an xml"), os.FileMode(0755)); err != nil {
+	if err := os.WriteFile(tmpFile.Name(), []byte("surely this is not an xml"), os.FileMode(0755)); err != nil {
 		panic(err)
 	}
 
@@ -259,7 +258,7 @@ func generateAndPopulateCorrectLocalConfig(testName string) *os.File {
 	tmpFile := test.GenerateRandomFile(testName)
 
 	// Actual localconfig.xml file taken and redacted from a Zimbra installation
-	if err := ioutil.WriteFile(tmpFile.Name(), []byte(`<?xml version="1.0" encoding="UTF-8"?>
+	if err := os.WriteFile(tmpFile.Name(), []byte(`<?xml version="1.0" encoding="UTF-8"?>
 
 <localconfig>
   <key name="ssl_default_digest">

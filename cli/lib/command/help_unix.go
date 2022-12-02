@@ -26,5 +26,5 @@ func (h *Help) Run(ctx *GlobalCommonFlags) error {
 	args := make([]string, 1)
 	args = append(args, h.applicationName)
 	// We call exec directly otherwise exec.Command will perform "fork and run", we want to exec without run here.
-	return syscall.Exec(strings.Trim(out.String(), "\n"), args, []string{})
+	return syscall.Exec(strings.Trim(out.String(), "\n"), args, []string{}) // #nosec
 }

@@ -1,13 +1,13 @@
 package setup
 
 import (
+	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
+	"bitbucket.org/zextras/service-discover/cli/lib/carbonio/mocks"
 	"bitbucket.org/zextras/service-discover/cli/lib/command"
 	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
 	mocks3 "bitbucket.org/zextras/service-discover/cli/lib/exec/mocks"
 	mocks4 "bitbucket.org/zextras/service-discover/cli/lib/systemd/mocks"
 	"bitbucket.org/zextras/service-discover/cli/lib/test"
-	"bitbucket.org/zextras/service-discover/cli/lib/zimbra"
-	"bitbucket.org/zextras/service-discover/cli/lib/zimbra/mocks"
 	mocks2 "bitbucket.org/zextras/service-discover/cli/server/command/setup/mocks"
 	"bitbucket.org/zextras/service-discover/cli/server/config"
 	"bytes"
@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"io/fs"
-	"io/ioutil"
 	"net"
 	"os"
 	native_exec "os/exec"
@@ -57,11 +56,11 @@ func TestSetup_importSetup(t *testing.T) {
 	t.Parallel()
 
 	// Write the localconfig directly in a tmpFile, we will refactor this code anyway with something better
-	zimbraLocalConfig, err := ioutil.TempFile("/tmp", "testsetup_run")
+	zimbraLocalConfig, err := os.CreateTemp("/tmp", "testsetup_run")
 	if err != nil {
 		panic(err)
 	}
-	if err := ioutil.WriteFile(zimbraLocalConfig.Name(), test.GenerateLocalConfig(
+	if err := os.WriteFile(zimbraLocalConfig.Name(), test.GenerateLocalConfig(
 		t,
 		"mailbox-1.example.com",
 		"ldap://mailbox-1.example.com:389",
@@ -108,16 +107,31 @@ func TestSetup_importSetup(t *testing.T) {
 				consulCAKeyFile.Name(),
 				mutableConfigFile.Name(),
 			}, func() {
-				err := os.RemoveAll(consulConfigDir)
-				err = os.RemoveAll(consulHome)
-				err = os.RemoveAll(consulData)
-				err = os.RemoveAll(clusterFile.Name())
-				err = os.RemoveAll(consulAclBootstrap.Name())
-				err = os.RemoveAll(consulCertificate.Name())
-				err = os.RemoveAll(consulCAKeyFile.Name())
-				err = os.RemoveAll(clusterCredentialFile.Name())
-				err = os.RemoveAll(mutableConfigFile.Name())
-				if err != nil { // Any error
+				if err := os.RemoveAll(consulConfigDir); err != nil {
+					panic(err)
+				}
+				if err := os.RemoveAll(consulHome); err != nil {
+					panic(err)
+				}
+				if err := os.RemoveAll(consulData); err != nil {
+					panic(err)
+				}
+				if err := os.RemoveAll(clusterFile.Name()); err != nil {
+					panic(err)
+				}
+				if err := os.RemoveAll(consulAclBootstrap.Name()); err != nil {
+					panic(err)
+				}
+				if err := os.RemoveAll(consulCertificate.Name()); err != nil {
+					panic(err)
+				}
+				if err := os.RemoveAll(consulCAKeyFile.Name()); err != nil {
+					panic(err)
+				}
+				if err := os.RemoveAll(clusterCredentialFile.Name()); err != nil {
+					panic(err)
+				}
+				if err := os.RemoveAll(mutableConfigFile.Name()); err != nil {
 					panic(err)
 				}
 			}
@@ -145,7 +159,7 @@ func TestSetup_importSetup(t *testing.T) {
 			t,
 			err,
 			fmt.Sprintf(
-				"cannot find Cluster credential in %s, please copy the file from the existing server",
+				"cannot find Cluster credential in %s, please copy the file from the existing server or upload it to LDAP",
 				s.ClusterCredential,
 			),
 		)
@@ -195,7 +209,7 @@ func TestSetup_importSetup(t *testing.T) {
 		assert.NoError(t, err)
 		tarWriter, err := credentialsEncrypter.NewWriter(file, []byte("password"))
 		assert.NoError(t, err)
-		err = ioutil.WriteFile(setupFiles.consulFileConfig, []byte("Test"), os.FileMode(0644))
+		err = os.WriteFile(setupFiles.consulFileConfig, []byte("Test"), os.FileMode(0644))
 		assert.NoError(t, err)
 		consulFileConfig, err := os.Open(setupFiles.consulFileConfig)
 		assert.NoError(t, err)
@@ -343,12 +357,12 @@ func TestSetup_importSetup(t *testing.T) {
 			cmd := native_exec.Command(
 				"/usr/bin/consul",
 				"agent",
-				"-dev", //otherwise it takes up to 10 seconds to boostrap
+				"-dev", // otherwise it takes up to 10 seconds to boostrap
 				"-config-dir",
 				s.ConsulConfigDir,
 				"-server",
 				"-bind",
-				"127.0.0.1", //otherwise test address will be used
+				"127.0.0.1", // otherwise test address will be used
 			)
 			err := cmd.Start()
 			if err != nil {
@@ -377,7 +391,7 @@ func setupLdapMock(businessDep *mocks2.BusinessDependencies) {
 	ldapMockHandler := new(mocks.LdapHandler)
 	ldapMockHandler.On("CheckServerAvailability", true).Return(nil)
 	ldapMockHandler.
-		On("AddService", "mailbox-1.example.com", zimbra.ServiceDiscoverServiceName).
+		On("AddService", "mailbox-1.example.com", carbonio.ServiceDiscoverServiceName).
 		Return(nil)
 	businessDep.On("LdapHandler", mock.Anything).Return(ldapMockHandler)
 }

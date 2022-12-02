@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bitbucket.org/zextras/service-discover/cli/lib/zimbra"
+	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
 	"fmt"
 	"os"
 	"os/user"
@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	//starting from 1000 to avoid conflicts with consul exit codes
+	// Starting from 1000 to avoid conflicts with consul exit codes
 	ExitCodeWrongArgs = 1001
 	ExitCodeUserStuff = 1002
 	ExitCodeLocalCfg  = 1003
@@ -52,26 +52,26 @@ func (r realDependencies) Exec(argv0 string, argv []string, envv []string) (err 
 	return syscall.Exec(argv0, argv, envv)
 }
 
-func (r realDependencies) LoadLocalConfig() (zimbra.LocalConfig, error) {
-	localConfig, err := zimbra.LoadLocalConfig(zimbra.LocalConfigPath)
+func (r realDependencies) LoadLocalConfig() (carbonio.LocalConfig, error) {
+	localConfig, err := carbonio.LoadLocalConfig(carbonio.LocalConfigPath)
 	return localConfig, err
 }
 
-func (r realDependencies) CreateNewHandler(localConfig zimbra.LocalConfig) zimbra.LdapHandler {
-	return zimbra.CreateNewHandler(localConfig)
+func (r realDependencies) CreateNewHandler(localConfig carbonio.LocalConfig) carbonio.LdapHandler {
+	return carbonio.CreateNewHandler(localConfig)
 }
 
 type deps interface {
 	Exit(code int)
 	Log(a ...interface{})
-    Getenv(key string) (env string)
+	Getenv(key string) (env string)
 	Getuid() (uid int)
 	UserLookup(username string) (*user.User, error)
 	Setuid(uid int) (err error)
 	Setgid(gid int) (err error)
 	Exec(argv0 string, argv []string, envv []string) (err error)
-	LoadLocalConfig() (zimbra.LocalConfig, error)
-	CreateNewHandler(localConfig zimbra.LocalConfig) zimbra.LdapHandler
+	LoadLocalConfig() (carbonio.LocalConfig, error)
+	CreateNewHandler(localConfig carbonio.LocalConfig) carbonio.LdapHandler
 }
 
 type ErrorWithExitCode struct {
@@ -91,8 +91,8 @@ func runServiceDiscoverDaemon(d deps, args []string) {
 	}
 	isServer := args[1] == "server"
 
-	//root privileges only serves to read the localconfig, once we have the
-	//necessary credentials we can drop privileges to reduce the attack surface
+	// root privileges only serves to read the localconfig, once we have the
+	// necessary credentials we can drop privileges to reduce the attack surface
 	err := checkRoot(d)
 	if err != nil {
 		d.Log(err.Log)
@@ -146,7 +146,7 @@ func changeUser(d deps) *ErrorWithExitCode {
 	serviceDiscoverUser, err := d.UserLookup("service-discover")
 	if err != nil {
 		return &ErrorWithExitCode{
-			Log:      "cannot find user 'service-discover': "+err.Error(),
+			Log:      "cannot find user 'service-discover': " + err.Error(),
 			ExitCode: ExitCodeUserStuff,
 		}
 	}
@@ -206,7 +206,6 @@ func startConsul(d deps, isServer bool, servers []string, localServer string) *E
 		}
 	}
 
-
 	// HACK: consul doesn't notify readiness to systemd if the list of servers is empty
 	if isServer {
 		args = append(args, fmt.Sprintf("-retry-join=%s", localServer))
@@ -222,31 +221,30 @@ func startConsul(d deps, isServer bool, servers []string, localServer string) *E
 	}
 
 	if isServer && !found {
-		//a consul server is missing from ldap could cause trouble
-		//better to stop it
+		// a consul server is missing from ldap could cause trouble
+		// better to stop it
 		return &ErrorWithExitCode{
-			Log:      "local service-discover server NOT present in ldap/zimbraServiceEnabled attribute "+localServer,
+			Log:      "local service-discover server NOT present in ldap/zimbraServiceEnabled attribute " + localServer,
 			ExitCode: ExitCodeLdapError,
 		}
 	}
 
 	if !isServer && found {
-		//consul agent is written in ldap when it shouldn't be
-		//better to stop it
+		// consul agent is written in ldap when it shouldn't be
+		// better to stop it
 		return &ErrorWithExitCode{
-			Log:      "local service-discover agent must NOT be present in ldap/zimbraServiceEnabled attribute "+localServer,
+			Log:      "local service-discover agent must NOT be present in ldap/zimbraServiceEnabled attribute " + localServer,
 			ExitCode: ExitCodeLdapError,
 		}
 	}
 
-
-	envs := make([]string,0)
+	envs := make([]string, 0)
 
 	if len(d.Getenv("SHELL")) > 0 {
-		envs = append(envs,"SHELL="+d.Getenv("SHELL"))
+		envs = append(envs, "SHELL="+d.Getenv("SHELL"))
 	}
 	if len(d.Getenv("NOTIFY_SOCKET")) > 0 {
-		envs = append(envs,"NOTIFY_SOCKET="+d.Getenv("NOTIFY_SOCKET"))
+		envs = append(envs, "NOTIFY_SOCKET="+d.Getenv("NOTIFY_SOCKET"))
 	}
 
 	err := d.Exec(
@@ -267,7 +265,7 @@ func startConsul(d deps, isServer bool, servers []string, localServer string) *E
 	}
 }
 
-func readLocalConfig(d deps) (zimbra.LdapHandler, string, *ErrorWithExitCode) {
+func readLocalConfig(d deps) (carbonio.LdapHandler, string, *ErrorWithExitCode) {
 	localConfig, err := d.LoadLocalConfig()
 	if err != nil {
 		return nil, "", &ErrorWithExitCode{
@@ -276,11 +274,11 @@ func readLocalConfig(d deps) (zimbra.LdapHandler, string, *ErrorWithExitCode) {
 		}
 	}
 	handler := d.CreateNewHandler(localConfig)
-	return handler, localConfig.Value(zimbra.LocalConfigServerHostname), nil
+	return handler, localConfig.Value(carbonio.LocalConfigServerHostname), nil
 }
 
-func queryAllServiceDiscoverServers(ldapHandler zimbra.LdapHandler) ([]string, *ErrorWithExitCode) {
-	servers, err := ldapHandler.QueryAllServersWithService(zimbra.ServiceDiscoverServiceName)
+func queryAllServiceDiscoverServers(ldapHandler carbonio.LdapHandler) ([]string, *ErrorWithExitCode) {
+	servers, err := ldapHandler.QueryAllServersWithService(carbonio.ServiceDiscoverServiceName)
 	if err != nil {
 		return nil, &ErrorWithExitCode{
 			Log:      "unable to query ldap: " + err.Error(),

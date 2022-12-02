@@ -12,4 +12,5 @@ const (
 	ConsultFileConfig      = ConsulConfig + "/main.json"
 	LocalConfigPath        = "/opt/zextras/conf/localconfig.xml"
 	ClusterCredential      = ConsulConfig + "/cluster-credentials.tar.gpg"
+	LDAPDNName             = "service-discover-credentials"
 )

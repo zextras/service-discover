@@ -33,8 +33,7 @@ type Formatter interface {
 	JsonRender() (string, error)
 }
 
-
-type EmptyFormatter struct {}
+type EmptyFormatter struct{}
 
 func (e EmptyFormatter) PlainRender() (string, error) {
 	return "", nil

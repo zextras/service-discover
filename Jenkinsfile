@@ -44,7 +44,7 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                     modules["exec"] = "cli/lib/exec"
                     modules["formatter"] = "cli/lib/formatter"
                     modules["parser"] = "cli/lib/parser"
-                    modules["zimbra"] = "cli/lib/zimbra"
+                    modules["carbonio"] = "cli/lib/carbonio"
                     modules.each{key, value ->
                         builds[key] = {
                             dir(value) {

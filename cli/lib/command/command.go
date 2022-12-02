@@ -2,7 +2,7 @@ package command
 
 import (
 	"io"
-	"io/ioutil"
+	"os"
 )
 
 // The Command struct holds all the common data between all the different commands. It hold base information like the
@@ -51,14 +51,14 @@ func (c *Command) Config(writer io.Writer, agentName string) Config {
 		agentName: agentName,
 		Get: GetConfig{
 			Command:   *c,
-			ReadFile: ioutil.ReadFile,
+			ReadFile:  os.ReadFile,
 			writer:    writer,
 			agentName: agentName,
 		},
 		Set: SetConfig{
 			Command:   *c,
-			ReadFile: ioutil.ReadFile,
-			WriteFile: ioutil.WriteFile,
+			ReadFile:  os.ReadFile,
+			WriteFile: os.WriteFile,
 			writer:    writer,
 			agentName: agentName,
 		},

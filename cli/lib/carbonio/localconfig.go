@@ -1,16 +1,16 @@
-package zimbra
+package carbonio
 
 import (
 	"encoding/xml"
 	"errors"
-	"io/ioutil"
+	"os"
 	"strings"
 )
 
 const LocalConfigLdapMasterUrl = "ldap_master_url"
 const LocalConfigLdapUrl = "ldap_url"
 const LocalConfigLdapUserDn = "zimbra_ldap_userdn"
-const LocalConfigLdapPassword = "zimbra_ldap_password"
+const LocalConfigLdapPassword = "zimbra_ldap_password" // #nosec
 const LocalConfigServerHostname = "zimbra_server_hostname"
 const LocalConfigPath = "/opt/zextras/conf/localconfig.xml"
 
@@ -35,16 +35,16 @@ type LocalConfigEntry struct {
 }
 
 func loadLocalConfig(path string) (*rawLocalConfig, error) {
-	zimbraLocalConfig := &rawLocalConfig{}
-	localConfigBytes, err := ioutil.ReadFile(path)
+	carbonioLocalConfig := &rawLocalConfig{}
+	localConfigBytes, err := os.ReadFile(path) // #nosec
 	if err != nil {
 		return nil, errors.New("unable to parse local config at: " + path)
 	}
-	err = xml.Unmarshal(localConfigBytes, zimbraLocalConfig)
+	err = xml.Unmarshal(localConfigBytes, carbonioLocalConfig)
 	if err != nil {
 		return nil, err
 	}
-	return zimbraLocalConfig, nil
+	return carbonioLocalConfig, nil
 }
 
 // A LocalConfig represents a Zimbra configuration stored by Zimbra. Normally, this configuration is in form of an XML,

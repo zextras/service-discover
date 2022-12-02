@@ -2,6 +2,7 @@ package setup
 
 import (
 	"bitbucket.org/zextras/service-discover/cli/agent/config"
+	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
 	"bitbucket.org/zextras/service-discover/cli/lib/command"
 	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
 	"bitbucket.org/zextras/service-discover/cli/lib/exec"
@@ -9,13 +10,11 @@ import (
 	"bitbucket.org/zextras/service-discover/cli/lib/permissions"
 	"bitbucket.org/zextras/service-discover/cli/lib/systemd"
 	"bitbucket.org/zextras/service-discover/cli/lib/term"
-	"bitbucket.org/zextras/service-discover/cli/lib/zimbra"
 	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/coreos/go-systemd/v22/dbus"
 	"github.com/pkg/errors"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/user"
@@ -53,8 +52,8 @@ type businessDependencies interface {
 	NetInterfaces() ([]net.Interface, error)
 	AddrResolver(n net.Interface) ([]net.Addr, error)
 	LookupIP(s string) ([]net.IP, error)
-	LdapHandler(zimbra.LocalConfig) zimbra.LdapHandler
-	LocalConfigLoader(path string) (zimbra.LocalConfig, error)
+	LdapHandler(carbonio.LocalConfig) carbonio.LdapHandler
+	LocalConfigLoader(path string) (carbonio.LocalConfig, error)
 	SystemdUnitHandler() (systemd.UnitManager, error)
 	CreateCommand(name string, args ...string) exec.Cmd
 	GetuidSyscall() int
@@ -84,12 +83,12 @@ func (r realDependencies) LookupIP(s string) ([]net.IP, error) {
 	return net.LookupIP(s)
 }
 
-func (r realDependencies) LdapHandler(config zimbra.LocalConfig) zimbra.LdapHandler {
-	return zimbra.CreateNewHandler(config)
+func (r realDependencies) LdapHandler(config carbonio.LocalConfig) carbonio.LdapHandler {
+	return carbonio.CreateNewHandler(config)
 }
 
-func (r realDependencies) LocalConfigLoader(path string) (zimbra.LocalConfig, error) {
-	return zimbra.LoadLocalConfig(path)
+func (r realDependencies) LocalConfigLoader(path string) (carbonio.LocalConfig, error) {
+	return carbonio.LoadLocalConfig(path)
 }
 
 func (r realDependencies) SystemdUnitHandler() (systemd.UnitManager, error) {
@@ -244,11 +243,13 @@ func preRun(clusterCredentialPath string, d businessDependencies) error {
 	if err != nil {
 		return err
 	}
-	defer clusterCredentialFile.Close()
+	defer func(clusterCredentialFile *os.File) {
+		_ = clusterCredentialFile.Close()
+	}(clusterCredentialFile)
 
 	_, err = os.Stat(config.ConsultFileConfig)
 	if err == nil {
-		return errors.New(fmt.Sprintf("setup of service-discover already perfomed, manually reset and try again."))
+		return errors.New("setup of service-discover already performed, manually reset and try again.")
 	}
 
 	return nil
@@ -329,14 +330,28 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 	if err := command.CheckValidBindingAddress(d, networks, s.BindAddress); err != nil {
 		return nil, err
 	}
+	zimbraLocalConfig, err := carbonio.LoadLocalConfig(s.LocalConfigPath)
+	if err != nil {
+		return nil, err
+	}
+	ldapHandler := d.LdapHandler(zimbraLocalConfig)
+	zimbraHostname, err := command.RetrieveZimbraHostname(zimbraLocalConfig, ldapHandler)
+	if err != nil {
+		return nil, err
+	}
+	if err := command.DownloadCredentialsFromLDAP(ldapHandler, s.ClusterCredential); err != nil {
+		return nil, errors.WithMessage(err, "unable to download credentials from LDAP")
+	}
 	clusterCredentialFile, err := command.OpenClusterCredential(s.ClusterCredential)
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("unable to open %s: %s", s.ClusterCredential, err))
 	}
-	defer clusterCredentialFile.Close()
+	defer func(clusterCredentialFile *os.File) {
+		_ = clusterCredentialFile.Close()
+	}(clusterCredentialFile)
 	credReader, err := credentialsEncrypter.NewReader(clusterCredentialFile, []byte(s.Password))
 	if err != nil {
-		return nil, err
+		return nil, errors.WithMessagef(err, "unable to read %s", clusterCredentialFile.Name())
 	}
 	// We calculate the path relative to the root (i.e. without the "/" at the beginning) since this should not be
 	// included in standard tarballs
@@ -356,7 +371,7 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := ioutil.WriteFile(caFile.Name(), extractedFiles[caPath], os.FileMode(0600)); err != nil {
+	if err := os.WriteFile(caFile.Name(), extractedFiles[caPath], os.FileMode(0600)); err != nil {
 		return nil, err
 	}
 
@@ -365,12 +380,12 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 		return nil, err
 	}
 
-	caKeyFile, err := ioutil.TempFile("", config.ApplicationName+"*")
+	caKeyFile, err := os.CreateTemp("", config.ApplicationName+"*")
 	if err != nil {
 		return nil, err
 	}
 	defer os.Remove(caKeyFile.Name())
-	if err := ioutil.WriteFile(caKeyFile.Name(), extractedFiles[caKeyPath], os.FileMode(0600)); err != nil {
+	if err := os.WriteFile(caKeyFile.Name(), extractedFiles[caKeyPath], os.FileMode(0600)); err != nil {
 		return nil, err
 	}
 
@@ -385,16 +400,6 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 
 	if err := os.Remove(caKeyFile.Name()); err != nil {
 		return nil, errors.WithMessage(err, "cannot remove secret "+caKeyFile.Name()+" please remove it manually")
-	}
-
-	zimbraLocalConfig, err := zimbra.LoadLocalConfig(s.LocalConfigPath)
-	if err != nil {
-		return nil, err
-	}
-	ldapHandler := d.LdapHandler(zimbraLocalConfig)
-	zimbraHostname, err := command.RetrieveZimbraHostname(zimbraLocalConfig, ldapHandler)
-	if err != nil {
-		return nil, err
 	}
 
 	err = command.CheckHostnameAddress(d, zimbraHostname)
@@ -478,7 +483,7 @@ func writeSetupConfig(consulAgentConfig *setupConfig, destination string) error 
 		return err
 	}
 
-	if err := ioutil.WriteFile(destination, consulAgentBs, os.FileMode(0600)); err != nil {
+	if err := os.WriteFile(destination, consulAgentBs, os.FileMode(0600)); err != nil {
 		return errors.WithMessagef(err, "unable to save generated configuration file in %s", destination)
 	}
 

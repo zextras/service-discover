@@ -1,18 +1,17 @@
 package setup
 
 import (
+	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
 	"bitbucket.org/zextras/service-discover/cli/lib/command"
 	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
 	exec2 "bitbucket.org/zextras/service-discover/cli/lib/exec"
 	"bitbucket.org/zextras/service-discover/cli/lib/formatter"
 	"bitbucket.org/zextras/service-discover/cli/lib/permissions"
 	"bitbucket.org/zextras/service-discover/cli/lib/systemd"
-	"bitbucket.org/zextras/service-discover/cli/lib/zimbra"
 	"bufio"
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -49,7 +48,7 @@ func (s *Setup) firstSetup(d businessDependencies) (formatter.Formatter, error) 
 // keys for the service discover to work in a secure way to finally write all the configuration in a PGP signed tarball
 // archive
 func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration) error {
-	zimbraLocalConfig, err := zimbra.LoadLocalConfig(s.LocalConfigPath)
+	zimbraLocalConfig, err := carbonio.LoadLocalConfig(s.LocalConfigPath)
 	if err != nil {
 		return err
 	}
@@ -81,7 +80,7 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 	if err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(s.ConsulFileConfig, consulFileBytes, os.FileMode(0600)); err != nil {
+	if err := os.WriteFile(s.ConsulFileConfig, consulFileBytes, os.FileMode(0600)); err != nil {
 		return errors.New(fmt.Sprintf("unable to save generated configuration file in %s: %s", s.ConsulHome, err))
 	}
 
@@ -129,20 +128,20 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 	if err := command.SetACLToken(d.CreateCommand, serverToken, aclBootstrapUnmarshal.SecretID); err != nil {
 		return err
 	}
-	aclFile, err := ioutil.TempFile("", command.ConsulAclBootstrap)
+	aclFile, err := os.CreateTemp("", command.ConsulAclBootstrap)
 	if err != nil {
 		return err
 	}
 	defer os.Remove(aclFile.Name())
-	if err = ioutil.WriteFile(aclFile.Name(), aclBootstrapJson, 0600); err != nil {
+	if err = os.WriteFile(aclFile.Name(), aclBootstrapJson, 0600); err != nil {
 		return err
 	}
-	gossipKeyFile, err := ioutil.TempFile("", command.GossipKey)
+	gossipKeyFile, err := os.CreateTemp("", command.GossipKey)
 	if err != nil {
 		return err
 	}
 	defer os.Remove(gossipKeyFile.Name())
-	if err = ioutil.WriteFile(gossipKeyFile.Name(), []byte(consulConfigFile.Encrypt), 0600); err != nil {
+	if err = os.WriteFile(gossipKeyFile.Name(), []byte(consulConfigFile.Encrypt), 0600); err != nil {
 		return err
 	}
 	filesToCompress := map[string]string{
@@ -156,8 +155,13 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 		return err
 	}
 
-	if err = ioutil.WriteFile(s.ConsulHome+"/password", []byte(s.Password), 0400); err != nil {
+	if err = os.WriteFile(s.ConsulHome+"/password", []byte(s.Password), 0400); err != nil {
 		return err
+	}
+
+	err = command.UploadCredentialsToLDAP(ldapHandler, s.ClusterCredential)
+	if err != nil {
+		return errors.WithMessage(err, "unable to upload credentials file to LDAP")
 	}
 
 	err = systemd.EnableSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit)
@@ -174,7 +178,9 @@ func (s *Setup) createEncryptedSecret(filesToCompress map[string]string, passwor
 	if err != nil {
 		return errors.New(fmt.Sprintf("unable to create %s: %s", s.ClusterCredential, err))
 	}
-	defer encryptedSecretFiles.Close()
+	defer func(encryptedSecretFiles *os.File) {
+		_ = encryptedSecretFiles.Close()
+	}(encryptedSecretFiles)
 	if err := encryptedSecretFiles.Chmod(os.FileMode(0600)); err != nil {
 		return errors.New(fmt.Sprintf("unable to change permission to %s: %s", s.ClusterCredential, err))
 	}
@@ -184,7 +190,7 @@ func (s *Setup) createEncryptedSecret(filesToCompress map[string]string, passwor
 	}
 	defer encWriter.Close()
 	for name, path := range filesToCompress {
-		file, err := os.Open(path)
+		file, err := os.Open(path) // #nosec
 		if err != nil {
 			return errors.New(fmt.Sprintf("unable to open %s: %s", path, err))
 		}
@@ -209,24 +215,21 @@ func (s *Setup) createACLBootstrapToken(d businessDependencies) ([]byte, error) 
 	ticker := time.NewTicker(250 * time.Millisecond)
 	go func() {
 		for {
-			select {
-			case <-ticker.C:
-				aclBootstrapJson, err := d.CreateCommand(consulBin, "acl", "bootstrap", "-format", "json").Output()
-				if err != nil {
-					stderr := err.Error()
-					if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
-						stderr = strings.TrimSpace(string(ee.Stderr))
-						if stderr != "Failed ACL bootstrapping: Unexpected response code: 500 (The ACL system is currently in legacy mode.)" {
-							res := returnResult{err: exec2.ErrorFromStderr(err, "unable to create ACL bootstrap token")}
-							result <- res
-							return
-						}
+			<-ticker.C
+			aclBootstrapJson, err := d.CreateCommand(consulBin, "acl", "bootstrap", "-format", "json").Output()
+			if err != nil {
+				if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
+					stderr := strings.TrimSpace(string(ee.Stderr))
+					if stderr != "Failed ACL bootstrapping: Unexpected response code: 500 (The ACL system is currently in legacy mode.)" {
+						res := returnResult{err: exec2.ErrorFromStderr(err, "unable to create ACL bootstrap token")}
+						result <- res
+						return
 					}
-				} else {
-					res := returnResult{data: aclBootstrapJson}
-					result <- res
-					return
 				}
+			} else {
+				res := returnResult{data: aclBootstrapJson}
+				result <- res
+				return
 			}
 		}
 	}()

@@ -1,10 +1,10 @@
 package setup
 
 import (
+	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
 	"bitbucket.org/zextras/service-discover/cli/lib/exec"
 	"bitbucket.org/zextras/service-discover/cli/lib/systemd"
 	"bitbucket.org/zextras/service-discover/cli/lib/term"
-	"bitbucket.org/zextras/service-discover/cli/lib/zimbra"
 	"context"
 	"github.com/coreos/go-systemd/v22/dbus"
 	"io"
@@ -24,8 +24,8 @@ type businessDependencies interface {
 	NetInterfaces() ([]net.Interface, error)
 	AddrResolver(n net.Interface) ([]net.Addr, error)
 	LookupIP(s string) ([]net.IP, error)
-	LdapHandler(zimbra.LocalConfig) zimbra.LdapHandler
-	LocalConfigLoader(path string) (zimbra.LocalConfig, error)
+	LdapHandler(carbonio.LocalConfig) carbonio.LdapHandler
+	LocalConfigLoader(path string) (carbonio.LocalConfig, error)
 	SystemdUnitHandler() (systemd.UnitManager, error)
 	CreateCommand(name string, args ...string) exec.Cmd
 	GetuidSyscall() int
@@ -63,12 +63,12 @@ func (r realDependencies) LookupIP(s string) ([]net.IP, error) {
 	return net.LookupIP(s)
 }
 
-func (r realDependencies) LdapHandler(config zimbra.LocalConfig) zimbra.LdapHandler {
-	return zimbra.CreateNewHandler(config)
+func (r realDependencies) LdapHandler(config carbonio.LocalConfig) carbonio.LdapHandler {
+	return carbonio.CreateNewHandler(config)
 }
 
-func (r realDependencies) LocalConfigLoader(path string) (zimbra.LocalConfig, error) {
-	return zimbra.LoadLocalConfig(path)
+func (r realDependencies) LocalConfigLoader(path string) (carbonio.LocalConfig, error) {
+	return carbonio.LoadLocalConfig(path)
 }
 
 func (r realDependencies) SystemdUnitHandler() (systemd.UnitManager, error) {

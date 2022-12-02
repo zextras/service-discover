@@ -45,6 +45,6 @@ func (v *Version) Run(globalFlags *GlobalCommonFlags) error {
 	if err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(v.writer, out)
+	_, err = fmt.Fprint(v.writer, out)
 	return err
 }

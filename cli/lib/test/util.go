@@ -3,13 +3,12 @@ package test
 import (
 	"bitbucket.org/zextras/service-discover/cli/lib/test/mocks"
 	"bytes"
-	"io/ioutil"
 	"os"
 	"time"
 )
 
 func GenerateRandomFile(testName string) *os.File {
-	file, err := ioutil.TempFile("/tmp", testName)
+	file, err := os.CreateTemp("/tmp", testName)
 	if err != nil {
 		panic(err)
 	}
@@ -17,7 +16,7 @@ func GenerateRandomFile(testName string) *os.File {
 }
 
 func GenerateRandomFolder(prefix string) string {
-	file, err := ioutil.TempDir("/tmp", prefix)
+	file, err := os.MkdirTemp("/tmp", prefix)
 	if err != nil {
 		panic(err)
 	}

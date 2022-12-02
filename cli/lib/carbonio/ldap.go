@@ -1,15 +1,20 @@
-package zimbra
+package carbonio
 
 import (
+	"encoding/base64"
 	"errors"
+	"fmt"
 	"github.com/go-ldap/ldap/v3"
+	"io"
 )
 
 const (
 	LdapSeverBaseDn            = "cn=servers,cn=zimbra"
+	LdapConfigBaseDn           = "cn=config,cn=zimbra"
 	ServiceDiscoverServiceName = "service-discover"
 	AttrServiceEnabled         = "zimbraServiceEnabled"
 	AttrServiceHostname        = "zimbraServiceHostname"
+	AttrCarbonioCredentials    = "carbonioMeshCredentials" // #nosec
 )
 
 type LdapHandler interface {
@@ -17,18 +22,17 @@ type LdapHandler interface {
 	RemoveService(server string, service string) error
 	QueryAllServersWithService(service string) ([]string, error)
 	CheckServerAvailability(write bool) error
+	UploadBinary(reader io.Reader, dn string, attribute string) error
+	DownloadBinary(dn string, attribute string) ([]byte, error)
 }
 
 type ldapConnInterface interface {
+	Add(*ldap.AddRequest) error
+	Del(*ldap.DelRequest) error
 	Bind(username, password string) error
 	Modify(modifyRequest *ldap.ModifyRequest) error
 	Search(searchRequest *ldap.SearchRequest) (*ldap.SearchResult, error)
 	Close()
-}
-
-type ldapContext struct {
-	Credentials ldapCredentials
-	Connect     func(url string) (ldapConnInterface, error)
 }
 
 type ldapCredentials struct {
@@ -38,19 +42,83 @@ type ldapCredentials struct {
 	Password    string
 }
 
-//CreateNewHandler Returns a new context to execute ldap queries
+type ldapContext struct {
+	Credentials ldapCredentials
+	Connect     func(url string) (ldapConnInterface, error)
+}
+
+func (l *ldapContext) UploadBinary(reader io.Reader, dn string, attribute string) error {
+	connection, err := connect(l, true)
+	if err != nil {
+		return err
+	}
+	defer connection.Close()
+
+	content, err := io.ReadAll(reader)
+	encodedContent := base64.StdEncoding.EncodeToString(content)
+	if err != nil {
+		return err
+	}
+	addRequest := ldap.NewModifyRequest(dn, []ldap.Control{})
+	addRequest.Replace(attribute, []string{encodedContent})
+
+	return connection.Modify(addRequest)
+}
+
+func (l *ldapContext) DownloadBinary(dn string, attribute string) ([]byte, error) {
+	connection, err := connect(l, false)
+	if err != nil {
+		return nil, err
+	}
+	defer connection.Close()
+
+	searchRequest := ldap.NewSearchRequest(
+		dn,
+		ldap.ScopeWholeSubtree,
+		ldap.ScopeBaseObject,
+		1,
+		600,
+		false,
+		"("+attribute+"=*)",
+		[]string{
+			attribute,
+		},
+		[]ldap.Control{},
+	)
+
+	result, err := connection.Search(searchRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(result.Entries) == 0 || len(result.Entries) > 1 {
+		return nil, fmt.Errorf("expected 1 ldap result but instead got %d", len(result.Entries))
+	}
+
+	entry := result.Entries[0]
+
+	encodedContent := entry.GetAttributeValue(attribute)
+
+	return base64.StdEncoding.DecodeString(encodedContent)
+}
+
+// CreateNewHandler Returns a new context to execute ldap queries
 func CreateNewHandler(localConfig LocalConfig) LdapHandler {
 	return &ldapContext{
 		readLdapCredentials(localConfig),
-		func(url string) (ldapConnInterface, error) {
-			return ldap.DialURL(url)
-		},
+		standardLdapConnection(),
 	}
 }
 
-//CheckServerAvailability Returns an error if the server is not available
-func (context *ldapContext) CheckServerAvailability(write bool) error {
-	connection, err := connect(context, write)
+func standardLdapConnection() func(url string) (ldapConnInterface, error) {
+	return func(url string) (ldapConnInterface, error) {
+		return ldap.DialURL(url)
+	}
+}
+
+// CheckServerAvailability Returns an error if the server is not available
+func (l *ldapContext) CheckServerAvailability(write bool) error {
+	connection, err := connect(l, write)
 	if err != nil {
 		return err
 	}
@@ -58,19 +126,19 @@ func (context *ldapContext) CheckServerAvailability(write bool) error {
 	return nil
 }
 
-//AddServiceForLocalServer Adds to the provided server the service
-func (context *ldapContext) AddService(server string, service string) error {
-	return modifyEnabledServices(context, server, service, changeAdd)
+// AddService Adds to the provided server the service
+func (l *ldapContext) AddService(server string, service string) error {
+	return modifyEnabledServices(l, server, service, changeAdd)
 }
 
-//RemoveServiceForLocalServer Removes from the provided server the service
-func (context *ldapContext) RemoveService(server string, service string) error {
-	return modifyEnabledServices(context, server, service, changeRemove)
+// RemoveService Removes from the provided server the service
+func (l *ldapContext) RemoveService(server string, service string) error {
+	return modifyEnabledServices(l, server, service, changeRemove)
 }
 
-//QueryAllServersWithService Returns an array of all servers with the provided service
-func (context *ldapContext) QueryAllServersWithService(service string) ([]string, error) {
-	connection, err := connect(context, false)
+// QueryAllServersWithService Returns an array of all servers with the provided service
+func (l *ldapContext) QueryAllServersWithService(service string) ([]string, error) {
+	connection, err := connect(l, false)
 	if err != nil {
 		return nil, err
 	}
@@ -110,14 +178,11 @@ func connect(context *ldapContext, writeAccess bool) (ldapConnInterface, error) 
 	var connection ldapConnInterface
 	var err error
 
-	var urls []string
-	if writeAccess {
-		//to write we need master
-		urls = context.Credentials.MasterUrls
-	} else {
-		//we want to query masters before replicas
-		//to get a more consistent view
-		urls = append(context.Credentials.MasterUrls, context.Credentials.ReplicaUrls...)
+	urls := context.Credentials.MasterUrls
+	if !writeAccess {
+		// we want to query masters before replicas
+		// to get a more consistent view
+		urls = append(urls, context.Credentials.ReplicaUrls...)
 	}
 
 	var lastErr error
@@ -176,7 +241,7 @@ func modifyEnabledServices(context *ldapContext, server string, service string, 
 		return errors.New("server '" + server + "' not found on LDAP")
 	}
 
-	//check if already exist, other modify will fail
+	// check if already exist, other modify will fail
 	attributeExist := false
 	for _, serviceEnabled := range result.Entries[0].GetAttributeValues(AttrServiceEnabled) {
 		if serviceEnabled == service {
@@ -200,10 +265,8 @@ func modifyEnabledServices(context *ldapContext, server string, service string, 
 	switch change {
 	case changeAdd:
 		request.Add(AttrServiceEnabled, []string{service})
-		break
 	case changeRemove:
 		request.Delete(AttrServiceEnabled, []string{service})
-		break
 	default:
 		panic("Invalid LDAP change")
 	}

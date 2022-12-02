@@ -2,26 +2,33 @@ package setup
 
 import (
 	"bitbucket.org/zextras/service-discover/cli/agent/command/setup/mocks"
+	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
+	mocks5 "bitbucket.org/zextras/service-discover/cli/lib/carbonio/mocks"
 	"bitbucket.org/zextras/service-discover/cli/lib/command"
 	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
 	mocks2 "bitbucket.org/zextras/service-discover/cli/lib/exec/mocks"
 	mocks4 "bitbucket.org/zextras/service-discover/cli/lib/systemd/mocks"
 	"bitbucket.org/zextras/service-discover/cli/lib/test"
-	mocks5 "bitbucket.org/zextras/service-discover/cli/lib/zimbra/mocks"
 	"bytes"
+	"context"
+	"encoding/base64"
 	"fmt"
 	"github.com/coreos/go-systemd/v22/dbus"
+	"github.com/go-ldap/ldap/v3"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/testcontainers/testcontainers-go"
 	"html/template"
-	"io/ioutil"
+	"io"
 	"net"
 	"os"
 	"os/user"
 	"path"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 )
 
 type addrStub struct {
@@ -79,7 +86,7 @@ func TestSetup_preRun(t *testing.T) {
 		assert.EqualError(t,
 			preRun(clusterCredentialPath, mockedDep),
 			fmt.Sprintf(
-				"cannot find Cluster credential in %s, please copy the file from the existing server",
+				"cannot find Cluster credential in %s, please copy the file from the existing server or upload it to LDAP",
 				clusterCredentialPath,
 			),
 		)
@@ -101,7 +108,77 @@ func TestSetup_preRun(t *testing.T) {
 }
 
 func TestSetup_setup(t *testing.T) {
-	t.Parallel()
+	type testDependencies struct {
+		FakeLocalConfig           *os.File
+		ClusterCredentialDownload *os.File
+		Container                 testcontainers.Container
+		CtxContainer              context.Context
+	}
+	setup := func(t *testing.T, testName string, credentialsContent []byte) (*testDependencies, func()) {
+		container, ctxContainer := test.SpinUpCarbonioLdap(t, test.PUBLIC_IMAGE_ADDRESS, test.RELEASE_22110)
+		containerIP, err := container.ContainerIP(ctxContainer)
+		if err != nil {
+			t.Error(err)
+		}
+		localConfigByte := test.GenerateLocalConfig(
+			t,
+			containerIP,
+			"ldap://"+containerIP+":389",
+			"ldap://"+containerIP+":389",
+			test.DefaultLdapUserDN,
+			"password",
+		)
+		file, err := os.CreateTemp("", testName+"*")
+		if err != nil {
+			t.Error(err)
+		}
+		if err := os.WriteFile(file.Name(), localConfigByte, 0744); err != nil {
+			t.Error(err)
+		}
+		connection, err := ldap.DialURL("ldap://"+containerIP+":389", ldap.DialWithDialer(&net.Dialer{Timeout: 5 * time.Minute}))
+		if err != nil {
+			t.Error(err)
+		}
+		if err := connection.Bind(test.DefaultLdapUserDN, "password"); err != nil {
+			t.Error(err)
+		}
+
+		encodedContent := base64.StdEncoding.EncodeToString(credentialsContent)
+		modRequest := ldap.NewModifyRequest("cn=config,cn=zimbra", []ldap.Control{})
+		modRequest.Replace("carbonioMeshCredentials", []string{encodedContent})
+		err = connection.Modify(modRequest)
+		assert.NoError(t, err)
+
+		clusterCredentialDownloadFile := test.GenerateRandomFile(testName)
+
+		return &testDependencies{
+				file,
+				clusterCredentialDownloadFile,
+				container,
+				ctxContainer,
+			}, func() {
+				defer func(container testcontainers.Container, ctx context.Context) {
+					err := container.Terminate(ctx)
+					if err != nil {
+						t.Error(err)
+					}
+				}(container, ctxContainer)
+
+				defer func(name string) {
+					err := os.Remove(name)
+					if err != nil {
+						t.Error(err)
+					}
+				}(file.Name())
+
+				defer func(name string) {
+					err := os.Remove(name)
+					if err != nil {
+						t.Error(err)
+					}
+				}(clusterCredentialDownloadFile.Name())
+			}
+	}
 
 	t.Run("Should fail when invalid binding address is selected", func(t *testing.T) {
 		selectedInterface := net.Interface{
@@ -124,10 +201,15 @@ func TestSetup_setup(t *testing.T) {
 		assert.EqualError(t, err, "invalid binding address selected")
 	})
 
-	t.Run("Should fail when cluster credentials are missing", func(t *testing.T) {
-		nonExistingFilename := "you-wish-there-is-a-file-here"
+	t.Run("Should fail when cluster credentials are corrupted", func(t *testing.T) {
+		testStruct, cleanup := setup(t, "shouldFailWhenClusterCredentialsAreMissing", []byte("this is a test"))
+		defer cleanup()
 		selectedInterface := net.Interface{
 			Name: "en1",
+		}
+		localConfig, err := carbonio.LoadLocalConfig(testStruct.FakeLocalConfig.Name())
+		if err != nil {
+			t.Error(err)
 		}
 		mockDep := new(mocks.BusinessDependencies)
 		mockDep.On("NetInterfaces").Return([]net.Interface{
@@ -138,31 +220,40 @@ func TestSetup_setup(t *testing.T) {
 		}, nil).
 			On("AddrResolver", selectedInterface).Return([]net.Addr{
 			&addrStub{ip: "192.168.1.1"},
-		}, nil)
+		}, nil).On("LdapHandler", mock.Anything).Return(carbonio.CreateNewHandler(localConfig))
 		s := &Setup{
-			ClusterCredential: "you-wish-there-is-a-file-here",
+			ClusterCredential: testStruct.ClusterCredentialDownload.Name(),
 			BindAddress:       "192.168.1.1",
+			LocalConfigPath:   testStruct.FakeLocalConfig.Name(),
 		}
-		_, err := s.setup(mockDep)
+		// We have to simulate the file doesn't exist anymore
+		assert.NoError(t, os.Remove(testStruct.ClusterCredentialDownload.Name()))
+		_, err = s.setup(mockDep)
 		assert.EqualError(
 			t,
 			err,
 			fmt.Sprintf(
-				"unable to open %s: cannot find Cluster credential in %s, please copy the file from the existing server",
-				nonExistingFilename,
-				nonExistingFilename,
+				"unable to read %s: EOF",
+				testStruct.ClusterCredentialDownload.Name(),
 			),
 		)
 	})
 
 	t.Run("Should fail when a wrong password is set", func(t *testing.T) {
-		clusterCredential := test.GenerateRandomFile("Should fail when a wrong password is set")
-		defer os.Remove(clusterCredential.Name())
-		writer, err := credentialsEncrypter.NewWriter(clusterCredential, []byte("password"))
+		contentToUpload := bytes.Buffer{}
+		writer, err := credentialsEncrypter.NewWriter(&contentToUpload, []byte("password"))
 		assert.NoError(t, err)
 		assert.NoError(t, writer.Close())
+		readContentToUpload, err := io.ReadAll(&contentToUpload)
+		assert.NoError(t, err)
+		testStruct, cleanup := setup(t, "Should fail when a wrong password is set", readContentToUpload)
+		defer cleanup()
 		selectedInterface := net.Interface{
 			Name: "en1",
+		}
+		localConfig, err := carbonio.LoadLocalConfig(testStruct.FakeLocalConfig.Name())
+		if err != nil {
+			t.Error(err)
 		}
 		mockDep := new(mocks.BusinessDependencies)
 		mockDep.On("NetInterfaces").Return([]net.Interface{
@@ -173,30 +264,40 @@ func TestSetup_setup(t *testing.T) {
 		}, nil).
 			On("AddrResolver", selectedInterface).Return([]net.Addr{
 			&addrStub{ip: "192.168.1.1"},
-		}, nil)
+		}, nil).On("LdapHandler", mock.Anything).Return(carbonio.CreateNewHandler(localConfig))
 		s := &Setup{
-			ClusterCredential: clusterCredential.Name(),
+			ClusterCredential: testStruct.ClusterCredentialDownload.Name(),
 			BindAddress:       "192.168.1.1",
 			Password:          "wrong-password",
+			LocalConfigPath:   testStruct.FakeLocalConfig.Name(),
 		}
 		_, err = s.setup(mockDep)
 		assert.EqualError(
 			t,
 			err,
-			"openpgp: incorrect key",
+			fmt.Sprintf("unable to read %s: openpgp: incorrect key",
+				testStruct.ClusterCredentialDownload.Name()),
 		)
 	})
 
 	t.Run("Should fail to create TLS certificate if CA is not present", func(t *testing.T) {
-		clusterCredential := test.GenerateRandomFile("Should fail to create TLS certificate if CA is not present")
-		defer os.Remove(clusterCredential.Name())
-		consulHome := test.GenerateRandomFolder("Should fail to create TLS certificate if CA is not present")
-		defer os.RemoveAll(consulHome)
-		writer, err := credentialsEncrypter.NewWriter(clusterCredential, []byte("password"))
+		contentToUpload := bytes.Buffer{}
+		writer, err := credentialsEncrypter.NewWriter(&contentToUpload, []byte("password"))
 		assert.NoError(t, err)
 		assert.NoError(t, writer.Close())
+		readContentToUpload, err := io.ReadAll(&contentToUpload)
+		assert.NoError(t, err)
+		testStruct, cleanup := setup(t, "Should fail to create TLS certificate if CA is not present", readContentToUpload)
+		defer cleanup()
+
+		consulHome := test.GenerateRandomFolder("Should fail to create TLS certificate if CA is not present")
+		defer os.RemoveAll(consulHome)
 		selectedInterface := net.Interface{
 			Name: "en1",
+		}
+		localConfig, err := carbonio.LoadLocalConfig(testStruct.FakeLocalConfig.Name())
+		if err != nil {
+			t.Error(err)
 		}
 		mockDep := new(mocks.BusinessDependencies)
 		mockDep.On("NetInterfaces").Return([]net.Interface{
@@ -207,12 +308,13 @@ func TestSetup_setup(t *testing.T) {
 		}, nil).
 			On("AddrResolver", selectedInterface).Return([]net.Addr{
 			&addrStub{ip: "192.168.1.1"},
-		}, nil)
+		}, nil).On("LdapHandler", mock.Anything).Return(carbonio.CreateNewHandler(localConfig))
 		s := &Setup{
-			ClusterCredential: clusterCredential.Name(),
+			ClusterCredential: testStruct.ClusterCredentialDownload.Name(),
 			BindAddress:       "192.168.1.1",
 			Password:          "password",
 			ConsulHome:        consulHome,
+			LocalConfigPath:   testStruct.FakeLocalConfig.Name(),
 		}
 		_, err = s.setup(mockDep)
 		expectedCaPath, _ := filepath.Rel("/", path.Join(consulHome, command.ConsulCA))
@@ -227,28 +329,17 @@ func TestSetup_setup(t *testing.T) {
 
 	t.Run("Should fail when systemd enabling service-discover unit returns an error", func(t *testing.T) {
 		testName := "Should fail when systemd enabling service-discover unit returns an error"
+		contentToUpload := bytes.Buffer{}
+		writer, err := credentialsEncrypter.NewWriter(&contentToUpload, []byte("password"))
+		assert.NoError(t, err)
 		errorCause := "this is the error"
 		unitName := "service-discover.service"
 		mutableConfiguration := test.GenerateRandomFile(testName)
 		defer os.Remove(mutableConfiguration.Name())
-		localConfig := test.GenerateRandomFile(testName)
-		defer os.Remove(localConfig.Name())
-		assert.NoError(t, ioutil.WriteFile(localConfig.Name(), test.GenerateLocalConfig(
-			t,
-			"mailbox-1.example.com",
-			"ldap://mailbox-1.example.com:389",
-			"ldap://mailbox-1.example.com:389",
-			test.DefaultLdapUserDN,
-			"pa$$word",
-		), 0644))
-		clusterCredential := test.GenerateRandomFile(testName)
-		defer os.Remove(clusterCredential.Name())
 		mutableConfig := test.GenerateRandomFile(testName)
 		defer os.Remove(mutableConfig.Name())
 		consulHome := test.GenerateRandomFolder(testName)
 		defer os.RemoveAll(consulHome)
-		writer, err := credentialsEncrypter.NewWriter(clusterCredential, []byte("password"))
-		assert.NoError(t, err)
 		dumbCaContent, caStat := test.CreateDumbFile([]byte("Test"), command.ConsulCA)
 		assert.NoError(t, writer.AddFile(dumbCaContent, caStat, command.ConsulCA, consulHome+"/"))
 		dumbGossipKeyContent, gossipStat := test.CreateDumbFile([]byte("Gossip-test"), command.GossipKey)
@@ -260,6 +351,10 @@ func TestSetup_setup(t *testing.T) {
 }`), command.ConsulAclBootstrap)
 		assert.NoError(t, writer.AddFile(dumbAclContent, aclStat, command.ConsulAclBootstrap, "/"))
 		assert.NoError(t, writer.Close())
+		readContentToUpload, err := io.ReadAll(&contentToUpload)
+		assert.NoError(t, err)
+		testStruct, cleanup := setup(t, testName, readContentToUpload)
+		defer cleanup()
 		mockDep := new(mocks.BusinessDependencies)
 		mockDep.On(
 			"LookupUser", "service-discover").Return(&user.User{
@@ -291,15 +386,17 @@ func TestSetup_setup(t *testing.T) {
 		selectedInterface := net.Interface{
 			Name: "en1",
 		}
+		containerIP, err := testStruct.Container.ContainerIP(testStruct.CtxContainer)
+		assert.NoError(t, err)
 		aclTemplateData := struct {
 			ZimbraHostname string
-		}{ZimbraHostname: "agent-mailbox-1-example-com"}
+		}{ZimbraHostname: fmt.Sprintf("agent-%s", strings.ReplaceAll(containerIP, ".", "-"))}
 		aclTemplate := template.Must(template.New("acl").Parse(command.AclPolicyTemplateText))
 		aclRenderOut := bytes.Buffer{}
 		assert.NoError(t, aclTemplate.Execute(&aclRenderOut, aclTemplateData))
-		aclRenderBs, err := ioutil.ReadAll(&aclRenderOut)
+		aclRenderBs, err := io.ReadAll(&aclRenderOut)
 		assert.NoError(t, err)
-		mockDep.On("LookupIP", "mailbox-1.example.com").Return([]net.IP{net.IPv4(1, 1, 1, 1)}, nil)
+		mockDep.On("LookupIP", containerIP).Return([]net.IP{net.IPv4(1, 1, 1, 1)}, nil)
 		mockDep.On("CreateCommand",
 			"/usr/bin/consul",
 			"tls",
@@ -319,7 +416,7 @@ func TestSetup_setup(t *testing.T) {
 				"policy",
 				"create",
 				"-name",
-				"agent-mailbox-1-example-com",
+				fmt.Sprintf("agent-%s", strings.ReplaceAll(containerIP, ".", "-")),
 				"-rules",
 				string(aclRenderBs),
 			).
@@ -330,7 +427,7 @@ func TestSetup_setup(t *testing.T) {
 				"token",
 				"create",
 				"-policy-name",
-				"agent-mailbox-1-example-com",
+				fmt.Sprintf("agent-%s", strings.ReplaceAll(containerIP, ".", "-")),
 				"-format",
 				"json",
 			).
@@ -362,6 +459,10 @@ func TestSetup_setup(t *testing.T) {
 				ch := args.Get(2).(chan<- string)
 				ch <- "done"
 			})
+		localConfig, err := carbonio.LoadLocalConfig(testStruct.FakeLocalConfig.Name())
+		if err != nil {
+			t.Error(err)
+		}
 		mockLdapHandler := new(mocks5.LdapHandler)
 		mockLdapHandler.On("CheckServerAvailability", true).
 			Return(nil)
@@ -369,12 +470,12 @@ func TestSetup_setup(t *testing.T) {
 			On("SystemdUnitHandler").
 			Return(unitManager, nil).
 			On("LdapHandler", mock.Anything).
-			Return(mockLdapHandler)
+			Return(carbonio.CreateNewHandler(localConfig))
 		s := &Setup{
 			ConsulHome:        consulHome,
-			LocalConfigPath:   localConfig.Name(),
+			LocalConfigPath:   testStruct.FakeLocalConfig.Name(),
 			ConsulFileConfig:  mutableConfiguration.Name(),
-			ClusterCredential: clusterCredential.Name(),
+			ClusterCredential: testStruct.ClusterCredentialDownload.Name(),
 			MutableConfigFile: mutableConfig.Name(),
 			Password:          "password",
 			BindAddress:       "192.168.1.1",
@@ -385,26 +486,15 @@ func TestSetup_setup(t *testing.T) {
 
 	t.Run("Should properly run without errors", func(t *testing.T) {
 		testName := "Should properly run without errors"
+		contentToUpload := bytes.Buffer{}
+		writer, err := credentialsEncrypter.NewWriter(&contentToUpload, []byte("password"))
+		assert.NoError(t, err)
 		mutableConfiguration := test.GenerateRandomFile(testName)
 		defer os.Remove(mutableConfiguration.Name())
-		localConfig := test.GenerateRandomFile(testName)
-		defer os.Remove(localConfig.Name())
-		assert.NoError(t, ioutil.WriteFile(localConfig.Name(), test.GenerateLocalConfig(
-			t,
-			"mailbox-1.example.com",
-			"ldap://mailbox-1.example.com:389",
-			"ldap://mailbox-1.example.com:389",
-			test.DefaultLdapUserDN,
-			"pa$$word",
-		), 0644))
-		clusterCredential := test.GenerateRandomFile(testName)
-		defer os.Remove(clusterCredential.Name())
 		mutableConfig := test.GenerateRandomFile(testName)
 		defer os.Remove(mutableConfig.Name())
 		consulHome := test.GenerateRandomFolder(testName)
 		defer os.RemoveAll(consulHome)
-		writer, err := credentialsEncrypter.NewWriter(clusterCredential, []byte("password"))
-		assert.NoError(t, err)
 		dumbCaContent, caStat := test.CreateDumbFile([]byte("Test"), command.ConsulCA)
 		assert.NoError(t, writer.AddFile(dumbCaContent, caStat, command.ConsulCA, consulHome+"/"))
 		dumbGossipKeyContent, gossipStat := test.CreateDumbFile([]byte("Gossip-test"), command.GossipKey)
@@ -416,6 +506,10 @@ func TestSetup_setup(t *testing.T) {
 		dumbCaKeyContent, caKeyStat := test.CreateDumbFile([]byte("Gossip-test"), command.GossipKey)
 		assert.NoError(t, writer.AddFile(dumbCaKeyContent, caKeyStat, command.ConsulCAKey, consulHome+"/"))
 		assert.NoError(t, writer.Close())
+		readContentToUpload, err := io.ReadAll(&contentToUpload)
+		assert.NoError(t, err)
+		testStruct, cleanup := setup(t, testName, readContentToUpload)
+		defer cleanup()
 		mockDep := new(mocks.BusinessDependencies)
 		mockDep.On(
 			"LookupUser", "service-discover").Return(&user.User{
@@ -447,15 +541,17 @@ func TestSetup_setup(t *testing.T) {
 		selectedInterface := net.Interface{
 			Name: "en1",
 		}
+		containerIP, err := testStruct.Container.ContainerIP(testStruct.CtxContainer)
+		assert.NoError(t, err)
 		aclTemplateData := struct {
 			ZimbraHostname string
-		}{ZimbraHostname: "agent-mailbox-1-example-com"}
+		}{ZimbraHostname: fmt.Sprintf("agent-%s", strings.ReplaceAll(containerIP, ".", "-"))}
 		aclTemplate := template.Must(template.New("acl").Parse(command.AclPolicyTemplateText))
 		aclRenderOut := bytes.Buffer{}
 		assert.NoError(t, aclTemplate.Execute(&aclRenderOut, aclTemplateData))
-		aclRenderBs, err := ioutil.ReadAll(&aclRenderOut)
+		aclRenderBs, err := io.ReadAll(&aclRenderOut)
 		assert.NoError(t, err)
-		mockDep.On("LookupIP", "mailbox-1.example.com").Return([]net.IP{net.IPv4(1, 1, 1, 1)}, nil)
+		mockDep.On("LookupIP", containerIP).Return([]net.IP{net.IPv4(1, 1, 1, 1)}, nil)
 		mockDep.On("CreateCommand",
 			"/usr/bin/consul",
 			"tls",
@@ -475,7 +571,7 @@ func TestSetup_setup(t *testing.T) {
 				"policy",
 				"create",
 				"-name",
-				"agent-mailbox-1-example-com",
+				fmt.Sprintf("agent-%s", strings.ReplaceAll(containerIP, ".", "-")),
 				"-rules",
 				string(aclRenderBs),
 			).
@@ -486,7 +582,7 @@ func TestSetup_setup(t *testing.T) {
 				"token",
 				"create",
 				"-policy-name",
-				"agent-mailbox-1-example-com",
+				fmt.Sprintf("agent-%s", strings.ReplaceAll(containerIP, ".", "-")),
 				"-format",
 				"json",
 			).
@@ -518,6 +614,10 @@ func TestSetup_setup(t *testing.T) {
 				ch := args.Get(2).(chan<- string)
 				ch <- "done"
 			})
+		localConfig, err := carbonio.LoadLocalConfig(testStruct.FakeLocalConfig.Name())
+		if err != nil {
+			t.Error(err)
+		}
 		mockDep.On("SystemdUnitHandler").Return(unitManager, nil)
 		mockLdapHandler := new(mocks5.LdapHandler)
 		mockLdapHandler.On("CheckServerAvailability", true).
@@ -526,11 +626,11 @@ func TestSetup_setup(t *testing.T) {
 			On("SystemdUnitHandler").
 			Return(unitManager, nil).
 			On("LdapHandler", mock.Anything).
-			Return(mockLdapHandler)
+			Return(carbonio.CreateNewHandler(localConfig))
 		s := &Setup{
-			LocalConfigPath:   localConfig.Name(),
+			LocalConfigPath:   testStruct.FakeLocalConfig.Name(),
 			ConsulFileConfig:  mutableConfiguration.Name(),
-			ClusterCredential: clusterCredential.Name(),
+			ClusterCredential: testStruct.ClusterCredentialDownload.Name(),
 			MutableConfigFile: mutableConfig.Name(),
 			BindAddress:       "192.168.1.1",
 			Password:          "password",
@@ -538,7 +638,7 @@ func TestSetup_setup(t *testing.T) {
 		}
 		_, err = s.setup(mockDep)
 		assert.NoError(t, err)
-		mutableConfigContent, err := ioutil.ReadFile(mutableConfig.Name())
+		mutableConfigContent, err := os.ReadFile(mutableConfig.Name())
 		assert.NoError(t, err)
 		assert.Equal(t, `{
   "bind_addr": "192.168.1.1"

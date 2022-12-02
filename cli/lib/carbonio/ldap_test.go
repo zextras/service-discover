@@ -1,15 +1,30 @@
-package zimbra
+package carbonio
 
 import (
+	"bitbucket.org/zextras/service-discover/cli/lib/test"
+	"bytes"
+	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
+	"fmt"
 	"github.com/go-ldap/ldap/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/testcontainers/testcontainers-go"
 	"testing"
 )
 
 type MockLdapConnection struct {
 	mock.Mock
+}
+
+func (mock *MockLdapConnection) Add(request *ldap.AddRequest) error {
+	panic("should not be called")
+}
+
+func (mock *MockLdapConnection) Del(request *ldap.DelRequest) error {
+	panic("should not be called")
 }
 
 func (mock *MockLdapConnection) Bind(username, password string) error {
@@ -38,8 +53,8 @@ func Test_connect(t *testing.T) {
 		got, err := connect(
 			&ldapContext{
 				Credentials: ldapCredentials{
-					MasterUrls:  []string{ "ldap://example.com:123" },
-					ReplicaUrls: []string{ "never use me" },
+					MasterUrls:  []string{"ldap://example.com:123"},
+					ReplicaUrls: []string{"never use me"},
 					Username:    "username",
 					Password:    "password",
 				},
@@ -63,8 +78,8 @@ func TestEnableDisableService(t *testing.T) {
 	t.Run("replica is not used for writes", func(t *testing.T) {
 		handler := ldapContext{
 			Credentials: ldapCredentials{
-				MasterUrls:  []string{ "ldap://example.com:123" },
-				ReplicaUrls: []string{ "never use me" },
+				MasterUrls:  []string{"ldap://example.com:123"},
+				ReplicaUrls: []string{"never use me"},
 				Username:    "username",
 				Password:    "password",
 			},
@@ -121,8 +136,8 @@ func TestEnableDisableService(t *testing.T) {
 
 		handler := ldapContext{
 			Credentials: ldapCredentials{
-				MasterUrls:  []string{ "ldap://example.com:123" },
-				ReplicaUrls: []string{ "never use me" },
+				MasterUrls:  []string{"ldap://example.com:123"},
+				ReplicaUrls: []string{"never use me"},
 				Username:    "username",
 				Password:    "password",
 			},
@@ -179,8 +194,8 @@ func TestEnableDisableService(t *testing.T) {
 
 		handler := ldapContext{
 			Credentials: ldapCredentials{
-				MasterUrls:  []string{ "ldap://example.com:123" },
-				ReplicaUrls: []string{ "never use me" },
+				MasterUrls:  []string{"ldap://example.com:123"},
+				ReplicaUrls: []string{"never use me"},
 				Username:    "username",
 				Password:    "password",
 			},
@@ -204,7 +219,6 @@ func TestEnableDisableService(t *testing.T) {
 }
 
 func TestQueryAllServiceDiscoverServers(t *testing.T) {
-
 	t.Run("query all servers", func(t *testing.T) {
 		mockLdapConnection := new(MockLdapConnection)
 		mockLdapConnection.On("Close").Return()
@@ -240,8 +254,8 @@ func TestQueryAllServiceDiscoverServers(t *testing.T) {
 
 		handler := ldapContext{
 			Credentials: ldapCredentials{
-				MasterUrls:  []string{ "ldap://example.com:123" },
-				ReplicaUrls: []string{ "never use me" },
+				MasterUrls:  []string{"ldap://example.com:123"},
+				ReplicaUrls: []string{"never use me"},
 				Username:    "username",
 				Password:    "password",
 			},
@@ -265,8 +279,8 @@ func TestQueryAllServiceDiscoverServers(t *testing.T) {
 	t.Run("both master and replica fails", func(t *testing.T) {
 		handler := ldapContext{
 			Credentials: ldapCredentials{
-				MasterUrls:  []string{ "ldap://example.com:123" },
-				ReplicaUrls: []string{ "never use me" },
+				MasterUrls:  []string{"ldap://example.com:123"},
+				ReplicaUrls: []string{"never use me"},
 				Username:    "username",
 				Password:    "password",
 			},
@@ -285,5 +299,109 @@ func TestQueryAllServiceDiscoverServers(t *testing.T) {
 		assert.Nil(t, got)
 		assert.NotNil(t, err)
 		assert.Equal(t, "replica connection failed", err.Error())
+	})
+}
+
+func TestLDAPDownloadAndUploadCapabilities(t *testing.T) {
+	testDn := "cn=config,cn=zimbra"
+	testAttribute := "carbonioMeshCredentials"
+	t.Run("should download content from LDAP", func(t *testing.T) {
+		expectedContent := make([]byte, 2048000) // 2 MB random byte array to simulate random binary content
+		_, err := rand.Read(expectedContent)
+		assert.NoError(t, err)
+		ldapContainer, containerCtx := test.SpinUpCarbonioLdap(t, test.PUBLIC_IMAGE_ADDRESS, test.RELEASE_22110)
+		defer func(ldapContainer testcontainers.Container, ctx context.Context) {
+			if err := ldapContainer.Terminate(ctx); err != nil {
+				t.Error(err)
+			}
+		}(ldapContainer, containerCtx)
+
+		ldapIp, err := ldapContainer.ContainerIP(containerCtx)
+		assert.NoError(t, err)
+
+		masterUrl := fmt.Sprintf("ldap://%s:%s", ldapIp, "389")
+
+		ldapHandler := ldapContext{
+			Credentials: ldapCredentials{
+				MasterUrls:  []string{masterUrl},
+				ReplicaUrls: []string{},
+				Username:    "uid=zimbra,cn=admins,cn=zimbra",
+				Password:    "password",
+			},
+			Connect: standardLdapConnection(),
+		}
+
+		connection, err := connect(&ldapHandler, true)
+		assert.NoError(t, err)
+		expectedEncoded := base64.StdEncoding.EncodeToString(expectedContent)
+		modRequest := ldap.NewModifyRequest(testDn, []ldap.Control{})
+		modRequest.Replace(testAttribute, []string{expectedEncoded})
+		err = connection.Modify(modRequest)
+		assert.NoError(t, err)
+
+		downloadedBinary, err := ldapHandler.DownloadBinary(testDn, testAttribute)
+		assert.NoError(t, err)
+
+		assert.Equal(t, expectedContent, downloadedBinary, "The two byte arrays are no the same")
+	})
+
+	t.Run("should upload content from LDAP", func(t *testing.T) {
+		expectedContent := make([]byte, 2048000) // 2 MB random byte array to simulate random binary content
+		_, err := rand.Read(expectedContent)
+		assert.NoError(t, err)
+		ldapContainer, containerCtx := test.SpinUpCarbonioLdap(t, test.PUBLIC_IMAGE_ADDRESS, test.RELEASE_22110)
+		defer func(ldapContainer testcontainers.Container, ctx context.Context) {
+			if err := ldapContainer.Terminate(ctx); err != nil {
+				t.Error(err)
+			}
+		}(ldapContainer, containerCtx)
+
+		ldapIp, err := ldapContainer.ContainerIP(containerCtx)
+		assert.NoError(t, err)
+
+		masterUrl := fmt.Sprintf("ldap://%s:%s", ldapIp, "389")
+
+		ldapHandler := ldapContext{
+			Credentials: ldapCredentials{
+				MasterUrls:  []string{masterUrl},
+				ReplicaUrls: []string{},
+				Username:    "uid=zimbra,cn=admins,cn=zimbra",
+				Password:    "password",
+			},
+			Connect: standardLdapConnection(),
+		}
+
+		err = ldapHandler.UploadBinary(bytes.NewBuffer(expectedContent), testDn, testAttribute)
+		assert.NoError(t, err)
+
+		connection, err := connect(&ldapHandler, false)
+		assert.NoError(t, err)
+		defer connection.Close()
+
+		searchRequest := ldap.NewSearchRequest(
+			testDn,
+			ldap.ScopeWholeSubtree,
+			ldap.ScopeBaseObject,
+			1,
+			600,
+			false,
+			"("+testAttribute+"=*)",
+			[]string{
+				testAttribute,
+			},
+			[]ldap.Control{},
+		)
+
+		result, err := connection.Search(searchRequest)
+		assert.NoError(t, err)
+
+		assert.Equal(t, 1, len(result.Entries), "Expected exactly 1 result from ldap")
+
+		entry := result.Entries[0]
+
+		encodedContent := entry.GetAttributeValue(testAttribute)
+		decodedContent, err := base64.StdEncoding.DecodeString(encodedContent)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedContent, decodedContent, "The downloaded content doesn't match the uploaded one")
 	})
 }

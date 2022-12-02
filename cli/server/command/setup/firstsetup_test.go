@@ -1,29 +1,28 @@
 package setup
 
 import (
+	mocks5 "bitbucket.org/zextras/service-discover/cli/lib/carbonio/mocks"
 	"bitbucket.org/zextras/service-discover/cli/lib/command"
 	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
 	"bitbucket.org/zextras/service-discover/cli/lib/exec"
 	mocks4 "bitbucket.org/zextras/service-discover/cli/lib/exec/mocks"
 	mocks3 "bitbucket.org/zextras/service-discover/cli/lib/systemd/mocks"
 	"bitbucket.org/zextras/service-discover/cli/lib/term/mocks"
-	mocks5 "bitbucket.org/zextras/service-discover/cli/lib/zimbra/mocks"
 	mocks2 "bitbucket.org/zextras/service-discover/cli/server/command/setup/mocks"
 	"os/user"
 	"syscall"
 
+	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
 	"bitbucket.org/zextras/service-discover/cli/lib/test"
-	"bitbucket.org/zextras/service-discover/cli/lib/zimbra"
 	"bytes"
 	"crypto/rand"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
-	native_exec "os/exec"
+	nexec "os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -99,12 +98,13 @@ func TestFirstSetup_business(t *testing.T) {
 		setup, setupCleanup := createSetup(t)
 		cleanups = append(cleanups, setupCleanup)
 
-		mockLocalConfig, err := zimbra.LoadLocalConfig(setup.LocalConfigPath)
+		mockLocalConfig, err := carbonio.LoadLocalConfig(setup.LocalConfigPath)
 		assert.NoError(t, err)
 		mockLdapHandler := new(mocks5.LdapHandler)
+		mockLdapHandler.On("UploadBinary", mock.Anything, "cn=config,cn=zimbra", "carbonioMeshCredentials").Return(nil)
 		mockSystemdUnit := new(mocks3.UnitManager)
 		mockDependencies := new(mocks2.BusinessDependencies)
-		mockDependencies.On("writer").Return(ioutil.Discard)
+		mockDependencies.On("writer").Return(io.Discard)
 		mockNetwork(mockDependencies, false, false)
 		cleanup := mockBusinessDependencies(&setup, mockDependencies, &mockLocalConfig, mockLdapHandler, mockSystemdUnit)
 		cleanups = append(cleanups, cleanup)
@@ -121,6 +121,7 @@ func TestFirstSetup_business(t *testing.T) {
 		assert.Equal(t, "{\"cluster_credentials\":\""+setup.ClusterCredential+"\"}", text)
 
 		mockLdapHandler.AssertNumberOfCalls(t, "AddService", 1)
+		mockLdapHandler.AssertNumberOfCalls(t, "UploadBinary", 1)
 		mockDependencies.AssertNumberOfCalls(t, "CreateCommand", 6)
 
 		clusterCredentialFile, err := os.Open(setup.ClusterCredential)
@@ -174,12 +175,13 @@ func TestFirstSetup_business(t *testing.T) {
 		setup, setupCleanup := createSetup(t)
 		cleanups = append(cleanups, setupCleanup)
 
-		mockLocalConfig, err := zimbra.LoadLocalConfig(setup.LocalConfigPath)
+		mockLocalConfig, err := carbonio.LoadLocalConfig(setup.LocalConfigPath)
 		assert.NoError(t, err)
 		mockLdapHandler := new(mocks5.LdapHandler)
+		mockLdapHandler.On("UploadBinary", mock.Anything, "cn=config,cn=zimbra", "carbonioMeshCredentials").Return(nil)
 		mockSystemdUnit := new(mocks3.UnitManager)
 		mockDependencies := new(mocks2.BusinessDependencies)
-		mockDependencies.On("writer").Return(ioutil.Discard)
+		mockDependencies.On("writer").Return(io.Discard)
 		mockNetwork(mockDependencies, true, false)
 		cleanup := mockBusinessDependencies(&setup, mockDependencies, &mockLocalConfig, mockLdapHandler, mockSystemdUnit)
 		cleanups = append(cleanups, cleanup)
@@ -194,7 +196,7 @@ func TestFirstSetup_business(t *testing.T) {
 func mockBusinessDependencies(
 	setup *Setup,
 	mockDependencies *mocks2.BusinessDependencies,
-	mockLocalConfig *zimbra.LocalConfig,
+	mockLocalConfig *carbonio.LocalConfig,
 	mockLdapHandler *mocks5.LdapHandler,
 	mockSystemdUnit *mocks3.UnitManager,
 ) func() {
@@ -326,15 +328,15 @@ func mockBusinessDependencies(
 	).Run(func(args mock.Arguments) {
 		ch := args.Get(2).(chan<- string)
 
-		cmd := native_exec.Command(
+		cmd := nexec.Command(
 			"/usr/bin/consul",
 			"agent",
-			"-dev", //otherwise it takes up to 10 seconds to boostrap
+			"-dev", // otherwise it takes up to 10 seconds to boostrap
 			"-config-dir",
 			setup.ConsulConfigDir,
 			"-server",
 			"-bind",
-			"127.0.0.1", //otherwise test address will be used
+			"127.0.0.1", // otherwise test address will be used
 		)
 		err := cmd.Start()
 		if err != nil {
@@ -389,7 +391,7 @@ func createSetup(t *testing.T) (Setup, func()) {
 		panic(err)
 	}
 
-	err = ioutil.WriteFile(setup.LocalConfigPath, test.GenerateLocalConfig(
+	err = os.WriteFile(setup.LocalConfigPath, test.GenerateLocalConfig(
 		t,
 		"mailbox-1.example.com",
 		"ldap://mailbox-1.example.com:389",
@@ -528,29 +530,6 @@ Specify the binding address for service discovery: `, string(allOut))
 	})
 }
 
-func populateWithFirstClusterInput(bindingAddress string) *bytes.Buffer {
-	buf := bytes.NewBuffer([]byte(bindingAddress + `
-password
-`))
-	return buf
-}
-
-func mockLdap(ldap mocked) {
-	ldap.On(
-		"CheckServerAvailability",
-		true,
-	).Return(nil).
-		On(
-			"AddService",
-			"mailbox-1.example.com",
-			zimbra.ServiceDiscoverServiceName,
-		).Return(nil).
-		On(
-			"QueryAllServersWithService",
-			zimbra.ServiceDiscoverServiceName,
-		).Return(0, nil)
-}
-
 func mockNetwork(network mocked, withoutLocalHost bool, includeSubnet bool) {
 	localhost := net.Interface{
 		Index:        1, // Read GoDoc about net.Interface if you're puzzled by this
@@ -634,8 +613,7 @@ func TestSetup_createEncryptedSecret(t *testing.T) {
 		NumberOfFiles     int
 	}
 	type args struct {
-		filesToCompress map[string]string
-		password        string
+		password string
 	}
 	tests := []struct {
 		name    string
@@ -688,7 +666,7 @@ func TestSetup_createEncryptedSecret(t *testing.T) {
 				if err != nil {
 					panic(err)
 				}
-				err = ioutil.WriteFile(file.Name(), content, 0644)
+				err = os.WriteFile(file.Name(), content, 0644)
 				if err != nil {
 					panic(err)
 				}
@@ -715,9 +693,9 @@ func TestSetup_createEncryptedSecret(t *testing.T) {
 					actualBytesBuf := &bytes.Buffer{}
 					_, err = io.Copy(actualBytesBuf, reader)
 					assert.NoError(t, err)
-					expectedBytes, err := ioutil.ReadFile(filesToInclude[header.Name])
+					expectedBytes, err := os.ReadFile(filesToInclude[header.Name])
 					assert.NoError(t, err)
-					actualBytes, err := ioutil.ReadAll(actualBytesBuf)
+					actualBytes, err := io.ReadAll(actualBytesBuf)
 					assert.NoError(t, err)
 					assert.Equal(
 						t,
