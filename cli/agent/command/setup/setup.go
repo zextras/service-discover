@@ -239,14 +239,6 @@ func preRun(clusterCredentialPath string, d businessDependencies) error {
 		return errors.New("this command must be executed as root")
 	}
 
-	clusterCredentialFile, err := command.OpenClusterCredential(clusterCredentialPath)
-	if err != nil {
-		return err
-	}
-	defer func(clusterCredentialFile *os.File) {
-		_ = clusterCredentialFile.Close()
-	}(clusterCredentialFile)
-
 	_, err = os.Stat(config.ConsultFileConfig)
 	if err == nil {
 		return errors.New("setup of service-discover already performed, manually reset and try again.")

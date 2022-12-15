@@ -73,7 +73,7 @@ func TestSetup_preRun(t *testing.T) {
 		)
 	})
 
-	t.Run("Should fail if cluster credential file is missing", func(t *testing.T) {
+	t.Run("Should not fail if cluster credential file is missing", func(t *testing.T) {
 		clusterCredentialPath := "bogus-value"
 		missingConsul := new(mocks2.Cmd)
 		missingConsul.On("Run").Return(nil)
@@ -83,12 +83,9 @@ func TestSetup_preRun(t *testing.T) {
 			Return(missingConsul).
 			On("GetuidSyscall").
 			Return(0)
-		assert.EqualError(t,
+		assert.NoError(t,
 			preRun(clusterCredentialPath, mockedDep),
-			fmt.Sprintf(
-				"cannot find Cluster credential in %s, please copy the file from the existing server or upload it to LDAP",
-				clusterCredentialPath,
-			),
+			"Pre run should not give Cluster-credential missing error",
 		)
 	})
 
