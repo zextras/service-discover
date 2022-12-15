@@ -3,7 +3,7 @@ targets=(
   "ubuntu"
 )
 pkgname="service-discover-agent"
-pkgver="0.1.6"
+pkgver="0.1.7"
 pkgrel="1"
 pkgdesc="Service discover agent cli"
 pkgdesclong=(
