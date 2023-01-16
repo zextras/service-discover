@@ -7,6 +7,7 @@ import (
 	"bitbucket.org/zextras/service-discover/cli/lib/formatter"
 	"bitbucket.org/zextras/service-discover/cli/lib/permissions"
 	"bitbucket.org/zextras/service-discover/cli/lib/systemd"
+	"bitbucket.org/zextras/service-discover/cli/server/config"
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
@@ -39,7 +40,9 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 	if err != nil {
 		return nil, err
 	}
-
+	if err := command.DownloadCredentialsFromLDAP(ldapHandler, s.ClusterCredential); err != nil {
+		return nil, errors.WithMessage(err, "unable to download credentials from LDAP")
+	}
 	clusterCredential, err := command.OpenClusterCredential(s.ClusterCredential)
 	if err != nil {
 		return nil, err
@@ -51,18 +54,26 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 	}
 	// We calculate the path relative to the root (i.e. without the "/" at the beginning) since this should not be
 	// included in standard tarballs
-	caFullPath, err := filepath.Rel("/", filepath.Join(s.ConsulHome, command.ConsulCA))
+	tarballCaFullPath, err := filepath.Rel("/", filepath.Join(config.ConsulHome, command.ConsulCA))
 	if err != nil {
 		return nil, err
 	}
-	caKeyFullPath, err := filepath.Rel("/", filepath.Join(s.ConsulHome, command.ConsulCAKey))
+	localCaFullPath, err := filepath.Rel("/", filepath.Join(s.ConsulHome, command.ConsulCA))
+	if err != nil {
+		return nil, err
+	}
+	tarballCaKeyFullPath, err := filepath.Rel("/", filepath.Join(config.ConsulHome, command.ConsulCAKey))
+	if err != nil {
+		return nil, err
+	}
+	localCaKeyFullPath, err := filepath.Rel("/", filepath.Join(s.ConsulHome, command.ConsulCAKey))
 	if err != nil {
 		return nil, err
 	}
 	extractedFiles, err := credentialsEncrypter.ReadFiles(
 		credReader,
-		caFullPath,
-		caKeyFullPath,
+		tarballCaFullPath,
+		tarballCaKeyFullPath,
 		command.ConsulAclBootstrap,
 		command.GossipKey,
 	)
@@ -70,19 +81,19 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 		return nil, err
 	}
 
-	if err := os.WriteFile("/"+caFullPath, extractedFiles[caFullPath], os.FileMode(0600)); err != nil {
+	if err := os.WriteFile("/"+localCaFullPath, extractedFiles[tarballCaFullPath], os.FileMode(0600)); err != nil {
 		return nil, err
 	}
 
-	err = permissions.SetStrictPermissions(d, "/"+caFullPath)
+	err = permissions.SetStrictPermissions(d, "/"+localCaFullPath)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := os.WriteFile("/"+caKeyFullPath, extractedFiles[caKeyFullPath], os.FileMode(0600)); err != nil {
+	if err := os.WriteFile("/"+localCaKeyFullPath, extractedFiles[tarballCaKeyFullPath], os.FileMode(0600)); err != nil {
 		return nil, err
 	}
-	defer os.Remove("/" + caKeyFullPath)
+	defer os.Remove("/" + localCaKeyFullPath)
 
 	gossipKey := string(extractedFiles[command.GossipKey])
 	consulConfigFile, err := s.generateCertificateAndConfig(d, zimbraHostname, gossipKey)
