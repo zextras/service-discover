@@ -1,22 +1,10 @@
 package setup
 
 import (
-	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
-	"bitbucket.org/zextras/service-discover/cli/lib/command"
-	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
-	mocks3 "bitbucket.org/zextras/service-discover/cli/lib/exec/mocks"
-	mocks4 "bitbucket.org/zextras/service-discover/cli/lib/systemd/mocks"
-	"bitbucket.org/zextras/service-discover/cli/lib/test"
-	mocks2 "bitbucket.org/zextras/service-discover/cli/server/command/setup/mocks"
-	"bitbucket.org/zextras/service-discover/cli/server/config"
 	"bytes"
 	"context"
 	"encoding/base64"
 	"fmt"
-	"github.com/go-ldap/ldap/v3"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/testcontainers/testcontainers-go"
 	"io/fs"
 	"net"
 	"os"
@@ -26,6 +14,19 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
+	"bitbucket.org/zextras/service-discover/cli/lib/command"
+	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
+	mocks3 "bitbucket.org/zextras/service-discover/cli/lib/exec/mocks"
+	mocks4 "bitbucket.org/zextras/service-discover/cli/lib/systemd/mocks"
+	"bitbucket.org/zextras/service-discover/cli/lib/test"
+	mocks2 "bitbucket.org/zextras/service-discover/cli/server/command/setup/mocks"
+	"bitbucket.org/zextras/service-discover/cli/server/config"
+	"github.com/go-ldap/ldap/v3"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/testcontainers/testcontainers-go"
 )
 
 // fakeCredentialsTar represents a valid credentials.tar.gpg file. It has been pasted as part of the codebase because golang doens't have a well defined way to point out test resources, so in order to avoid tests randomly failing I preferred pasting it here (it's still text after all luckly). You can read more here: https://web.archive.org/web/20230113095034/https://groups.google.com/g/Golang-Nuts/c/VPVlIiO5yXw
@@ -214,6 +215,7 @@ func TestSetup_importSetup(t *testing.T) {
 	}
 
 	defaultClusterCredentialsPassword := "assext"
+	testingMode = true
 
 	setup := func(t *testing.T, testName string, includeTar bool) (*setupOutput, func()) {
 		var clusterCredentialsContent []byte

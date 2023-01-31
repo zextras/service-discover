@@ -1,6 +1,9 @@
 package setup
 
 import (
+	"os/user"
+	"syscall"
+
 	mocks5 "bitbucket.org/zextras/service-discover/cli/lib/carbonio/mocks"
 	"bitbucket.org/zextras/service-discover/cli/lib/command"
 	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
@@ -9,16 +12,13 @@ import (
 	mocks3 "bitbucket.org/zextras/service-discover/cli/lib/systemd/mocks"
 	"bitbucket.org/zextras/service-discover/cli/lib/term/mocks"
 	mocks2 "bitbucket.org/zextras/service-discover/cli/server/command/setup/mocks"
-	"os/user"
-	"syscall"
 
-	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
-	"bitbucket.org/zextras/service-discover/cli/lib/test"
 	"bytes"
 	"crypto/rand"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
+	"bitbucket.org/zextras/service-discover/cli/lib/test"
+
 	"io"
 	"net"
 	"os"
@@ -26,6 +26,9 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 type addrStub struct {
@@ -362,6 +365,7 @@ func mockBusinessDependencies(
 }
 
 func createSetup(t *testing.T) (Setup, func()) {
+	testingMode = true
 	tmpDir := t.TempDir()
 	setup := Setup{
 		ConsulConfigDir:   tmpDir + "/config",

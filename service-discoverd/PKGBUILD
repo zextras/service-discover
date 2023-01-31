@@ -20,6 +20,8 @@ depends=(
   "carbonio-core"
   "service-discover-base"
 )
+sources=("service-discoverd-docker")
+hashsums=("skip")
 
 postinst:ubuntu() {
     adduser --system --group --home '/var/lib/service-discover/' 'service-discover'
@@ -63,4 +65,5 @@ build() {
 package() {
   cd "${srcdir}"
   install -Dm 755 service-discoverd "${pkgdir}/usr/bin/service-discoverd"
+  install -Dm 755 service-discoverd-docker "${pkgdir}/usr/bin/service-discoverd-docker"
 }

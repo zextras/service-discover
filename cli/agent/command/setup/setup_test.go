@@ -1,24 +1,10 @@
 package setup
 
 import (
-	"bitbucket.org/zextras/service-discover/cli/agent/command/setup/mocks"
-	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
-	mocks5 "bitbucket.org/zextras/service-discover/cli/lib/carbonio/mocks"
-	"bitbucket.org/zextras/service-discover/cli/lib/command"
-	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
-	mocks2 "bitbucket.org/zextras/service-discover/cli/lib/exec/mocks"
-	mocks4 "bitbucket.org/zextras/service-discover/cli/lib/systemd/mocks"
-	"bitbucket.org/zextras/service-discover/cli/lib/test"
 	"bytes"
 	"context"
 	"encoding/base64"
 	"fmt"
-	"github.com/coreos/go-systemd/v22/dbus"
-	"github.com/go-ldap/ldap/v3"
-	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/testcontainers/testcontainers-go"
 	"html/template"
 	"io"
 	"net"
@@ -29,6 +15,21 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"bitbucket.org/zextras/service-discover/cli/agent/command/setup/mocks"
+	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
+	mocks5 "bitbucket.org/zextras/service-discover/cli/lib/carbonio/mocks"
+	"bitbucket.org/zextras/service-discover/cli/lib/command"
+	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
+	mocks2 "bitbucket.org/zextras/service-discover/cli/lib/exec/mocks"
+	mocks4 "bitbucket.org/zextras/service-discover/cli/lib/systemd/mocks"
+	"bitbucket.org/zextras/service-discover/cli/lib/test"
+	"github.com/coreos/go-systemd/v22/dbus"
+	"github.com/go-ldap/ldap/v3"
+	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/testcontainers/testcontainers-go"
 )
 
 type addrStub struct {
@@ -105,6 +106,8 @@ func TestSetup_preRun(t *testing.T) {
 }
 
 func TestSetup_setup(t *testing.T) {
+	testingMode = true
+
 	type testDependencies struct {
 		FakeLocalConfig           *os.File
 		ClusterCredentialDownload *os.File

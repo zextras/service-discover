@@ -1,6 +1,12 @@
 package setup
 
 import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+
 	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
 	"bitbucket.org/zextras/service-discover/cli/lib/command"
 	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
@@ -8,11 +14,7 @@ import (
 	"bitbucket.org/zextras/service-discover/cli/lib/permissions"
 	"bitbucket.org/zextras/service-discover/cli/lib/systemd"
 	"bitbucket.org/zextras/service-discover/cli/server/config"
-	"encoding/json"
-	"fmt"
 	"github.com/pkg/errors"
-	"os"
-	"path/filepath"
 )
 
 // importSetup refers to the run performed on a non-first cluster instance in a non-interactive way.
@@ -126,8 +128,20 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 		return nil, err
 	}
 
-	if err := systemd.StartSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit); err != nil {
-		return nil, errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
+	isContainer := command.CheckDockerContainer()
+
+	if isContainer && !testingMode {
+		cmd := exec.Command("sudo", "-u", "service-discover",
+			"service-discoverd-docker", "server")
+
+		err = cmd.Run()
+		if err != nil {
+			return nil, errors.WithMessage(err, "unable to start service-discoverd server")
+		}
+	} else {
+		if err := systemd.StartSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit); err != nil {
+			return nil, errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
+		}
 	}
 
 	aclBootstrapToken := command.ACLTokenCreation{}
@@ -153,9 +167,11 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 		return nil, err
 	}
 
-	err = systemd.EnableSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit)
-	if err != nil {
-		return nil, errors.New(fmt.Sprintf("unable to enable %s unit: %s", serviceDiscoverUnit, err))
+	if !isContainer {
+		err = systemd.EnableSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit)
+		if err != nil {
+			return nil, errors.New(fmt.Sprintf("unable to enable %s unit: %s", serviceDiscoverUnit, err))
+		}
 	}
 
 	return &formatter.EmptyFormatter{}, nil

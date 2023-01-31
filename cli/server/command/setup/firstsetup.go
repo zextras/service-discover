@@ -1,6 +1,14 @@
 package setup
 
 import (
+	"bufio"
+	"encoding/json"
+	"fmt"
+	"os"
+	"os/exec"
+	"strings"
+	"time"
+
 	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
 	"bitbucket.org/zextras/service-discover/cli/lib/command"
 	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
@@ -8,15 +16,10 @@ import (
 	"bitbucket.org/zextras/service-discover/cli/lib/formatter"
 	"bitbucket.org/zextras/service-discover/cli/lib/permissions"
 	"bitbucket.org/zextras/service-discover/cli/lib/systemd"
-	"bufio"
-	"encoding/json"
-	"fmt"
 	"github.com/pkg/errors"
-	"os"
-	"os/exec"
-	"strings"
-	"time"
 )
+
+var testingMode bool
 
 // firstSetup specifically handles the command sent by the final user in a non-interactive way. This will print
 // as less as possible and it is intended to be used in with power users or from other programs
@@ -101,9 +104,23 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 	if err := command.AddServiceInLDAP(ldapHandler, zimbraHostname); err != nil {
 		return err
 	}
-	if err := systemd.StartSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit); err != nil {
-		return errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
+
+	isContainer := command.CheckDockerContainer()
+
+	if isContainer && !testingMode {
+		cmd := exec.Command("sudo", "-u", "service-discover",
+			"service-discoverd-docker", "server")
+
+		err = cmd.Run()
+		if err != nil {
+			return errors.WithMessage(err, "unable to start service-discoverd server")
+		}
+	} else {
+		if err := systemd.StartSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit); err != nil {
+			return errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
+		}
 	}
+
 	aclBootstrapJson, err := s.createACLBootstrapToken(d)
 	if err != nil {
 		return err
@@ -164,10 +181,13 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 		return errors.WithMessage(err, "unable to upload credentials file to LDAP")
 	}
 
-	err = systemd.EnableSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit)
-	if err != nil {
-		return errors.New(fmt.Sprintf("unable to enable %s unit: %s", serviceDiscoverUnit, err))
+	if !isContainer {
+		err = systemd.EnableSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit)
+		if err != nil {
+			return errors.New(fmt.Sprintf("unable to enable %s unit: %s", serviceDiscoverUnit, err))
+		}
 	}
+
 	return nil
 }
 

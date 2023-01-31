@@ -48,6 +48,7 @@ const (
 }`
 	Agent  ConsulRole = "agent"
 	Server ConsulRole = "server"
+	DockerMarker = "/.dockerenv"
 )
 
 type NetworkInterfaces interface {
@@ -297,4 +298,9 @@ func CheckHostnameAddress(d NetworkInterfaces, hostname string) error {
 		}
 	}
 	return nil
+}
+
+func CheckDockerContainer() bool {
+	_, error := os.Stat(DockerMarker)
+	return !errors.Is(error, os.ErrNotExist)
 }

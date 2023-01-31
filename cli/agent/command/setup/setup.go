@@ -1,6 +1,15 @@
 package setup
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net"
+	"os"
+	"os/user"
+	"path/filepath"
+	"strings"
+
 	"bitbucket.org/zextras/service-discover/cli/agent/config"
 	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
 	"bitbucket.org/zextras/service-discover/cli/lib/command"
@@ -10,17 +19,11 @@ import (
 	"bitbucket.org/zextras/service-discover/cli/lib/permissions"
 	"bitbucket.org/zextras/service-discover/cli/lib/systemd"
 	"bitbucket.org/zextras/service-discover/cli/lib/term"
-	"context"
-	"encoding/json"
-	"fmt"
 	"github.com/coreos/go-systemd/v22/dbus"
 	"github.com/pkg/errors"
-	"net"
-	"os"
-	"os/user"
-	"path/filepath"
-	"strings"
 )
+
+var testingMode bool
 
 const (
 	rootUid               = 0
@@ -444,9 +447,21 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 		return nil, err
 	}
 
-	if err := systemd.StartSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit); err != nil {
-		return nil, errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
+	isContainer := command.CheckDockerContainer()
+	if isContainer && !testingMode {
+		cmd := exec.Command("sudo", "-u", "service-discover",
+			"service-discoverd-docker", "agent")
+
+		err = cmd.Run()
+		if err != nil {
+			return nil, errors.WithMessage(err, "unable to start service-discoverd")
+		}
+	} else {
+		if err := systemd.StartSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit); err != nil {
+			return nil, errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
+		}
 	}
+
 	aclBootstrapToken := command.ACLTokenCreation{}
 	if err := json.Unmarshal(extractedFiles[command.ConsulAclBootstrap], &aclBootstrapToken); err != nil {
 		return nil, errors.WithMessagef(err, "unable to decode ACL Bootstrap token")
@@ -461,9 +476,11 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 		return nil, err
 	}
 
-	err = systemd.EnableSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit)
-	if err != nil {
-		return nil, errors.New(fmt.Sprintf("unable to enable %s unit: %s", serviceDiscoverUnit, err))
+	if !isContainer || testingMode {
+		err = systemd.EnableSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit)
+		if err != nil {
+			return nil, errors.New(fmt.Sprintf("unable to enable %s unit: %s", serviceDiscoverUnit, err))
+		}
 	}
 
 	return &formatter.EmptyFormatter{}, nil
