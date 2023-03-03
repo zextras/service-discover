@@ -1,8 +1,8 @@
 package command
 
 import (
-	"bitbucket.org/zextras/service-discover/cli/agent/config"
-	"bitbucket.org/zextras/service-discover/cli/lib/command"
+	"github.com/Zextras/service-discover/cli/agent/config"
+	"github.com/Zextras/service-discover/cli/lib/command"
 	"fmt"
 	"os"
 )

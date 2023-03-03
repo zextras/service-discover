@@ -1,7 +1,7 @@
 package carbonio
 
 import (
-	"bitbucket.org/zextras/service-discover/cli/lib/test"
+	"github.com/Zextras/service-discover/cli/lib/test"
 	"bytes"
 	"context"
 	"crypto/rand"

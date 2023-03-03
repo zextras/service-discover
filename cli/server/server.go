@@ -2,11 +2,11 @@
 package main
 
 import (
-	"bitbucket.org/zextras/service-discover/cli/lib/command"
-	"bitbucket.org/zextras/service-discover/cli/lib/parser"
-	internalCommand "bitbucket.org/zextras/service-discover/cli/server/command"
-	"bitbucket.org/zextras/service-discover/cli/server/command/setup"
-	"bitbucket.org/zextras/service-discover/cli/server/config"
+	"github.com/Zextras/service-discover/cli/lib/command"
+	"github.com/Zextras/service-discover/cli/lib/parser"
+	internalCommand "github.com/Zextras/service-discover/cli/server/command"
+	"github.com/Zextras/service-discover/cli/server/command/setup"
+	"github.com/Zextras/service-discover/cli/server/config"
 	"github.com/alecthomas/kong"
 	"os"
 )

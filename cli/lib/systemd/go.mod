@@ -1,4 +1,4 @@
-module bitbucket.org/zextras/service-discover/cli/lib/systemd
+module github.com/Zextras/service-discover/cli/lib/systemd
 
 go 1.16
 

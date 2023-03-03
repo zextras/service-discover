@@ -1,10 +1,10 @@
 package setup
 
 import (
-	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
-	"bitbucket.org/zextras/service-discover/cli/lib/exec"
-	"bitbucket.org/zextras/service-discover/cli/lib/systemd"
-	"bitbucket.org/zextras/service-discover/cli/lib/term"
+	"github.com/Zextras/service-discover/cli/lib/carbonio"
+	"github.com/Zextras/service-discover/cli/lib/exec"
+	"github.com/Zextras/service-discover/cli/lib/systemd"
+	"github.com/Zextras/service-discover/cli/lib/term"
 	"context"
 	"github.com/coreos/go-systemd/v22/dbus"
 	"io"

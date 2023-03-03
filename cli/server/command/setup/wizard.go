@@ -1,9 +1,9 @@
 package setup
 
 import (
-	"bitbucket.org/zextras/service-discover/cli/lib/command"
-	"bitbucket.org/zextras/service-discover/cli/lib/formatter"
-	"bitbucket.org/zextras/service-discover/cli/lib/term"
+	"github.com/Zextras/service-discover/cli/lib/command"
+	"github.com/Zextras/service-discover/cli/lib/formatter"
+	"github.com/Zextras/service-discover/cli/lib/term"
 	"github.com/pkg/errors"
 	"os"
 )

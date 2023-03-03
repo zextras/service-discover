@@ -1,7 +1,7 @@
 package command
 
 import (
-	"bitbucket.org/zextras/service-discover/cli/lib/formatter"
+	"github.com/Zextras/service-discover/cli/lib/formatter"
 )
 
 // The GlobalCommonFlags struct represents flags that applies globally to the whole application.

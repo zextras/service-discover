@@ -2,7 +2,7 @@ package credentialsEncrypter
 
 import (
 	"archive/tar"
-	mocks2 "bitbucket.org/zextras/service-discover/cli/lib/test/mocks"
+	mocks2 "github.com/Zextras/service-discover/cli/lib/test/mocks"
 	"bytes"
 	"github.com/stretchr/testify/assert"
 	"io"

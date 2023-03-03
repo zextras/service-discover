@@ -2,7 +2,7 @@ package credentialsEncrypter
 
 import (
 	"archive/tar"
-	"bitbucket.org/zextras/service-discover/cli/lib/test"
+	"github.com/Zextras/service-discover/cli/lib/test"
 	"bufio"
 	"bytes"
 	"fmt"

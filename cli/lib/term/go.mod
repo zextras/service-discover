@@ -1,4 +1,4 @@
-module bitbucket.org/zextras/service-discover/cli/lib/term
+module github.com/Zextras/service-discover/cli/lib/term
 
 go 1.16
 

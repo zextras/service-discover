@@ -1,9 +1,9 @@
 package command
 
 import (
-	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
-	"bitbucket.org/zextras/service-discover/cli/lib/formatter"
-	"bitbucket.org/zextras/service-discover/cli/lib/term"
+	"github.com/Zextras/service-discover/cli/lib/credentialsEncrypter"
+	"github.com/Zextras/service-discover/cli/lib/formatter"
+	"github.com/Zextras/service-discover/cli/lib/term"
 	"bytes"
 	"encoding/json"
 	"fmt"

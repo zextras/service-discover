@@ -1,7 +1,7 @@
 package test
 
 import (
-	"bitbucket.org/zextras/service-discover/cli/lib/test/mocks"
+	"github.com/Zextras/service-discover/cli/lib/test/mocks"
 	"bytes"
 	"os"
 	"time"

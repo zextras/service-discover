@@ -1,9 +1,9 @@
 package command
 
 import (
-	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
-	"bitbucket.org/zextras/service-discover/cli/lib/carbonio/mocks"
-	"bitbucket.org/zextras/service-discover/cli/lib/test"
+	"github.com/Zextras/service-discover/cli/lib/carbonio"
+	"github.com/Zextras/service-discover/cli/lib/carbonio/mocks"
+	"github.com/Zextras/service-discover/cli/lib/test"
 	"context"
 	"encoding/base64"
 	"errors"

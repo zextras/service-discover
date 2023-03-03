@@ -1,10 +1,10 @@
 package setup
 
 import (
-	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
-	mocks2 "bitbucket.org/zextras/service-discover/cli/lib/carbonio/mocks"
-	"bitbucket.org/zextras/service-discover/cli/lib/test"
-	"bitbucket.org/zextras/service-discover/cli/server/command/setup/mocks"
+	"github.com/Zextras/service-discover/cli/lib/carbonio"
+	mocks2 "github.com/Zextras/service-discover/cli/lib/carbonio/mocks"
+	"github.com/Zextras/service-discover/cli/lib/test"
+	"github.com/Zextras/service-discover/cli/server/command/setup/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"os"

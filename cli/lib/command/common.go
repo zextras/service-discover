@@ -1,8 +1,8 @@
 package command
 
 import (
-	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
-	"bitbucket.org/zextras/service-discover/cli/lib/exec"
+	"github.com/Zextras/service-discover/cli/lib/carbonio"
+	"github.com/Zextras/service-discover/cli/lib/exec"
 	"bytes"
 	"context"
 	"encoding/json"

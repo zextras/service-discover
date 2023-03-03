@@ -1,4 +1,4 @@
-module bitbucket.org/zextras/service-discover/cli/lib/parser
+module github.com/Zextras/service-discover/cli/lib/parser
 
 go 1.15
 

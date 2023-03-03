@@ -1,4 +1,4 @@
-module bitbucket.org/zextras/service-discover/cli/lib/test
+module github.com/Zextras/service-discover/cli/lib/test
 
 go 1.15
 

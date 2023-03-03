@@ -1,8 +1,8 @@
 package exec
 
 import (
-	mocks3 "bitbucket.org/zextras/service-discover/cli/lib/exec/mocks"
-	"bitbucket.org/zextras/service-discover/cli/lib/test"
+	mocks3 "github.com/Zextras/service-discover/cli/lib/exec/mocks"
+	"github.com/Zextras/service-discover/cli/lib/test"
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"

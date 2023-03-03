@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
-	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
-	"bitbucket.org/zextras/service-discover/cli/lib/command"
-	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
-	exec2 "bitbucket.org/zextras/service-discover/cli/lib/exec"
-	"bitbucket.org/zextras/service-discover/cli/lib/formatter"
-	"bitbucket.org/zextras/service-discover/cli/lib/permissions"
-	"bitbucket.org/zextras/service-discover/cli/lib/systemd"
+	"github.com/Zextras/service-discover/cli/lib/carbonio"
+	"github.com/Zextras/service-discover/cli/lib/command"
+	"github.com/Zextras/service-discover/cli/lib/credentialsEncrypter"
+	exec2 "github.com/Zextras/service-discover/cli/lib/exec"
+	"github.com/Zextras/service-discover/cli/lib/formatter"
+	"github.com/Zextras/service-discover/cli/lib/permissions"
+	"github.com/Zextras/service-discover/cli/lib/systemd"
 	"github.com/pkg/errors"
 )
 
