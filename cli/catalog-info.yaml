@@ -1,0 +1,20 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: service-discover-cli
+  title: Service Discover CLI
+  description: |
+    CLI of the service-discover service.
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+  tags:
+    - service-discover
+    - cli
+    - agent
+    - consul
+    - go
+    - backend
+spec:
+  type: service
+  lifecycle: production
+  owner: new-bacon-monsters
