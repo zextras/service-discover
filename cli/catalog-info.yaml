@@ -4,7 +4,8 @@ metadata:
   name: service-discover-cli
   title: Service Discover CLI
   description: |
-    CLI of the service-discover service.
+    CLI of the service-discover service. It is specifically designed for interacting with an
+    Agent node.
   annotations:
     backstage.io/techdocs-ref: dir:.
   tags:
