@@ -1,3 +1,21 @@
+/*
+ * Copyright (C) 2023 Zextras srl
+ *
+ *     This program is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU Affero General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ *
+ *     This program is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU Affero General Public License for more details.
+ *
+ *     You should have received a copy of the GNU Affero General Public License
+ *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ */
+
 package setup
 
 import (
@@ -10,15 +28,15 @@ import (
 	"path/filepath"
 	"strings"
 
-	"bitbucket.org/zextras/service-discover/cli/agent/config"
-	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
-	"bitbucket.org/zextras/service-discover/cli/lib/command"
-	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
-	"bitbucket.org/zextras/service-discover/cli/lib/exec"
-	"bitbucket.org/zextras/service-discover/cli/lib/formatter"
-	"bitbucket.org/zextras/service-discover/cli/lib/permissions"
-	"bitbucket.org/zextras/service-discover/cli/lib/systemd"
-	"bitbucket.org/zextras/service-discover/cli/lib/term"
+	"github.com/Zextras/service-discover/cli/agent/config"
+	"github.com/Zextras/service-discover/cli/lib/carbonio"
+	"github.com/Zextras/service-discover/cli/lib/command"
+	"github.com/Zextras/service-discover/cli/lib/credentialsEncrypter"
+	"github.com/Zextras/service-discover/cli/lib/exec"
+	"github.com/Zextras/service-discover/cli/lib/formatter"
+	"github.com/Zextras/service-discover/cli/lib/permissions"
+	"github.com/Zextras/service-discover/cli/lib/systemd"
+	"github.com/Zextras/service-discover/cli/lib/term"
 	"github.com/coreos/go-systemd/v22/dbus"
 	"github.com/pkg/errors"
 )

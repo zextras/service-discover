@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
+	"github.com/Zextras/service-discover/cli/lib/carbonio"
 	"errors"
 	"github.com/stretchr/testify/mock"
 	"io"

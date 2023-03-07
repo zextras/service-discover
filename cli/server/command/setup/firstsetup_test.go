@@ -1,23 +1,41 @@
+/*
+ * Copyright (C) 2023 Zextras srl
+ *
+ *     This program is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU Affero General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ *
+ *     This program is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU Affero General Public License for more details.
+ *
+ *     You should have received a copy of the GNU Affero General Public License
+ *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ */
+
 package setup
 
 import (
 	"os/user"
 	"syscall"
 
-	mocks5 "bitbucket.org/zextras/service-discover/cli/lib/carbonio/mocks"
-	"bitbucket.org/zextras/service-discover/cli/lib/command"
-	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
-	"bitbucket.org/zextras/service-discover/cli/lib/exec"
-	mocks4 "bitbucket.org/zextras/service-discover/cli/lib/exec/mocks"
-	mocks3 "bitbucket.org/zextras/service-discover/cli/lib/systemd/mocks"
-	"bitbucket.org/zextras/service-discover/cli/lib/term/mocks"
-	mocks2 "bitbucket.org/zextras/service-discover/cli/server/command/setup/mocks"
+	mocks5 "github.com/Zextras/service-discover/cli/lib/carbonio/mocks"
+	"github.com/Zextras/service-discover/cli/lib/command"
+	"github.com/Zextras/service-discover/cli/lib/credentialsEncrypter"
+	"github.com/Zextras/service-discover/cli/lib/exec"
+	mocks4 "github.com/Zextras/service-discover/cli/lib/exec/mocks"
+	mocks3 "github.com/Zextras/service-discover/cli/lib/systemd/mocks"
+	"github.com/Zextras/service-discover/cli/lib/term/mocks"
+	mocks2 "github.com/Zextras/service-discover/cli/server/command/setup/mocks"
 
 	"bytes"
 	"crypto/rand"
 
-	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
-	"bitbucket.org/zextras/service-discover/cli/lib/test"
+	"github.com/Zextras/service-discover/cli/lib/carbonio"
+	"github.com/Zextras/service-discover/cli/lib/test"
 
 	"io"
 	"net"

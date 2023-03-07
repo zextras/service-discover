@@ -1,3 +1,21 @@
+/*
+ * Copyright (C) 2023 Zextras srl
+ *
+ *     This program is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU Affero General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ *
+ *     This program is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU Affero General Public License for more details.
+ *
+ *     You should have received a copy of the GNU Affero General Public License
+ *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ */
+
 package permissions
 
 import (
@@ -14,8 +32,8 @@ type PermissionInterface interface {
 	Chmod(path string, mode os.FileMode) error
 }
 
-//SetStrictPermissions change permissions to 600 and change ownership, only of the specific
-//path, to 'service-discover' user and group
+// SetStrictPermissions change permissions to 600 and change ownership, only of the specific
+// path, to 'service-discover' user and group
 func SetStrictPermissions(d PermissionInterface, path string) error {
 	serviceDiscoverUser, err := d.LookupUser("service-discover")
 	if err != nil {

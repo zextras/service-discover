@@ -1,3 +1,3 @@
-module bitbucket.org/zextras/service-discover/cli
+module github.com/Zextras/service-discover/cli
 
 go 1.15

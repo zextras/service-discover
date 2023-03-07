@@ -1,3 +1,21 @@
+/*
+ * Copyright (C) 2023 Zextras srl
+ *
+ *     This program is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU Affero General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ *
+ *     This program is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU Affero General Public License for more details.
+ *
+ *     You should have received a copy of the GNU Affero General Public License
+ *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ */
+
 package setup
 
 import (
@@ -15,14 +33,14 @@ import (
 	"testing"
 	"time"
 
-	"bitbucket.org/zextras/service-discover/cli/lib/carbonio"
-	"bitbucket.org/zextras/service-discover/cli/lib/command"
-	"bitbucket.org/zextras/service-discover/cli/lib/credentialsEncrypter"
-	mocks3 "bitbucket.org/zextras/service-discover/cli/lib/exec/mocks"
-	mocks4 "bitbucket.org/zextras/service-discover/cli/lib/systemd/mocks"
-	"bitbucket.org/zextras/service-discover/cli/lib/test"
-	mocks2 "bitbucket.org/zextras/service-discover/cli/server/command/setup/mocks"
-	"bitbucket.org/zextras/service-discover/cli/server/config"
+	"github.com/Zextras/service-discover/cli/lib/carbonio"
+	"github.com/Zextras/service-discover/cli/lib/command"
+	"github.com/Zextras/service-discover/cli/lib/credentialsEncrypter"
+	mocks3 "github.com/Zextras/service-discover/cli/lib/exec/mocks"
+	mocks4 "github.com/Zextras/service-discover/cli/lib/systemd/mocks"
+	"github.com/Zextras/service-discover/cli/lib/test"
+	mocks2 "github.com/Zextras/service-discover/cli/server/command/setup/mocks"
+	"github.com/Zextras/service-discover/cli/server/config"
 	"github.com/go-ldap/ldap/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
