@@ -1,0 +1,23 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: service-discover-command-lib
+  title: Service Discover Command Library
+  description: |
+    The Command library holds all the common data between all the different commands.
+    It hold base information like the application name and the application version.
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+  tags:
+    - service-discover
+    - cli
+    - lib
+    - library
+    - command
+    - consul
+    - go
+    - backend
+spec:
+  type: library
+  lifecycle: production
+  owner: new-bacon-monsters
