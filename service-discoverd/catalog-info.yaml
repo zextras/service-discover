@@ -4,7 +4,7 @@ metadata:
   name: service-discover-daemon
   title: Service Discover Daemon
   description: |
-    Service-discover daemon is a wrapper to interact with Zimbra and provide a dynamically set of
+    Service-discover daemon is a wrapper to interact with Carbonio and provide a dynamically set of
     options to Consul that otherwise we would need to provide statically.
     On top of that, this daemon takes care of possible start up and tear down checks.
   annotations:

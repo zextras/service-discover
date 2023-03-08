@@ -1,18 +1,18 @@
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: service-discover-cli
-  title: Service Discover CLI
+  name: service-discover-server
+  title: Service Discover Server CLI
   description: |
-    CLI of the service-discover service. It is specifically designed for interacting with an
-    Agent node.
+    This CLI is specifically designed for interacting with a Server node.
   annotations:
     backstage.io/techdocs-ref: dir:.
   tags:
     - service-discover
     - cli
-    - agent
+    - server
     - consul
+    - node
     - go
     - backend
 spec:
