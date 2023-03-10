@@ -1,0 +1,21 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: service-discover-server
+  title: Service Discover Server CLI
+  description: |
+    This CLI is specifically designed for interacting with a Server node.
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+  tags:
+    - service-discover
+    - cli
+    - server
+    - consul
+    - node
+    - go
+    - backend
+spec:
+  type: service
+  lifecycle: production
+  owner: new-bacon-monsters

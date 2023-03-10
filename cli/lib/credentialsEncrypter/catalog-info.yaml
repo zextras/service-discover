@@ -1,0 +1,31 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: service-discover-encrypter-lib
+  title: Service Discover Credentials Encrypter Library
+  description: |
+    The Credentials Encrypter library bassically contains a reader and a writer.
+    The reader automatically decrypts the passed reader, assuming it is a
+    tarball symmetrically encrypted with OpenPGP.
+    The writer represents an encryption reader. The encryption is performed with OpenPGP,
+    and it is performed in a symmetric way. The generated file is a tarball one,
+    _without_ any compression.
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+  tags:
+    - service-discover
+    - cli
+    - lib
+    - library
+    - credentials
+    - encrypter
+    - reader
+    - writer
+    - openPGP
+    - consul
+    - go
+    - backend
+spec:
+  type: library
+  lifecycle: production
+  owner: new-bacon-monsters

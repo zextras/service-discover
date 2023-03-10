@@ -1,0 +1,21 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: service-discover-agent
+  title: Service Discover Agent CLI
+  description: |
+    This CLI is specifically designed for interacting with an Agent node.
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+  tags:
+    - service-discover
+    - cli
+    - agent
+    - node
+    - consul
+    - go
+    - backend
+spec:
+  type: service
+  lifecycle: production
+  owner: new-bacon-monsters

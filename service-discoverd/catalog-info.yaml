@@ -1,0 +1,22 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: service-discover-daemon
+  title: Service Discover Daemon
+  description: |
+    Service-discover daemon is a wrapper to interact with Carbonio and provide a dynamically set of
+    options to Consul that otherwise we would need to provide statically.
+    On top of that, this daemon takes care of possible start up and tear down checks.
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+  tags:
+    - service-discover
+    - service-discoverd
+    - daemon
+    - consul
+    - go
+    - backend
+spec:
+  type: service
+  lifecycle: production
+  owner: new-bacon-monsters
