@@ -68,12 +68,31 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                     steps {
                         unstash 'project'
                         sh 'sudo cp -r * /tmp'
-                        sh 'sudo pacur build ubuntu'
-                        stash includes: 'artifacts/', name: 'artifacts-deb'
+                        sh 'sudo pacur build ubuntu-focal'
+                        stash includes: 'artifacts/', name: 'artifacts-focal-deb'
                     }
                     post {
                         always {
-                            archiveArtifacts artifacts: "artifacts/*.deb", fingerprint: true
+                            archiveArtifacts artifacts: "artifacts/*focal*.deb", fingerprint: true
+                        }
+                    }
+                }
+
+                stage('Ubuntu 22.04') {
+                    agent {
+                        node {
+                            label 'pacur-agent-ubuntu-22.04-v1'
+                        }
+                    }
+                    steps {
+                        unstash 'project'
+                        sh 'sudo cp -r * /tmp'
+                        sh 'sudo pacur build ubuntu-jammy'
+                        stash includes: 'artifacts/', name: 'artifacts-jammy-deb'
+                    }
+                    post {
+                        always {
+                            archiveArtifacts artifacts: "artifacts/*jammy*.deb", fingerprint: true
                         }
                     }
                 }
@@ -111,7 +130,8 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                 }
             }
             steps {
-                unstash 'artifacts-deb'
+                unstash 'artifacts-focal-deb'
+                unstash 'artifacts-jammy-deb'
                 unstash 'artifacts-rpm'
                 script {
                     def server = Artifactory.server 'zextras-artifactory'
@@ -122,21 +142,16 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                     uploadSpec = """{
                         "files": [
                             {
-                                "pattern": "artifacts/service-discover-server*.deb",
+                                "pattern": "artifacts/*focal*.deb",
                                 "target": "ubuntu-playground/pool/",
                                 "props": "deb.distribution=focal;deb.component=main;deb.architecture=amd64"
                             },
                             {
-                                "pattern": "artifacts/service-discover-agent*.deb",
+                                "pattern": "artifacts/*jammy*.deb",
                                 "target": "ubuntu-playground/pool/",
-                                "props": "deb.distribution=focal;deb.component=main;deb.architecture=amd64"
+                                "props": "deb.distribution=jammy;deb.component=main;deb.architecture=amd64"
                             },
                             {
-                                "pattern": "artifacts/service-discover-daemon*.deb",
-                                "target": "ubuntu-playground/pool/",
-                                "props": "deb.distribution=focal;deb.component=main;deb.architecture=amd64"
-                            },
-                             {
                                 "pattern": "artifacts/(service-discover-server)-(*).rpm",
                                 "target": "centos8-playground/zextras/{1}/{1}-{2}.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
@@ -177,7 +192,8 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                 buildingTag()
             }
             steps {
-                unstash 'artifacts-deb'
+                unstash 'artifacts-focal-deb'
+                unstash 'artifacts-jammy-deb'
                 unstash 'artifacts-rpm'
                 script {
                     def server = Artifactory.server 'zextras-artifactory'
@@ -191,19 +207,14 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                     uploadSpec= """{
                         "files": [
                             {
-                                "pattern": "artifacts/service-discover-server*.deb",
+                                "pattern": "artifacts/*focal*.deb",
                                 "target": "ubuntu-rc/pool/",
                                 "props": "deb.distribution=focal;deb.component=main;deb.architecture=amd64"
                             },
                             {
-                                "pattern": "artifacts/service-discover-agent*.deb",
+                                "pattern": "artifacts/*jammy*.deb",
                                 "target": "ubuntu-rc/pool/",
-                                "props": "deb.distribution=focal;deb.component=main;deb.architecture=amd64"
-                            },
-                            {
-                                "pattern": "artifacts/service-discover-daemon*.deb",
-                                "target": "ubuntu-rc/pool/",
-                                "props": "deb.distribution=focal;deb.component=main;deb.architecture=amd64"
+                                "props": "deb.distribution=jammy;deb.component=main;deb.architecture=amd64"
                             }
                         ]
                     }"""
