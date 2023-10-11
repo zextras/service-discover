@@ -20,10 +20,10 @@ provides=(
 )
 depends=(
   "carbonio-prometheus-consul-exporter"
-  "config-generator"
   "envoyproxy"
   "service-discover-base"
   "service-discover-daemon"
+  "service-discover-template"
 )
 conflicts=(
   "service-discover-agent"

@@ -19,10 +19,10 @@ provides=(
   "service-discover"
 )
 depends=(
+  "envoyproxy"
   "service-discover-base"
   "service-discover-daemon"
-  "config-generator"
-  "envoyproxy"
+  "service-discover-template"
 )
 conflicts=(
   "service-discover-server"
