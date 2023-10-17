@@ -1,16 +1,9 @@
-targets=(
-  "centos"
-  "ubuntu"
-)
 pkgname="service-discover-agent"
 pkgver="0.1.8"
 pkgrel="1"
 pkgdesc="Service discover agent cli"
-pkgdesclong=(
-  "Service discover agent cli"
-)
 maintainer="Zextras srl <packages@zextras.com>"
-arch="amd64"
+arch=('x86_64')
 license=("PROPRIETARY")
 section="admin"
 priority="optional"
@@ -39,76 +32,76 @@ package() {
   install -Dm 644 ../service-discover.service "${pkgdir}/lib/systemd/system/service-discover.service"
 }
 
-postinst:ubuntu() {
+postinst__apt() {
   # Automatically added by dh_systemd_enable/11.1.6ubuntu2
-  if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-deconfigure" ] || [ "$1" = "abort-remove" ] ; then
-  	# This will only remove masks created by d-s-h on package removal.
-  	deb-systemd-helper unmask 'service-discover.service' >/dev/null || true
+  if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-deconfigure" ] || [ "$1" = "abort-remove" ]; then
+    # This will only remove masks created by d-s-h on package removal.
+    deb-systemd-helper unmask 'service-discover.service' >/dev/null || true
 
-  	# was-enabled defaults to true, so new installations run enable.
-  	if deb-systemd-helper --quiet was-enabled 'service-discover.service'; then
-  		# Enables the unit on first installation, creates new
-  		# symlinks on upgrades if the unit file has changed.
-  		deb-systemd-helper enable 'service-discover.service' >/dev/null || true
-  	else
-  		# Update the statefile to add new symlinks (if any), which need to be
-  		# cleaned up on purge. Also remove old symlinks.
-  		deb-systemd-helper update-state 'service-discover.service' >/dev/null || true
-  	fi
+    # was-enabled defaults to true, so new installations run enable.
+    if deb-systemd-helper --quiet was-enabled 'service-discover.service'; then
+      # Enables the unit on first installation, creates new
+      # symlinks on upgrades if the unit file has changed.
+      deb-systemd-helper enable 'service-discover.service' >/dev/null || true
+    else
+      # Update the statefile to add new symlinks (if any), which need to be
+      # cleaned up on purge. Also remove old symlinks.
+      deb-systemd-helper update-state 'service-discover.service' >/dev/null || true
+    fi
   fi
   # End automatically added section
   echo "Installed, run service-discover setup-wizard on first installation."
 }
 
-postinst:centos() {
+postinst__yum() {
   if [ -d /run/systemd/system ]; then
     systemctl daemon-reload >/dev/null 2>&1 || :
   fi
   echo "Installed, run service-discover setup-wizard on first installation."
 }
 
-prerm:ubuntu() {
+prerm__apt() {
   if [ -d /run/systemd/system ]; then
-      deb-systemd-invoke stop 'service-discover.service' >/dev/null || true
+    deb-systemd-invoke stop 'service-discover.service' >/dev/null || true
   fi
 }
 
-prerm:centos() {
-  if [ $1 -eq 0 ] ; then
+prerm__yum() {
+  if [ $1 -eq 0 ]; then
     # Package removal, not upgrade
     if [ -d /run/systemd/system ]; then
-      systemctl --no-reload disable videoserver.service > /dev/null 2>&1 || :
-      systemctl stop videoserver.service > /dev/null 2>&1 || :
+      systemctl --no-reload disable videoserver.service >/dev/null 2>&1 || :
+      systemctl stop videoserver.service >/dev/null 2>&1 || :
     fi
   fi
 }
 
-postrm:ubuntu() {
+postrm__apt() {
   if [ -d /run/systemd/system ]; then
     systemctl --system daemon-reload >/dev/null || true
   fi
   # Automatically added by dh_systemd_enable/11.1.6ubuntu2
   if [ "$1" = "remove" ]; then
-  	if [ -x "/usr/bin/deb-systemd-helper" ]; then
-  		deb-systemd-helper mask 'service-discover.service' >/dev/null || true
-  	fi
+    if [ -x "/usr/bin/deb-systemd-helper" ]; then
+      deb-systemd-helper mask 'service-discover.service' >/dev/null || true
+    fi
   fi
 
   if [ "$1" = "purge" ]; then
-  	if [ -x "/usr/bin/deb-systemd-helper" ]; then
-  		deb-systemd-helper purge 'service-discover.service' >/dev/null || true
-  		deb-systemd-helper unmask 'service-discover.service' >/dev/null || true
-  	fi
+    if [ -x "/usr/bin/deb-systemd-helper" ]; then
+      deb-systemd-helper purge 'service-discover.service' >/dev/null || true
+      deb-systemd-helper unmask 'service-discover.service' >/dev/null || true
+    fi
   fi
   # End automatically added section
   # Automatically added by dh_installdebconf/11.1.6ubuntu2
   if [ "$1" = purge ] && [ -e /usr/share/debconf/confmodule ]; then
-  	. /usr/share/debconf/confmodule
-  	db_purge
+    . /usr/share/debconf/confmodule
+    db_purge
   fi
 }
 
-postrm:centos() {
+postrm__yum() {
   if [ -d /run/systemd/system ]; then
     systemctl daemon-reload >/dev/null 2>&1 || :
   fi
