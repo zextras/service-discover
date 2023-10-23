@@ -2,20 +2,20 @@ pkgname="service-discover-agent"
 pkgver="0.1.8"
 pkgrel="1"
 pkgdesc="Service discover agent cli"
-maintainer="Zextras srl <packages@zextras.com>"
+maintainer="Zextras <packages@zextras.com>"
+copyright=('2022, Zextras <https://www.zextras.com>')
 arch=('x86_64')
-license=("PROPRIETARY")
 section="admin"
 priority="optional"
-url="https://www.zextras.com/"
+url="https://github.com/zextras"
 provides=(
   "service-discover"
 )
 depends=(
+  "envoyproxy"
   "service-discover-base"
   "service-discover-daemon"
-  "config-generator"
-  "envoyproxy"
+  "service-discover-template"
 )
 conflicts=(
   "service-discover-server"

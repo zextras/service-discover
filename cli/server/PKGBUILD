@@ -2,21 +2,21 @@ pkgname="service-discover-server"
 pkgver="0.1.8"
 pkgrel="1"
 pkgdesc="Service discover server cli"
-maintainer="Zextras srl <packages@zextras.com>"
+maintainer="Zextras <packages@zextras.com>"
+copyright=('2022, Zextras <https://www.zextras.com>')
 arch=('x86_64')
-license=("PROPRIETARY")
 section="admin"
 priority="optional"
-url="https://www.zextras.com/"
+url="https://github.com/zextras"
 provides=(
   "service-discover"
 )
 depends=(
   "carbonio-prometheus-consul-exporter"
-  "config-generator"
   "envoyproxy"
   "service-discover-base"
   "service-discover-daemon"
+  "service-discover-template"
 )
 conflicts=(
   "service-discover-agent"
