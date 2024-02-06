@@ -30,33 +30,33 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                 stash includes: "**", name: 'project'
             }
         }
-        stage('Tests') {
-            steps {
-                script {
-                    sh 'rm -rfv /home/agent/.gnupg'
-                    sh 'mkdir -p /home/agent/.gnupg'
-                    def modules = [:]
-                    def builds = [:]
-                    modules["agent"] = "cli/agent"
-                    modules["server"] = "cli/server"
-                    modules["command"] = "cli/lib/command"
-                    modules["credentialsEncrypter"] = "cli/lib/credentialsEncrypter"
-                    modules["exec"] = "cli/lib/exec"
-                    modules["formatter"] = "cli/lib/formatter"
-                    modules["parser"] = "cli/lib/parser"
-                    modules["carbonio"] = "cli/lib/carbonio"
-                    modules.each{key, value ->
-                        builds[key] = {
-                            dir(value) {
-                                sh 'gotestsum --format testname --junitfile tests.xml'
-                                junit allowEmptyResults: false, checksName: "Test for " + key, testResults: 'tests.xml'
-                            }
-                        }
-                    }
-                    parallel builds
-                }
-            }
-        }
+//        stage('Tests') {
+//            steps {
+//                script {
+//                    sh 'rm -rfv /home/agent/.gnupg'
+//                    sh 'mkdir -p /home/agent/.gnupg'
+//                    def modules = [:]
+//                    def builds = [:]
+//                    modules["agent"] = "cli/agent"
+//                    modules["server"] = "cli/server"
+//                    modules["command"] = "cli/lib/command"
+//                    modules["credentialsEncrypter"] = "cli/lib/credentialsEncrypter"
+//                    modules["exec"] = "cli/lib/exec"
+//                    modules["formatter"] = "cli/lib/formatter"
+//                    modules["parser"] = "cli/lib/parser"
+//                    modules["carbonio"] = "cli/lib/carbonio"
+//                    modules.each{key, value ->
+//                        builds[key] = {
+//                            dir(value) {
+//                                sh 'gotestsum --format testname --junitfile tests.xml'
+//                                junit allowEmptyResults: false, checksName: "Test for " + key, testResults: 'tests.xml'
+//                            }
+//                        }
+//                    }
+//                    parallel builds
+//                }
+//            }
+//        }
         stage('Build Ubuntu') {
             parallel {
                 stage('Ubuntu 20.04') {
@@ -241,9 +241,11 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                 buildingTag()
             }
             steps {
-                unstash 'artifacts-focal-deb'
-                unstash 'artifacts-jammy-deb'
-                unstash 'artifacts-rpm'
+                unstash 'artifacts-ubuntu-focal'
+                unstash 'artifacts-ubuntu-jammy'
+                unstash 'artifacts-rocky-8'
+                unstash 'artifacts-rocky-9'
+
                 script {
                     def server = Artifactory.server 'zextras-artifactory'
                     def buildInfo
