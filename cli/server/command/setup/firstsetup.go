@@ -127,8 +127,7 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 
 	if isContainer && !testingMode {
 
-		cmd := exec.Command(
-			"service-discoverd-docker", "server")
+		cmd := exec.Command("service-discoverd-docker", "server")
 
 		err = cmd.Run()
 		if err != nil {
