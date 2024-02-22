@@ -467,7 +467,7 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 
 	isContainer := command.CheckDockerContainer()
 	if isContainer && !testingMode {
-		cmd := exec.Command("sudo", "-u", "service-discover",
+		cmd := exec.Command(
 			"service-discoverd-docker", "agent")
 
 		err = cmd.Run()
