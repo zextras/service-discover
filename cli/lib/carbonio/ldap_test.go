@@ -327,7 +327,7 @@ func TestLDAPDownloadAndUploadCapabilities(t *testing.T) {
 		expectedContent := make([]byte, 2048000) // 2 MB random byte array to simulate random binary content
 		_, err := rand.Read(expectedContent)
 		assert.NoError(t, err)
-		ldapContainer, containerCtx := test.SpinUpCarbonioLdap(t, test.PUBLIC_IMAGE_ADDRESS, test.RELEASE_22110)
+		ldapContainer, containerCtx := test.SpinUpCarbonioLdap(t, test.PUBLIC_IMAGE_ADDRESS, test.LATEST_RELEASE)
 		defer func(ldapContainer testcontainers.Container, ctx context.Context) {
 			if err := ldapContainer.Terminate(ctx); err != nil {
 				t.Error(err)
@@ -367,7 +367,7 @@ func TestLDAPDownloadAndUploadCapabilities(t *testing.T) {
 		expectedContent := make([]byte, 2048000) // 2 MB random byte array to simulate random binary content
 		_, err := rand.Read(expectedContent)
 		assert.NoError(t, err)
-		ldapContainer, containerCtx := test.SpinUpCarbonioLdap(t, test.PUBLIC_IMAGE_ADDRESS, test.RELEASE_22110)
+		ldapContainer, containerCtx := test.SpinUpCarbonioLdap(t, test.PUBLIC_IMAGE_ADDRESS, test.LATEST_RELEASE)
 		defer func(ldapContainer testcontainers.Container, ctx context.Context) {
 			if err := ldapContainer.Terminate(ctx); err != nil {
 				t.Error(err)

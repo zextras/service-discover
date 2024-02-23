@@ -133,7 +133,7 @@ func TestSetup_setup(t *testing.T) {
 		CtxContainer              context.Context
 	}
 	setup := func(t *testing.T, testName string, credentialsContent []byte) (*testDependencies, func()) {
-		container, ctxContainer := test.SpinUpCarbonioLdap(t, test.PUBLIC_IMAGE_ADDRESS, test.RELEASE_22110)
+		container, ctxContainer := test.SpinUpCarbonioLdap(t, test.PUBLIC_IMAGE_ADDRESS, test.LATEST_RELEASE)
 		containerIP, err := container.ContainerIP(ctxContainer)
 		if err != nil {
 			t.Error(err)

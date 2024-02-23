@@ -30,8 +30,8 @@ import (
 
 const (
 	LATEST               = "latest"
-	RELEASE_22110        = "22.11.0"
-	PUBLIC_IMAGE_ADDRESS = "carbonio/ce-ldap-u20:%s"
+	LATEST_RELEASE       = "24.1.0"
+	PUBLIC_IMAGE_ADDRESS = "carbonio/ce-directory-server-u20:%s"
 	CI_DOCKER_NETWORK    = "ci_agent"
 	CI_NETWORK_MODE      = "overlay"
 	LOCAL_NETWORK_MODE   = "bridge"
