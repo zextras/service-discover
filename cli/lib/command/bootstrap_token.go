@@ -41,6 +41,7 @@ type BootstrapToken struct {
 	writer    io.Writer `kong:"-"`
 	agentName string    `kong:"-"`
 	Setup     bool      `optional name:"setup" help:"Used in setup scripts, doesn't prompt anything and returns $SETUP_CONSUL_TOKEN if defined."`
+	Password  string    `optional name:"password" help:"feed bootstrap password"`
 }
 
 type outputBootstrapToken struct {
@@ -88,7 +89,12 @@ func (v *BootstrapToken) ReadToken() (string, error) {
 	if v.Setup {
 		prompt = ""
 	}
-	password, err := ui.ReadPassword(prompt)
+	password := ""
+	if v.Password == "" {
+		password, err = ui.ReadPassword(prompt)
+	} else {
+		password = v.Password
+	}
 	if err != nil {
 		switch err.(type) {
 		case term.NotATerminalError:
