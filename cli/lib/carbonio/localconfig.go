@@ -25,8 +25,8 @@ import (
 	"strings"
 )
 
-const LocalConfigLdapMasterUrl = "ldap_master_url"
-const LocalConfigLdapUrl = "ldap_url"
+const LocalConfigLdapMasterUrl = "ldap_sd_master_url"
+const LocalConfigLdapUrl = "ldap_sd_url"
 const LocalConfigLdapUserDn = "zimbra_ldap_userdn"
 const LocalConfigLdapPassword = "zimbra_ldap_password" // #nosec
 const LocalConfigServerHostname = "zimbra_server_hostname"
