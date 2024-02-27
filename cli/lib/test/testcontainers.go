@@ -58,9 +58,10 @@ func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testconta
 	req := testcontainers.ContainerRequest{
 		Image:        fmt.Sprintf(address, version),
 		ExposedPorts: []string{"389/tcp"},
-		WaitingFor:   wait.ForExec([]string{"/usr/bin/wait-for-it", "ldap:389", "-t0"}),
-		Hostname:     "ldap.mail.local",
-		ExtraHosts:   []string{"mail.local:127.0.0.1"},
+		Entrypoint:   []string{"entrypoint"},
+		WaitingFor:   wait.ForExec([]string{"/usr/bin/wait-for-it", "$(hostname -i):389", "-t0"}),
+		Hostname:     "carbonio-ce-directory-server.carbonio-system.svc.cluster.local",
+		ExtraHosts:   []string{"carbonio-ce-directory-server.carbonio-system.svc.cluster.local:127.0.0.1"},
 		AutoRemove:   true,
 		Networks:     nets,
 		NetworkMode:  container.NetworkMode(netMode),
