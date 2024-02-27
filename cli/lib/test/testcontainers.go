@@ -29,12 +29,10 @@ import (
 )
 
 const (
-	LATEST               = "latest"
 	LATEST_RELEASE       = "24.1.0"
 	PUBLIC_IMAGE_ADDRESS = "carbonio/ce-directory-server-u20:%s"
 	CI_DOCKER_NETWORK    = "ci_agent"
 	CI_NETWORK_MODE      = "overlay"
-	LOCAL_NETWORK_MODE   = "bridge"
 )
 
 // SpinUpCarbonioLdap launches a Carbonio LDAP instance with the desired version. It returns the LDAP instance context and the container itself. Note it is necessary to defer the container stop otherwise the instance will be hanging forever `defer ldapContainer.Terminate()`!
@@ -49,7 +47,6 @@ func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testconta
 		netMode = CI_NETWORK_MODE
 	} else {
 		t.Log("Use standard local network for spinning LDAP")
-		netMode = LOCAL_NETWORK_MODE
 	}
 	t.Log("Networks that are going to be attached to the container")
 	for _, nNet := range nets {
@@ -59,9 +56,8 @@ func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testconta
 		Image:        fmt.Sprintf(address, version),
 		ExposedPorts: []string{"389/tcp"},
 		Entrypoint:   []string{"entrypoint"},
-		WaitingFor:   wait.ForExec([]string{"/usr/bin/wait-for-it", "$(hostname -i):389", "-t0"}),
+		WaitingFor:   wait.ForLog("Starting directory server...Done."),
 		Hostname:     "carbonio-ce-directory-server.carbonio-system.svc.cluster.local",
-		ExtraHosts:   []string{"carbonio-ce-directory-server.carbonio-system.svc.cluster.local:127.0.0.1"},
 		AutoRemove:   true,
 		Networks:     nets,
 		NetworkMode:  container.NetworkMode(netMode),
@@ -71,6 +67,8 @@ func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testconta
 		ContainerRequest: req,
 		Started:          true,
 	})
+	t.Log("LDAP Container created")
+
 	if err != nil {
 		t.Fatal(err)
 	}
