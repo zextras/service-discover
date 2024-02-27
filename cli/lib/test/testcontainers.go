@@ -21,7 +21,6 @@ package test
 import (
 	"context"
 	"fmt"
-	"github.com/docker/docker/api/types/container"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"os"
@@ -39,19 +38,12 @@ const (
 func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testcontainers.Container, context.Context) {
 	ctx := context.Background()
 
-	var nets []string
-	var netMode string
 	if os.Getenv("CI") == "true" {
 		t.Log("Using " + CI_DOCKER_NETWORK + " as network for LDAP")
-		nets = append(nets, CI_DOCKER_NETWORK)
-		netMode = CI_NETWORK_MODE
 	} else {
 		t.Log("Use standard local network for spinning LDAP")
 	}
 	t.Log("Networks that are going to be attached to the container")
-	for _, nNet := range nets {
-		t.Log(nNet)
-	}
 	req := testcontainers.ContainerRequest{
 		Image:        fmt.Sprintf(address, version),
 		ExposedPorts: []string{"389/tcp"},
@@ -59,8 +51,6 @@ func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testconta
 		WaitingFor:   wait.ForLog("Starting directory server...Done."),
 		Hostname:     "carbonio-ce-directory-server.carbonio-system.svc.cluster.local",
 		AutoRemove:   true,
-		Networks:     nets,
-		NetworkMode:  container.NetworkMode(netMode),
 	}
 
 	ldapC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
