@@ -40,11 +40,8 @@ func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testconta
 	ctx := context.Background()
 
 	var nets []string
-	var netMode string
 	if os.Getenv("CI") == "true" {
 		t.Log("Using " + CI_DOCKER_NETWORK + " as network for LDAP")
-		nets = append(nets, CI_DOCKER_NETWORK)
-		netMode = CI_NETWORK_MODE
 	} else {
 		t.Log("Use standard local network for spinning LDAP")
 	}
@@ -60,7 +57,7 @@ func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testconta
 		Hostname:     "carbonio-ce-directory-server.carbonio-system.svc.cluster.local",
 		AutoRemove:   true,
 		Networks:     nets,
-		NetworkMode:  container.NetworkMode(netMode),
+		NetworkMode:  container.NetworkMode("bridge"),
 	}
 
 	ldapC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -68,8 +65,13 @@ func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testconta
 		Started:          true,
 	})
 	t.Log("LDAP Container created")
+	logs, _ := ldapC.Logs(ctx)
+	var logValues []byte
+	logs.Read(logValues)
+	t.Logf("%v", logValues)
 
 	if err != nil {
+
 		t.Fatal(err)
 	}
 
