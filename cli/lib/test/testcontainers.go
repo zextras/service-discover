@@ -19,13 +19,11 @@
 package test
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
-	"io"
 	"os"
 	"testing"
 )
@@ -57,15 +55,11 @@ func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testconta
 	req := testcontainers.ContainerRequest{
 		Image:        fmt.Sprintf(address, version),
 		ExposedPorts: []string{"389/tcp"},
-		Entrypoint:   []string{"entrypoint"},
-		WaitingFor: wait.ForExec([]string{"/usr/bin/wait-for-it", "-t 0", "carbonio-ce-directory-server.carbonio-system.svc.cluster.local:389", "--", "echo", "LDAP is up"}).
-			WithResponseMatcher(func(body io.Reader) bool {
-				data, _ := io.ReadAll(body)
-				isEqual := bytes.Equal(data, []byte("LDAP is up\n"))
-				t.Logf("Data is equal? %v, %s", isEqual, string(data))
-				return isEqual
-			}),
-		Hostname: "carbonio-ce-directory-server.carbonio-system.svc.cluster.local",
+		Entrypoint:   []string{"/bin/bash"},
+		Cmd:          []string{"-c", "/opt/zextras/bin/ldap start && tail -f /dev/null"},
+		User:         "zextras",
+		WaitingFor:   wait.ForListeningPort("389/tcp"),
+		Hostname:     "carbonio-ce-directory-server.carbonio-system.svc.cluster.local",
 		HostConfigModifier: func(config *container.HostConfig) {
 			config.AutoRemove = true
 			config.NetworkMode = container.NetworkMode(netMode)
