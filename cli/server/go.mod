@@ -31,5 +31,5 @@ require (
 	github.com/go-ldap/ldap/v3 v3.2.4
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.8.0
-	github.com/testcontainers/testcontainers-go v0.14.0
+	github.com/testcontainers/testcontainers-go v0.28.0
 )
