@@ -73,7 +73,6 @@ func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testconta
 		HostConfigModifier: func(config *container.HostConfig) {
 			config.AutoRemove = true
 			config.NetworkMode = container.NetworkMode(netMode)
-			config.Memory = 8000000000
 			config.Ulimits = ulimits
 		},
 		Networks: nets,
