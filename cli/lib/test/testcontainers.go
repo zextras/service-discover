@@ -53,7 +53,7 @@ func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testconta
 		Image:        fmt.Sprintf(address, version),
 		ExposedPorts: []string{"389/tcp"},
 		Entrypoint:   []string{"entrypoint"},
-		WaitingFor:   wait.ForLog("Starting directory server...Done."),
+		WaitingFor:   wait.ForListeningPort("389/tcp"),
 		Hostname:     "carbonio-ce-directory-server.carbonio-system.svc.cluster.local",
 		AutoRemove:   true,
 		Networks:     nets,
