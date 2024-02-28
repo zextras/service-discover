@@ -59,12 +59,12 @@ func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testconta
 		ExposedPorts: []string{"389/tcp"},
 		Entrypoint:   []string{"entrypoint"},
 		WaitingFor: wait.ForExec([]string{"/usr/bin/wait-for-it", "-t 0", "carbonio-ce-directory-server.carbonio-system.svc.cluster.local:389", "--", "echo", "LDAP is up"}).
-		WithResponseMatcher(func(body io.Reader) bool {
-			data, _ := io.ReadAll(body)
-			isEqual := bytes.Equal(data, []byte("LDAP is up\n"))
-			t.Logf("Data is equal? %v, %s", isEqual, string(data))
-			return isEqual
-		}),
+			WithResponseMatcher(func(body io.Reader) bool {
+				data, _ := io.ReadAll(body)
+				isEqual := bytes.Equal(data, []byte("LDAP is up\n"))
+				t.Logf("Data is equal? %v, %s", isEqual, string(data))
+				return isEqual
+			}),
 		Hostname: "carbonio-ce-directory-server.carbonio-system.svc.cluster.local",
 		HostConfigModifier: func(config *container.HostConfig) {
 			config.AutoRemove = true
