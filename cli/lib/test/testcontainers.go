@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/go-units"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"io"
@@ -54,6 +55,7 @@ func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testconta
 	for _, nNet := range nets {
 		t.Log(nNet)
 	}
+	ulimits := []*units.Ulimit{{Name: "nofile", Soft: 1024, Hard: 1024}}
 	req := testcontainers.ContainerRequest{
 		Image:        fmt.Sprintf(address, version),
 		ExposedPorts: []string{"389/tcp"},
@@ -72,6 +74,7 @@ func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testconta
 			config.AutoRemove = true
 			config.NetworkMode = container.NetworkMode(netMode)
 			config.Memory = 8000000000
+			config.Ulimits = ulimits
 		},
 		Networks: nets,
 	}
