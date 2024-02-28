@@ -53,7 +53,6 @@ func (c *Command) BootstrapToken(writer io.Writer, agentName string) BootstrapTo
 		writer,
 		agentName,
 		false,
-		"",
 	}
 }
 
