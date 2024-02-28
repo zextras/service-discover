@@ -55,14 +55,13 @@ func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testconta
 	req := testcontainers.ContainerRequest{
 		Image:        fmt.Sprintf(address, version),
 		ExposedPorts: []string{"389/tcp"},
-		Entrypoint:   []string{"/bin/bash"},
-		Cmd:          []string{"-c", "/opt/zextras/bin/ldap start && tail -f /dev/null"},
-		User:         "zextras",
+		Entrypoint:   []string{"entrypoint"},
 		WaitingFor:   wait.ForListeningPort("389/tcp"),
 		Hostname:     "carbonio-ce-directory-server.carbonio-system.svc.cluster.local",
 		HostConfigModifier: func(config *container.HostConfig) {
 			config.AutoRemove = true
 			config.NetworkMode = container.NetworkMode(netMode)
+			config.Memory = 8000000000
 		},
 		Networks: nets,
 	}
