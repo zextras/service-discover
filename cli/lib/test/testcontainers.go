@@ -57,7 +57,9 @@ func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testconta
 	req := testcontainers.ContainerRequest{
 		Image:        fmt.Sprintf(address, version),
 		ExposedPorts: []string{"389/tcp"},
-		Entrypoint:   []string{"entrypoint"},
+		Entrypoint:   []string{"/bin/bash"},
+		Cmd:          []string{"-c", "/opt/zextras/bin/ldap start && tail -f /dev/null"},
+		User:         "zextras",
 		WaitingFor: wait.ForExec([]string{"/usr/bin/wait-for-it", "-t 0", "carbonio-ce-directory-server.carbonio-system.svc.cluster.local:389", "--", "echo", "LDAP is up"}).
 			WithResponseMatcher(func(body io.Reader) bool {
 				data, _ := io.ReadAll(body)
