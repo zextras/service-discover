@@ -49,11 +49,11 @@ func (c *Command) Version(writer io.Writer, agentName string) Version {
 // BootstrapToken generates a BootstrapToken structure that can is ready to be integrated as CLI command
 func (c *Command) BootstrapToken(writer io.Writer, agentName string) BootstrapToken {
 	return BootstrapToken{
-		*c,
-		writer,
-		agentName,
-		false,
-		"",
+		Command:   *c,
+		writer:    writer,
+		agentName: agentName,
+		Setup:     false,
+		Password:  "",
 	}
 }
 

@@ -31,17 +31,20 @@ import (
 )
 
 const (
-	ConsulConfig      = "/etc/zextras/service-discover"
-	ClusterCredential = ConsulConfig + "/cluster-credentials.tar.gpg"
-	SetupConsulToken  = "SETUP_CONSUL_TOKEN" // #nosec
+	SetupConsulToken = "SETUP_CONSUL_TOKEN" // #nosec
 )
 
 type BootstrapToken struct {
-	Command   `kong:"-"`
-	writer    io.Writer `kong:"-"`
-	agentName string    `kong:"-"`
-	Setup     bool      `optional name:"setup" help:"Used in setup scripts, doesn't prompt anything and returns $SETUP_CONSUL_TOKEN if defined."`
-	Password  string    `optional name:"password" help:"feed bootstrap password"`
+	bootstrapTokenConfig BootstrapTokenConfig `default:"/etc/zextras/service-discover/cluster-credentials.tar.gpg" kong:"-"`
+	Command              `kong:"-"`
+	writer               io.Writer `kong:"-"`
+	agentName            string    `kong:"-"`
+	Setup                bool      `optional name:"setup" help:"Used in setup scripts, doesn't prompt anything and returns $SETUP_CONSUL_TOKEN if defined."`
+	Password             string    `optional name:"password" help:"feed bootstrap password"`
+}
+
+type BootstrapTokenConfig struct {
+	ClusterCredentialLocation string
 }
 
 type outputBootstrapToken struct {
@@ -77,50 +80,50 @@ func (v *BootstrapToken) ReadToken() (string, error) {
 		wrapper = os.Stdout
 	}
 
-	ui, err := term.New(os.Stdin, wrapper, term.DefaultTermPrompt)
-	if err != nil {
-		return "", err
-	}
-	defer func(ui term.Terminal) {
-		_ = ui.Close()
-	}(ui)
-
 	prompt := "Insert the cluster credential password: "
 	if v.Setup {
 		prompt = ""
 	}
 	password := ""
 	if v.Password == "" {
+		ui, err := term.New(os.Stdin, wrapper, term.DefaultTermPrompt)
+		if err != nil {
+			return "", err
+		}
+		defer func(ui term.Terminal) {
+			_ = ui.Close()
+		}(ui)
 		password, err = ui.ReadPassword(prompt)
+		if err != nil {
+			switch err.(type) {
+			case term.NotATerminalError:
+				password = term.MustRead(ui.ReadLine())
+			default:
+				return "", err
+			}
+		}
 	} else {
 		password = v.Password
 	}
+	clusterCredentialFile, err := OpenClusterCredential(v.bootstrapTokenConfig.ClusterCredentialLocation)
 	if err != nil {
-		switch err.(type) {
-		case term.NotATerminalError:
-			password = term.MustRead(ui.ReadLine())
-		default:
-			return "", err
-		}
-	}
 
-	clusterCredentialFile, err := OpenClusterCredential(ClusterCredential)
-	if err != nil {
-		return "", errors.New(fmt.Sprintf("unable to open %s: %s", ClusterCredential, err))
+		println("FAIL READING CLUSTER")
+		return "", errors.New(fmt.Sprintf("unable to open %s: %s", v.bootstrapTokenConfig.ClusterCredentialLocation, err))
 	}
 	defer func(clusterCredentialFile *os.File) {
 		_ = clusterCredentialFile.Close()
 	}(clusterCredentialFile)
+
 	credReader, err := credentialsEncrypter.NewReader(clusterCredentialFile, []byte(password))
+
 	if err != nil {
 		return "", err
 	}
-
 	extractedFiles, err := credentialsEncrypter.ReadFiles(credReader, ConsulAclBootstrap)
 	if err != nil {
 		return "", err
 	}
-
 	aclBootstrapToken := ACLTokenCreation{}
 	if err := json.Unmarshal(extractedFiles[ConsulAclBootstrap], &aclBootstrapToken); err != nil {
 		return "", errors.WithMessagef(err, "unable to decode ACL Bootstrap token")
