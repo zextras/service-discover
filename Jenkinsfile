@@ -4,9 +4,6 @@ pipeline {
             label 'golang-agent-v2'
         }
     }
-    parameters {
-        booleanParam defaultValue: false, description: 'Whether to upload the packages in playground repositories', name: 'PLAYGROUND'
-    }
     options {
         skipDefaultCheckout()
         buildDiscarder(logRotator(numToKeepStr: '25'))
@@ -139,12 +136,9 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                 }
             }
         }
-        stage('Upload To Playground') {
+        stage('Upload To Devel') {
             when {
-                anyOf {
-                    branch 'playground/*'
-                    expression { params.PLAYGROUND == true }
-                }
+                branch 'devel'
             }
             steps {
                 unstash 'artifacts-ubuntu-focal'
@@ -162,72 +156,72 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                         "files": [
                             {
                                 "pattern": "artifacts/*focal*.deb",
-                                "target": "ubuntu-playground/pool/",
+                                "target": "ubuntu-devel/pool/",
                                 "props": "deb.distribution=focal;deb.component=main;deb.architecture=amd64"
                             },
                             {
                                 "pattern": "artifacts/*jammy*.deb",
-                                "target": "ubuntu-playground/pool/",
+                                "target": "ubuntu-devel/pool/",
                                 "props": "deb.distribution=jammy;deb.component=main;deb.architecture=amd64"
                             },
                             {
                                 "pattern": "artifacts/x86_64/(service-discover-server)-(*).el8.x86_64.rpm",
-                                "target": "centos8-playground/zextras/{1}/{1}-{2}.el8.x86_64.rpm",
+                                "target": "centos8-devel/zextras/{1}/{1}-{2}.el8.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
                                 "pattern": "artifacts/x86_64/(service-discover-agent)-(*).el8.x86_64.rpm",
-                                "target": "centos8-playground/zextras/{1}/{1}-{2}.el8.x86_64.rpm",
+                                "target": "centos8-devel/zextras/{1}/{1}-{2}.el8.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
                                 "pattern": "artifacts/x86_64/(service-discover-daemon)-(*).el8.x86_64.rpm",
-                                "target": "centos8-playground/zextras/{1}/{1}-{2}.el8.x86_64.rpm",
+                                "target": "centos8-devel/zextras/{1}/{1}-{2}.el8.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
                                 "pattern": "artifacts/x86_64/(service-discover-server)-(*).el8.x86_64.rpm",
-                                "target": "centos8-playground/zextras/{1}/{1}-{2}.el8.x86_64.rpm",
+                                "target": "centos8-devel/zextras/{1}/{1}-{2}.el8.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
                                 "pattern": "artifacts/x86_64/(service-discover-agent)-(*).el8.x86_64.rpm",
-                                "target": "centos8-playground/zextras/{1}/{1}-{2}.el8.x86_64.rpm",
+                                "target": "centos8-devel/zextras/{1}/{1}-{2}.el8.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
                                 "pattern": "artifacts/x86_64/(service-discover-daemon)-(*).el8.x86_64.rpm",
-                                "target": "centos8-playground/zextras/{1}/{1}-{2}.el8.x86_64.rpm",
+                                "target": "centos8-devel/zextras/{1}/{1}-{2}.el8.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
                                 "pattern": "artifacts/x86_64/(service-discover-server)-(*).el9.x86_64.rpm",
-                                "target": "rhel9-playground/zextras/{1}/{1}-{2}.el9.x86_64.rpm",
+                                "target": "rhel9-devel/zextras/{1}/{1}-{2}.el9.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
                                 "pattern": "artifacts/x86_64/(service-discover-agent)-(*).el9.x86_64.rpm",
-                                "target": "rhel9-playground/zextras/{1}/{1}-{2}.el9.x86_64.rpm",
+                                "target": "rhel9-devel/zextras/{1}/{1}-{2}.el9.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
                                 "pattern": "artifacts/x86_64/(service-discover-daemon)-(*).el9.x86_64.rpm",
-                                "target": "rhel9-playground/zextras/{1}/{1}-{2}.el9.x86_64.rpm",
+                                "target": "rhel9-devel/zextras/{1}/{1}-{2}.el9.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
                                 "pattern": "artifacts/x86_64/(service-discover-server)-(*).el9.x86_64.rpm",
-                                "target": "rhel9-playground/zextras/{1}/{1}-{2}.el9.x86_64.rpm",
+                                "target": "rhel9-devel/zextras/{1}/{1}-{2}.el9.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
                                 "pattern": "artifacts/x86_64/(service-discover-agent)-(*).el9.x86_64.rpm",
-                                "target": "rhel9-playground/zextras/{1}/{1}-{2}.el9.x86_64.rpm",
+                                "target": "rhel9-devel/zextras/{1}/{1}-{2}.el9.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
                                 "pattern": "artifacts/x86_64/(service-discover-daemon)-(*).el9.x86_64.rpm",
-                                "target": "rhel9-playground/zextras/{1}/{1}-{2}.el9.x86_64.rpm",
+                                "target": "rhel9-devel/zextras/{1}/{1}-{2}.el9.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             }
                         ]
