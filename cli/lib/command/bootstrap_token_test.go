@@ -19,7 +19,6 @@ func TestBootstrapToken_(t *testing.T) {
 
 	clusterCredentialsFile := test.GenerateRandomFile("test-bootstrap-token-cluster-credentials")
 	defer os.RemoveAll(clusterCredentialsFile.Name())
-	// TODO: maybe use reader in Bootstrap token instead of passing file location?
 
 	writer, _ := credentialsEncrypter.NewWriter(clusterCredentialsFile, []byte(password))
 
