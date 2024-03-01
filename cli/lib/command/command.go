@@ -19,6 +19,7 @@
 package command
 
 import (
+	term2 "github.com/Zextras/service-discover/cli/lib/term"
 	"io"
 	"os"
 )
@@ -55,6 +56,7 @@ func (c *Command) BootstrapToken(writer io.Writer, agentName string) BootstrapTo
 		Setup:                         false,
 		Password:                      "",
 		clusterCredentialFileLocation: "/etc/zextras/service-discover/cluster-credentials.tar.gpg",
+		termUiProvider:                &TermUiProvider{},
 	}
 }
 
@@ -62,6 +64,17 @@ func (c *Command) BootstrapToken(writer io.Writer, agentName string) BootstrapTo
 // "man <applicationName>"
 func (c *Command) Help() Help {
 	return Help{*c}
+}
+
+type UiProvider interface {
+	Get(writer io.Writer) (term2.Terminal, error)
+}
+
+type TermUiProvider struct {
+}
+
+func (c *TermUiProvider) Get(writer io.Writer) (term2.Terminal, error) {
+	return term2.New(os.Stdin, writer, term2.DefaultTermPrompt)
 }
 
 func (c *Command) Config(writer io.Writer, agentName string) Config {

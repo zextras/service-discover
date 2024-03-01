@@ -35,6 +35,7 @@ const (
 )
 
 type BootstrapToken struct {
+	termUiProvider                UiProvider
 	clusterCredentialFileLocation string `kong:"-"`
 	Command                       `kong:"-"`
 	writer                        io.Writer `kong:"-"`
@@ -80,9 +81,10 @@ func (v *BootstrapToken) ReadToken() (string, error) {
 	if v.Setup {
 		prompt = ""
 	}
-	password := ""
+	var password string
 	if v.Password == "" {
-		ui, err := term.New(os.Stdin, wrapper, term.DefaultTermPrompt)
+		var err error
+		ui, err := v.termUiProvider.Get(wrapper)
 		if err != nil {
 			return "", err
 		}
@@ -103,8 +105,6 @@ func (v *BootstrapToken) ReadToken() (string, error) {
 	}
 	clusterCredentialFile, err := OpenClusterCredential(v.clusterCredentialFileLocation)
 	if err != nil {
-
-		println("FAIL READING CLUSTER")
 		return "", errors.New(fmt.Sprintf("unable to open %s: %s", v.clusterCredentialFileLocation, err))
 	}
 	defer func(clusterCredentialFile *os.File) {
@@ -113,6 +113,7 @@ func (v *BootstrapToken) ReadToken() (string, error) {
 
 	credReader, err := credentialsEncrypter.NewReader(clusterCredentialFile, []byte(password))
 
+	println(fmt.Sprintf("Password is %v", password))
 	if err != nil {
 		return "", err
 	}
@@ -124,6 +125,7 @@ func (v *BootstrapToken) ReadToken() (string, error) {
 	if err := json.Unmarshal(extractedFiles[ConsulAclBootstrap], &aclBootstrapToken); err != nil {
 		return "", errors.WithMessagef(err, "unable to decode ACL Bootstrap token")
 	}
+	println(fmt.Sprintf("Acl is %v", aclBootstrapToken))
 
 	return aclBootstrapToken.SecretID, nil
 }
