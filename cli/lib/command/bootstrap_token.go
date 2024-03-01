@@ -113,7 +113,6 @@ func (v *BootstrapToken) ReadToken() (string, error) {
 
 	credReader, err := credentialsEncrypter.NewReader(clusterCredentialFile, []byte(password))
 
-	println(fmt.Sprintf("Password is %v", password))
 	if err != nil {
 		return "", err
 	}
@@ -125,7 +124,6 @@ func (v *BootstrapToken) ReadToken() (string, error) {
 	if err := json.Unmarshal(extractedFiles[ConsulAclBootstrap], &aclBootstrapToken); err != nil {
 		return "", errors.WithMessagef(err, "unable to decode ACL Bootstrap token")
 	}
-	println(fmt.Sprintf("Acl is %v", aclBootstrapToken))
 
 	return aclBootstrapToken.SecretID, nil
 }

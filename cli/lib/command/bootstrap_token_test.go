@@ -11,12 +11,29 @@ import (
 	"testing"
 )
 
+type fakeNotTerminal struct {
+	fakeTerminal
+}
+
+func (t fakeNotTerminal) Get(writer io.Writer) (term.Terminal, error) {
+	return &fakeNotTerminal{t.fakeTerminal}, nil
+}
+
+func (t fakeNotTerminal) ReadPassword(prompt string) (string, error) {
+	println("Not a terminal!")
+	return "", term.NotATerminalError(1)
+}
+
+func (t fakeNotTerminal) ReadLine() (string, error) {
+	return t.Password, nil
+}
+
 type fakeTerminal struct {
-	password string
+	Password string
 }
 
 func (t fakeTerminal) Get(writer io.Writer) (term.Terminal, error) {
-	return &fakeTerminal{t.password}, nil
+	return &fakeTerminal{t.Password}, nil
 }
 
 func (t fakeTerminal) Write(p []byte) (n int, err error) {
@@ -32,7 +49,7 @@ func (t fakeTerminal) WriteString(s string) (n int, err error) {
 }
 
 func (t fakeTerminal) ReadPassword(prompt string) (string, error) {
-	return t.password, nil
+	return t.Password, nil
 }
 
 func (t fakeTerminal) ReadLine() (string, error) {
@@ -66,7 +83,7 @@ func TestBootstrapToken_(t *testing.T) {
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
-			name: "Bootstrap Token with --password should return token",
+			name: "Bootstrap Token with --Password should return token",
 			setup: BootstrapToken{
 				Command:                       *cmd,
 				writer:                        os.Stdout,
@@ -77,32 +94,44 @@ func TestBootstrapToken_(t *testing.T) {
 			want: token,
 		},
 		{
-			name: "Bootstrap Token should not fail when providing password through terminal",
+			name: "Bootstrap Token should not fail when providing Password through terminal",
 			setup: BootstrapToken{
 				Command:                       *cmd,
 				writer:                        os.Stdout,
 				agentName:                     "myAgent",
 				Setup:                         false,
 				clusterCredentialFileLocation: clusterCredentialsFile.Name(),
-				termUiProvider:                &fakeTerminal{password: password},
+				termUiProvider:                &fakeTerminal{Password: password},
 			},
 			want: token,
 		},
 		{
-			name: "Bootstrap Token should not print token if setup true",
+			name: "Bootstrap Token should not fail when providing Password through terminal",
+			setup: BootstrapToken{
+				Command:                       *cmd,
+				writer:                        os.Stdout,
+				agentName:                     "myAgent",
+				Setup:                         false,
+				clusterCredentialFileLocation: clusterCredentialsFile.Name(),
+				termUiProvider:                &fakeTerminal{Password: password},
+			},
+			want: token,
+		},
+		{
+			name: "Bootstrap Token should not fail if not a terminal",
 			setup: BootstrapToken{
 				Command:                       *cmd,
 				writer:                        os.Stdout,
 				agentName:                     "myAgent",
 				Setup:                         true,
 				clusterCredentialFileLocation: clusterCredentialsFile.Name(),
-				termUiProvider:                &fakeTerminal{password: password},
+				termUiProvider:                &fakeNotTerminal{fakeTerminal{Password: password}},
 			},
 			want: token,
 		},
 		// Failures
 		{
-			name: "Bootstrap Token with --password and default credentials should fail if not found",
+			name: "Bootstrap Token with --Password and default credentials should fail if not found",
 			setup: BootstrapToken{
 				Command:                       *cmd,
 				writer:                        os.Stdout,
@@ -116,7 +145,7 @@ func TestBootstrapToken_(t *testing.T) {
 			},
 		},
 		{
-			name: "Bootstrap Token with wrong --password should fail",
+			name: "Bootstrap Token with wrong --Password should fail",
 			setup: BootstrapToken{
 				Command:                       *cmd,
 				writer:                        os.Stdout,
