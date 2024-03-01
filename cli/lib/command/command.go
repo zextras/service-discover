@@ -49,11 +49,12 @@ func (c *Command) Version(writer io.Writer, agentName string) Version {
 // BootstrapToken generates a BootstrapToken structure that can is ready to be integrated as CLI command
 func (c *Command) BootstrapToken(writer io.Writer, agentName string) BootstrapToken {
 	return BootstrapToken{
-		Command:   *c,
-		writer:    writer,
-		agentName: agentName,
-		Setup:     false,
-		Password:  "",
+		Command:                       *c,
+		writer:                        writer,
+		agentName:                     agentName,
+		Setup:                         false,
+		Password:                      "",
+		clusterCredentialFileLocation: "/etc/zextras/service-discover/cluster-credentials.tar.gpg",
 	}
 }
 

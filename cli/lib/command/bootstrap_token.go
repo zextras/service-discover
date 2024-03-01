@@ -35,16 +35,12 @@ const (
 )
 
 type BootstrapToken struct {
-	bootstrapTokenConfig BootstrapTokenConfig `default:"/etc/zextras/service-discover/cluster-credentials.tar.gpg" kong:"-"`
-	Command              `kong:"-"`
-	writer               io.Writer `kong:"-"`
-	agentName            string    `kong:"-"`
-	Setup                bool      `optional name:"setup" help:"Used in setup scripts, doesn't prompt anything and returns $SETUP_CONSUL_TOKEN if defined."`
-	Password             string    `optional name:"password" help:"feed bootstrap password"`
-}
-
-type BootstrapTokenConfig struct {
-	ClusterCredentialLocation string
+	clusterCredentialFileLocation string `kong:"-"`
+	Command                       `kong:"-"`
+	writer                        io.Writer `kong:"-"`
+	agentName                     string    `kong:"-"`
+	Setup                         bool      `optional name:"setup" help:"Used in setup scripts, doesn't prompt anything and returns $SETUP_CONSUL_TOKEN if defined."`
+	Password                      string    `optional name:"password" help:"feed bootstrap password"`
 }
 
 type outputBootstrapToken struct {
@@ -105,11 +101,11 @@ func (v *BootstrapToken) ReadToken() (string, error) {
 	} else {
 		password = v.Password
 	}
-	clusterCredentialFile, err := OpenClusterCredential(v.bootstrapTokenConfig.ClusterCredentialLocation)
+	clusterCredentialFile, err := OpenClusterCredential(v.clusterCredentialFileLocation)
 	if err != nil {
 
 		println("FAIL READING CLUSTER")
-		return "", errors.New(fmt.Sprintf("unable to open %s: %s", v.bootstrapTokenConfig.ClusterCredentialLocation, err))
+		return "", errors.New(fmt.Sprintf("unable to open %s: %s", v.clusterCredentialFileLocation, err))
 	}
 	defer func(clusterCredentialFile *os.File) {
 		_ = clusterCredentialFile.Close()
