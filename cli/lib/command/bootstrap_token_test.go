@@ -11,31 +11,31 @@ import (
 	"testing"
 )
 
-type FakeTerminal struct {
+type fakeTerminal struct {
 	password string
 }
 
-func (t FakeTerminal) Get(writer io.Writer) (term.Terminal, error) {
-	return &FakeTerminal{t.password}, nil
+func (t fakeTerminal) Get(writer io.Writer) (term.Terminal, error) {
+	return &fakeTerminal{t.password}, nil
 }
 
-func (t FakeTerminal) Write(p []byte) (n int, err error) {
+func (t fakeTerminal) Write(p []byte) (n int, err error) {
 	return 0, nil
 }
 
-func (t FakeTerminal) Close() error {
+func (t fakeTerminal) Close() error {
 	return nil
 }
 
-func (t FakeTerminal) WriteString(s string) (n int, err error) {
+func (t fakeTerminal) WriteString(s string) (n int, err error) {
 	return 0, nil
 }
 
-func (t FakeTerminal) ReadPassword(prompt string) (string, error) {
+func (t fakeTerminal) ReadPassword(prompt string) (string, error) {
 	return t.password, nil
 }
 
-func (t FakeTerminal) ReadLine() (string, error) {
+func (t fakeTerminal) ReadLine() (string, error) {
 	return "", nil
 }
 
@@ -84,7 +84,19 @@ func TestBootstrapToken_(t *testing.T) {
 				agentName:                     "myAgent",
 				Setup:                         false,
 				clusterCredentialFileLocation: clusterCredentialsFile.Name(),
-				termUiProvider:                &FakeTerminal{password: password},
+				termUiProvider:                &fakeTerminal{password: password},
+			},
+			want: token,
+		},
+		{
+			name: "Bootstrap Token should not print token if setup true",
+			setup: BootstrapToken{
+				Command:                       *cmd,
+				writer:                        os.Stdout,
+				agentName:                     "myAgent",
+				Setup:                         true,
+				clusterCredentialFileLocation: clusterCredentialsFile.Name(),
+				termUiProvider:                &fakeTerminal{password: password},
 			},
 			want: token,
 		},

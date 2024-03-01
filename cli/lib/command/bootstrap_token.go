@@ -35,7 +35,7 @@ const (
 )
 
 type BootstrapToken struct {
-	termUiProvider                UiProvider
+	termUiProvider                term.UiProvider
 	clusterCredentialFileLocation string `kong:"-"`
 	Command                       `kong:"-"`
 	writer                        io.Writer `kong:"-"`
