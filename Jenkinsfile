@@ -54,6 +54,22 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                 }
             }
         }
+        stage('SonarQube analysis') {
+            steps {
+                unstash 'project'
+                script {
+                    scannerHome = tool 'SonarScanner';
+                }
+                sh 'cd cli/agent; golangci-lint run --issues-exit-code 0 --out-format checkstyle > cli-agent.out'
+                sh 'cd cli/server; golangci-lint run --issues-exit-code 0 --out-format checkstyle > cli-server.out'
+                sh 'cd service-discoverd; golangci-lint run --issues-exit-code 0 --out-format checkstyle > discoverd.out'
+
+                withSonarQubeEnv(credentialsId: 'sonarqube-user-token',
+                    installationName: 'SonarQube instance') {
+                    sh "${scannerHome}/bin/sonar-scanner"
+                }
+            }
+        }
         stage('Build Ubuntu') {
             parallel {
                 stage('Ubuntu 20.04') {
