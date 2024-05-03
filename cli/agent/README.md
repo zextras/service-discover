@@ -7,7 +7,7 @@ This CLI is specifically designed for interacting with an Agent node.
 From the root of the package (where this file is located) run:
 
 ```bash
-go build .
+CGO_ENABLED=0 go build .
 ```
 
 For directly running the CLI just type:

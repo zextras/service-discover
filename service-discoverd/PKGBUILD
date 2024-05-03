@@ -19,7 +19,7 @@ sha256sums=("SKIP")
 
 build() {
   cd "${srcdir}"
-  go build ..
+  CGO_ENABLED=0 go build ..
 }
 
 package() {
