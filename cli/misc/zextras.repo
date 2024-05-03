@@ -1,5 +1,0 @@
-[zextras]
-name=Zextras RC repository
-baseurl=https://repo.zextras.io/rc/centos8
-enabled=1
-gpgcheck=0
