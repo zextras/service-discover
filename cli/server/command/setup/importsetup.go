@@ -42,6 +42,7 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 	if err != nil {
 		return nil, err
 	}
+
 	if err := command.CheckValidBindingAddress(d, networks, s.BindAddress); err != nil {
 		return nil, err
 	}
@@ -52,17 +53,21 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 	}
 
 	ldapHandler := d.LdapHandler(zimbraLocalConfig)
+
 	zimbraHostname, err := command.RetrieveZimbraHostname(zimbraLocalConfig, ldapHandler)
 	if err != nil {
 		return nil, err
 	}
+
 	err = command.CheckHostnameAddress(d, zimbraHostname)
 	if err != nil {
 		return nil, err
 	}
+
 	if err := command.DownloadCredentialsFromLDAP(ldapHandler, s.ClusterCredential); err != nil {
 		return nil, errors.WithMessage(err, "unable to download credentials from LDAP")
 	}
+
 	clusterCredential, err := command.OpenClusterCredential(s.ClusterCredential)
 	if err != nil {
 		return nil, err
@@ -78,18 +83,22 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 	if err != nil {
 		return nil, err
 	}
+
 	localCaFullPath, err := filepath.Rel("/", filepath.Join(s.ConsulHome, command.ConsulCA))
 	if err != nil {
 		return nil, err
 	}
+
 	tarballCaKeyFullPath, err := filepath.Rel("/", filepath.Join(config.ConsulHome, command.ConsulCAKey))
 	if err != nil {
 		return nil, err
 	}
+
 	localCaKeyFullPath, err := filepath.Rel("/", filepath.Join(s.ConsulHome, command.ConsulCAKey))
 	if err != nil {
 		return nil, err
 	}
+
 	extractedFiles, err := credentialsEncrypter.ReadFiles(
 		credReader,
 		tarballCaFullPath,
@@ -116,14 +125,17 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 	defer os.Remove("/" + localCaKeyFullPath)
 
 	gossipKey := string(extractedFiles[command.GossipKey])
+
 	consulConfigFile, err := s.generateCertificateAndConfig(d, zimbraHostname, gossipKey)
 	if err != nil {
 		return nil, err
 	}
+
 	consulFileBytes, err := json.MarshalIndent(consulConfigFile, "", "  ")
 	if err != nil {
 		return nil, err
 	}
+
 	if err := os.WriteFile(s.ConsulFileConfig, consulFileBytes, os.FileMode(0600)); err != nil {
 		return nil, errors.New(fmt.Sprintf("unable to save generated configuration file in %s: %s", s.ConsulHome, err))
 	}
@@ -175,6 +187,7 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 	if err != nil {
 		return nil, errors.WithMessage(err, "unable to create ACL policy for this server")
 	}
+
 	err = command.SetACLToken(d.CreateCommand, token, aclBootstrapToken.SecretID)
 	if err != nil {
 		return nil, err

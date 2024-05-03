@@ -297,8 +297,10 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 		if err != nil {
 			return err
 		}
+
 		term.MustWrite(d.Term().WriteString(render))
 	}
+
 	return nil
 }
 
@@ -332,6 +334,7 @@ func (s *Setup) createTLSCertificate(d businessDependencies, caFile *os.File, ca
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -340,6 +343,7 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if err := command.CheckValidBindingAddress(d, networks, s.BindAddress); err != nil {
 		return nil, err
 	}
@@ -347,21 +351,26 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	ldapHandler := d.LdapHandler(zimbraLocalConfig)
 	zimbraHostname, err := command.RetrieveZimbraHostname(zimbraLocalConfig, ldapHandler)
 	if err != nil {
 		return nil, err
 	}
+
 	if err := command.DownloadCredentialsFromLDAP(ldapHandler, s.ClusterCredential); err != nil {
 		return nil, errors.WithMessage(err, "unable to download credentials from LDAP")
 	}
+
 	clusterCredentialFile, err := command.OpenClusterCredential(s.ClusterCredential)
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("unable to open %s: %s", s.ClusterCredential, err))
 	}
+
 	defer func(clusterCredentialFile *os.File) {
 		_ = clusterCredentialFile.Close()
 	}(clusterCredentialFile)
+
 	credReader, err := credentialsEncrypter.NewReader(clusterCredentialFile, []byte(s.Password))
 	if err != nil {
 		return nil, errors.WithMessagef(err, "unable to read %s", clusterCredentialFile.Name())
@@ -372,18 +381,23 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	caKeyPath, err := filepath.Rel("/", filepath.Join(s.ConsulHome, command.ConsulCAKey))
 	if err != nil {
 		return nil, err
 	}
-	extractedFiles, err := credentialsEncrypter.ReadFiles(credReader, caPath, caKeyPath, command.GossipKey, command.ConsulAclBootstrap)
+
+	extractedFiles, err := credentialsEncrypter.ReadFiles(credReader,
+		caPath, caKeyPath, command.GossipKey, command.ConsulAclBootstrap)
 	if err != nil {
 		return nil, err
 	}
+
 	caFile, err := os.Create(s.ConsulHome + "/" + command.ConsulCA)
 	if err != nil {
 		return nil, err
 	}
+
 	if err := os.WriteFile(caFile.Name(), extractedFiles[caPath], os.FileMode(0600)); err != nil {
 		return nil, err
 	}
@@ -397,7 +411,9 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	defer os.Remove(caKeyFile.Name())
+
 	if err := os.WriteFile(caKeyFile.Name(), extractedFiles[caKeyPath], os.FileMode(0600)); err != nil {
 		return nil, err
 	}
@@ -488,6 +504,7 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 	if err != nil {
 		return nil, errors.WithMessage(err, "unable to create ACL policy for this agent")
 	}
+
 	err = command.SetACLToken(d.CreateCommand, token, aclBootstrapToken.SecretID)
 	if err != nil {
 		return nil, err

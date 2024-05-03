@@ -240,11 +240,14 @@ func TestSetup_importSetup(t *testing.T) {
 		if includeTar {
 			clusterCredentialsContent = []byte(fakeCredentialsTar)
 		}
+
 		container, ctxContainer := test.SpinUpCarbonioLdap(t, test.PUBLIC_IMAGE_ADDRESS, test.LATEST_RELEASE)
+
 		containerIP, err := container.ContainerIP(ctxContainer)
 		if err != nil {
 			t.Error(err)
 		}
+
 		localConfigByte := test.GenerateLocalConfig(
 			t,
 			containerIP,
@@ -253,17 +256,21 @@ func TestSetup_importSetup(t *testing.T) {
 			test.DefaultLdapUserDN,
 			"password",
 		)
+
 		file, err := os.CreateTemp("", testName+"*")
 		if err != nil {
 			t.Error(err)
 		}
+
 		if err := os.WriteFile(file.Name(), localConfigByte, 0744); err != nil {
 			t.Error(err)
 		}
+
 		connection, err := ldap.DialURL("ldap://"+containerIP+":389", ldap.DialWithDialer(&net.Dialer{Timeout: 5 * time.Minute}))
 		if err != nil {
 			t.Error(err)
 		}
+
 		if err := connection.Bind(test.DefaultLdapUserDN, "password"); err != nil {
 			t.Error(err)
 		}
@@ -313,33 +320,43 @@ func TestSetup_importSetup(t *testing.T) {
 				if err := os.RemoveAll(consulConfigDir); err != nil {
 					t.Error(err)
 				}
+
 				if err := os.RemoveAll(consulHome); err != nil {
 					t.Error(err)
 				}
+
 				if err := os.RemoveAll(consulData); err != nil {
 					t.Error(err)
 				}
+
 				if err := os.RemoveAll(clusterFile.Name()); err != nil {
 					t.Error(err)
 				}
+
 				if err := os.RemoveAll(consulAclBootstrap.Name()); err != nil {
 					t.Error(err)
 				}
+
 				if err := os.RemoveAll(consulCertificate.Name()); err != nil {
 					t.Error(err)
 				}
+
 				if err := os.RemoveAll(consulCAKeyFile.Name()); err != nil {
 					t.Error(err)
 				}
+
 				if err := os.RemoveAll(mutableConfigFile.Name()); err != nil {
 					t.Error(err)
 				}
+
 				if err := container.Terminate(ctxContainer); err != nil {
 					t.Error(err)
 				}
+
 				if err := os.Remove(file.Name()); err != nil {
 					t.Error(err)
 				}
+
 				if err := os.Remove(clusterCredentialDownloadFile.Name()); err != nil {
 					if !os.IsNotExist(err) {
 						t.Error(err)
@@ -351,8 +368,10 @@ func TestSetup_importSetup(t *testing.T) {
 	t.Run("Cluster credentials is required", func(t *testing.T) {
 		setupFiles, cleanup := setup(t, "Test cluster credentials is required", false)
 		defer cleanup()
+
 		containerIP, err := setupFiles.Container.ContainerIP(setupFiles.CtxContainer)
 		assert.NoError(t, err)
+
 		businessDep := new(mocks2.BusinessDependencies)
 		setupNetwork(businessDep, containerIP)
 		setupLdap(t, businessDep, setupFiles.FakeLocalConfig)
@@ -366,7 +385,9 @@ func TestSetup_importSetup(t *testing.T) {
 			MutableConfigFile: setupFiles.mutableConfigFile,
 			BindAddress:       "127.0.0.1",
 		}
+
 		assert.NoError(t, os.Remove(setupFiles.ClusterCredentialDownload.Name()))
+
 		_, err = s.importSetup(businessDep)
 		assert.EqualError(
 			t,
@@ -378,10 +399,13 @@ func TestSetup_importSetup(t *testing.T) {
 	t.Run("Wrong binding address", func(t *testing.T) {
 		setupFiles, cleanup := setup(t, "Wrong binding address", true)
 		defer cleanup()
+
 		containerIP, err := setupFiles.Container.ContainerIP(setupFiles.CtxContainer)
 		assert.NoError(t, err)
+
 		businessDep := new(mocks2.BusinessDependencies)
 		setupNetwork(businessDep, containerIP)
+
 		s := &Setup{
 			ConsulConfigDir:   setupFiles.consulConfigDir,
 			ConsulHome:        setupFiles.consulHome,
@@ -404,8 +428,10 @@ func TestSetup_importSetup(t *testing.T) {
 	t.Run("Wrong cluster credentials password", func(t *testing.T) {
 		setupFiles, cleanup := setup(t, "Wrong cluster credentials password", true)
 		defer cleanup()
+
 		containerIP, err := setupFiles.Container.ContainerIP(setupFiles.CtxContainer)
 		assert.NoError(t, err)
+
 		businessDep := new(mocks2.BusinessDependencies)
 		setupNetwork(businessDep, containerIP)
 		setupLdap(t, businessDep, setupFiles.FakeLocalConfig)
@@ -433,6 +459,7 @@ func TestSetup_importSetup(t *testing.T) {
 
 		assert.NoError(t, tarWriter.AddFile(consulFileConfig, stat, command.ConsulCA, config.ConsulHome))
 		assert.NoError(t, tarWriter.Close())
+
 		_, err = s.importSetup(businessDep)
 		assert.EqualError(
 			t,
@@ -447,8 +474,10 @@ func TestSetup_importSetup(t *testing.T) {
 	t.Run("Run with correct configuration and flags", func(t *testing.T) {
 		setupFiles, cleanup := setup(t, "Run with correct configuration and flags", true)
 		defer cleanup()
+
 		containerIP, err := setupFiles.Container.ContainerIP(setupFiles.CtxContainer)
 		assert.NoError(t, err)
+
 		businessDep := new(mocks2.BusinessDependencies)
 		setupNetwork(businessDep, containerIP)
 		setupBusinessDeps(businessDep)
@@ -520,6 +549,7 @@ func TestSetup_importSetup(t *testing.T) {
 			"default",
 			"secret-token-2",
 		).Return(setTokenCmd)
+
 		aclPolicyCreateMock := new(mocks3.Cmd)
 		aclPolicyCreateMock.On("Output").Return([]byte("something"), nil)
 		businessDep.On("CreateCommand",
@@ -566,6 +596,7 @@ func TestSetup_importSetup(t *testing.T) {
 			}
 		}()
 		setupLdap(t, businessDep, setupFiles.FakeLocalConfig)
+
 		systemdUnitMock := new(mocks4.UnitManager)
 		systemdUnitMock.On("StartUnit", "service-discover.service", "replace", mock.Anything).Return(
 			0, nil,
@@ -583,6 +614,7 @@ func TestSetup_importSetup(t *testing.T) {
 				"127.0.0.1", // otherwise test address will be used
 			)
 			err := cmd.Start()
+
 			if err != nil {
 				panic(err)
 			}
@@ -593,6 +625,7 @@ func TestSetup_importSetup(t *testing.T) {
 					panic(err)
 				}
 			})
+
 			time.Sleep(250 * time.Millisecond)
 			ch <- "done"
 		})
@@ -610,6 +643,7 @@ func setupLdap(t *testing.T, businessDep *mocks2.BusinessDependencies, fakeLocal
 	if err != nil {
 		t.Error(err)
 	}
+
 	businessDep.On("LdapHandler", mock.Anything).Return(carbonio.CreateNewHandler(localConfig))
 }
 

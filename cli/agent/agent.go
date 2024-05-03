@@ -20,13 +20,14 @@
 package main
 
 import (
+	"os"
+
 	internalCommand "github.com/Zextras/service-discover/cli/agent/command"
 	"github.com/Zextras/service-discover/cli/agent/command/setup"
 	"github.com/Zextras/service-discover/cli/agent/config"
 	"github.com/Zextras/service-discover/cli/lib/command"
 	"github.com/Zextras/service-discover/cli/lib/parser"
 	"github.com/alecthomas/kong"
-	"os"
 )
 
 // The CLI represents the actual cli representation
@@ -74,5 +75,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
 	ctx.FatalIfErrorf(ctx.Run(&cli.GlobalCommonFlags))
 }

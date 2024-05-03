@@ -1,12 +1,17 @@
 package main
 
 import (
-	"github.com/Zextras/service-discover/cli/lib/carbonio"
 	"errors"
-	"github.com/stretchr/testify/mock"
 	"io"
 	"os/user"
 	"testing"
+
+	"github.com/Zextras/service-discover/cli/lib/carbonio"
+	"github.com/stretchr/testify/mock"
+)
+
+const (
+	discoverdBinPath = "/usr/bin/service-discoverd"
 )
 
 type mockDependencies struct {
@@ -17,60 +22,71 @@ func (m *mockDependencies) Exit(code int) {
 	m.Called(code)
 }
 
-func (m *mockDependencies) Log(a ...interface{}) {
+func (m *mockDependencies) Log(a ...any) {
 	m.Called(a)
 }
 
 func (m *mockDependencies) Getuid() (uid int) {
 	args := m.Called()
+
 	return args.Int(0)
 }
 
 func (m *mockDependencies) Getenv(key string) (env string) {
 	args := m.Called(key)
+
 	return args.String(0)
 }
 
 func (m *mockDependencies) UserLookup(username string) (*user.User, error) {
 	args := m.Called(username)
-	_user := args.Get(0)
-	if _user == nil {
+	usr := args.Get(0)
+
+	if usr == nil {
 		return nil, args.Error(1)
 	}
-	return _user.(*user.User), args.Error(1)
+
+	return usr.(*user.User), args.Error(1)
 }
 
 func (m *mockDependencies) Setuid(uid int) (err error) {
 	args := m.Called(uid)
+
 	return args.Error(0)
 }
 
 func (m *mockDependencies) Setgid(gid int) (err error) {
 	args := m.Called(gid)
+
 	return args.Error(0)
 }
 
 func (m *mockDependencies) Exec(argv0 string, argv []string, env []string) (err error) {
 	args := m.Called(argv0, argv, env)
+
 	return args.Error(0)
 }
 
 func (m *mockDependencies) LoadLocalConfig() (carbonio.LocalConfig, error) {
 	args := m.Called()
 	localConfig := args.Get(0)
+
 	if localConfig == nil {
 		return nil, args.Error(1)
 	}
+
 	return localConfig.(carbonio.LocalConfig), nil
 }
 
 func (m *mockDependencies) CreateNewHandler(localConfig carbonio.LocalConfig) carbonio.LdapHandler {
 	args := m.Called(localConfig)
+
 	return args.Get(0).(carbonio.LdapHandler)
 }
 
 func (m *mockDependencies) Value(key string) string {
 	args := m.Called(key)
+
 	return args.String(0)
 }
 
@@ -90,11 +106,13 @@ func (m *mockDependencies) RemoveService(server string, service string) error {
 }
 func (m *mockDependencies) QueryAllServersWithService(service string) ([]string, error) {
 	args := m.Called(service)
-	_servers := args.Get(0)
-	if _servers == nil {
+	servers := args.Get(0)
+
+	if servers == nil {
 		return nil, args.Error(1)
 	}
-	return _servers.([]string), args.Error(1)
+
+	return servers.([]string), args.Error(1)
 }
 func (m *mockDependencies) CheckServerAvailability(write bool) error {
 	panic("should not be used")
@@ -114,11 +132,10 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 		setupMock(mockDependencies, true)
 		runServiceDiscoverDaemon(
 			mockDependencies,
-			[]string{"/usr/bin/service-discoverd", "server"},
+			[]string{discoverdBinPath, "server"},
 		)
 		mockDependencies.AssertNumberOfCalls(t, "Exec", 1)
 		mockDependencies.AssertCalled(t, "Exit", ExitCodeExecError)
-
 	})
 
 	t.Run("agent run", func(t *testing.T) {
@@ -126,7 +143,7 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 		setupMock(mockDependencies, false)
 		runServiceDiscoverDaemon(
 			mockDependencies,
-			[]string{"/usr/bin/service-discoverd", "agent"},
+			[]string{discoverdBinPath, "agent"},
 		)
 		mockDependencies.AssertNumberOfCalls(t, "Exec", 1)
 		mockDependencies.AssertCalled(t, "Exit", ExitCodeExecError)
@@ -137,9 +154,9 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 		setupMock(mockDependencies, true)
 		runServiceDiscoverDaemon(
 			mockDependencies,
-			[]string{"/usr/bin/service-discoverd"},
+			[]string{discoverdBinPath},
 		)
-		mockDependencies.AssertCalled(t, "Log", []interface{}{"one parameter: server or agent"})
+		mockDependencies.AssertCalled(t, "Log", []any{"one parameter: server or agent"})
 		mockDependencies.AssertCalled(t, "Exit", ExitCodeWrongArgs)
 	})
 
@@ -148,9 +165,9 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 		setupMock(mockDependencies, true)
 		runServiceDiscoverDaemon(
 			mockDependencies,
-			[]string{"/usr/bin/service-discoverd", "invalid"},
+			[]string{discoverdBinPath, "invalid"},
 		)
-		mockDependencies.AssertCalled(t, "Log", []interface{}{"one parameter: server or agent"})
+		mockDependencies.AssertCalled(t, "Log", []any{"one parameter: server or agent"})
 		mockDependencies.AssertCalled(t, "Exit", ExitCodeWrongArgs)
 	})
 
@@ -161,9 +178,9 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 
 		runServiceDiscoverDaemon(
 			mockDependencies,
-			[]string{"/usr/bin/service-discoverd", "server"},
+			[]string{discoverdBinPath, "server"},
 		)
-		mockDependencies.AssertCalled(t, "Log", []interface{}{"run as root"})
+		mockDependencies.AssertCalled(t, "Log", []any{"run as root"})
 		mockDependencies.AssertCalled(t, "Exit", ExitCodeUserStuff)
 	})
 
@@ -174,9 +191,9 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 
 		runServiceDiscoverDaemon(
 			mockDependencies,
-			[]string{"/usr/bin/service-discoverd", "server"},
+			[]string{discoverdBinPath, "server"},
 		)
-		mockDependencies.AssertCalled(t, "Log", []interface{}{"unable to read ldap configuration: fake error"})
+		mockDependencies.AssertCalled(t, "Log", []any{"unable to read ldap configuration: fake error"})
 		mockDependencies.AssertCalled(t, "Exit", ExitCodeLocalCfg)
 	})
 
@@ -189,9 +206,9 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 
 		runServiceDiscoverDaemon(
 			mockDependencies,
-			[]string{"/usr/bin/service-discoverd", "server"},
+			[]string{discoverdBinPath, "server"},
 		)
-		mockDependencies.AssertCalled(t, "Log", []interface{}{"cannot find user 'service-discover': fake error"})
+		mockDependencies.AssertCalled(t, "Log", []any{"cannot find user 'service-discover': fake error"})
 		mockDependencies.AssertCalled(t, "Exit", ExitCodeUserStuff)
 	})
 
@@ -202,9 +219,9 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 
 		runServiceDiscoverDaemon(
 			mockDependencies,
-			[]string{"/usr/bin/service-discoverd", "server"},
+			[]string{discoverdBinPath, "server"},
 		)
-		mockDependencies.AssertCalled(t, "Log", []interface{}{"cannot change uid: fake error"})
+		mockDependencies.AssertCalled(t, "Log", []any{"cannot change uid: fake error"})
 		mockDependencies.AssertCalled(t, "Exit", ExitCodeUserStuff)
 	})
 
@@ -218,9 +235,9 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 
 		runServiceDiscoverDaemon(
 			mockDependencies,
-			[]string{"/usr/bin/service-discoverd", "server"},
+			[]string{discoverdBinPath, "server"},
 		)
-		mockDependencies.AssertCalled(t, "Log", []interface{}{"unable to query ldap: fake error"})
+		mockDependencies.AssertCalled(t, "Log", []any{"unable to query ldap: fake error"})
 		mockDependencies.AssertCalled(t, "Exit", ExitCodeLdapError)
 	})
 
@@ -234,9 +251,10 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 
 		runServiceDiscoverDaemon(
 			mockDependencies,
-			[]string{"/usr/bin/service-discoverd", "server"},
+			[]string{discoverdBinPath, "server"},
 		)
-		mockDependencies.AssertCalled(t, "Log", []interface{}{"local service-discover server NOT present in ldap/zimbraServiceEnabled attribute local-hostname"})
+		mockDependencies.AssertCalled(t, "Log",
+			[]any{"local service-discover server NOT present in ldap/zimbraServiceEnabled attribute local-hostname"})
 		mockDependencies.AssertCalled(t, "Exit", ExitCodeLdapError)
 	})
 
@@ -250,9 +268,10 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 
 		runServiceDiscoverDaemon(
 			mockDependencies,
-			[]string{"/usr/bin/service-discoverd", "agent"},
+			[]string{discoverdBinPath, "agent"},
 		)
-		mockDependencies.AssertCalled(t, "Log", []interface{}{"local service-discover agent must NOT be present in ldap/zimbraServiceEnabled attribute local-hostname"})
+		mockDependencies.AssertCalled(t, "Log",
+			[]any{"local service-discover agent must NOT be present in ldap/zimbraServiceEnabled attribute local-hostname"})
 		mockDependencies.AssertCalled(t, "Exit", ExitCodeLdapError)
 	})
 
@@ -280,9 +299,9 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 
 		runServiceDiscoverDaemon(
 			mockDependencies,
-			[]string{"/usr/bin/service-discoverd", "server"},
+			[]string{discoverdBinPath, "server"},
 		)
-		mockDependencies.AssertCalled(t, "Log", []interface{}{"consul execute failed: fake error"})
+		mockDependencies.AssertCalled(t, "Log", []any{"consul execute failed: fake error"})
 		mockDependencies.AssertCalled(t, "Exit", ExitCodeExecError)
 	})
 }

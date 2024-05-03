@@ -22,6 +22,11 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"net"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/Zextras/service-discover/cli/lib/carbonio"
 	"github.com/Zextras/service-discover/cli/lib/command"
 	"github.com/Zextras/service-discover/cli/lib/exec"
@@ -30,10 +35,6 @@ import (
 	"github.com/Zextras/service-discover/cli/lib/term"
 	"github.com/Zextras/service-discover/cli/server/config"
 	"github.com/pkg/errors"
-	"net"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 const (
@@ -142,9 +143,12 @@ func gatherInputs(d interactiveDependencies, firstInstance bool) (*setupConfigur
 	}
 
 	var password string
+
 	if firstInstance {
-		firstPassword := term.MustRead(d.Term().ReadPassword("Create the cluster credentials password (will be used for setups): "))
+		firstPassword :=
+			term.MustRead(d.Term().ReadPassword("Create the cluster credentials password (will be used for setups): "))
 		password = term.MustRead(d.Term().ReadPassword("Type the credential password again: "))
+
 		if password != firstPassword {
 			return nil, errors.New("passwords do not match")
 		}
@@ -164,6 +168,7 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 	if err != nil {
 		return err
 	}
+
 	defer ui.Close()
 	d := realDependencies{
 		ui: &ui,
@@ -192,6 +197,7 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 	} else {
 		out, err = s.importSetup(d)
 	}
+
 	if err != nil {
 		return err
 	}
@@ -200,7 +206,9 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 	if err != nil {
 		return err
 	}
+
 	fmt.Fprint(d.Writer(), render)
+
 	return nil
 }
 
@@ -211,11 +219,14 @@ func (s *Setup) isFirstInstance(d businessDependencies) (bool, error) {
 		if err != nil {
 			return false, err
 		}
+
 		ldapHandler := d.LdapHandler(zimbraLocalConfig)
 		servers, err := ldapHandler.QueryAllServersWithService(carbonio.ServiceDiscoverServiceName)
+
 		if err != nil {
 			return false, err
 		}
+
 		return len(servers) == 0, nil
 	} else {
 		return false, nil
@@ -226,6 +237,7 @@ func preRun(d businessDependencies) error {
 	// We need to check that the executable is in $PATH
 	cmd := d.CreateCommand(consulBin, "version")
 	err := cmd.Run()
+
 	if err != nil {
 		return errors.New(fmt.Sprintf("unable to execute consul binary: %s", err))
 	}
@@ -244,11 +256,13 @@ func preRun(d businessDependencies) error {
 
 func addrsToSingleString(addrs *[]net.Addr, sep string) string {
 	strAddrs := make([]string, len(*addrs))
+
 	for i, a := range *addrs {
 		if a.String() != "" {
 			strAddrs[i] = a.String()
 		}
 	}
+
 	return strings.Join(strAddrs, sep)
 }
 
@@ -256,9 +270,11 @@ func addrsToSingleString(addrs *[]net.Addr, sep string) string {
 func generateGossipKey() (string, error) {
 	key := make([]byte, 32)
 	n, err := rand.Reader.Read(key)
+
 	if err != nil {
 		return "", errors.New(fmt.Sprintf("error reading random data: %s", err))
 	}
+
 	if n != 32 {
 		return "", errors.New("couldn't read enough entropy. Generate more entropy!")
 	}
@@ -287,16 +303,20 @@ func wizardBindAddressSelection(d interactiveDependencies) (string, error) {
 
 	term.MustWrite(fmt.Fprintf(d.Term(), "Specify the binding address for service discovery: "))
 	bindingAddress := term.MustRead(d.Term().ReadLine())
+
 	err = command.CheckValidBindingAddress(d, networks, bindingAddress)
 	if err != nil {
 		return "", err
 	}
+
 	return bindingAddress, nil
 }
 
-// generateCertificateAndConfig creates the TLS certificates for consul and finally it generates the gossip key. This ensure secure
-// communications inside Consul
-func (s *Setup) generateCertificateAndConfig(d businessDependencies, zimbraHostname string, gossipKey string) (*setupConfig, error) {
+// generateCertificateAndConfig creates the TLS certificates for consul and
+// finally it generates the gossip key. This ensure secure communications
+// inside Consul
+func (s *Setup) generateCertificateAndConfig(d businessDependencies,
+	zimbraHostname string, gossipKey string) (*setupConfig, error) {
 	certificateDaysFlag := fmt.Sprintf("-days=%d", certificateExpiration)
 	err := exec.InPath(
 		d.CreateCommand(consulBin,
@@ -307,6 +327,7 @@ func (s *Setup) generateCertificateAndConfig(d businessDependencies, zimbraHostn
 			"-server"),
 		s.ConsulHome,
 	)
+
 	if err != nil {
 		return nil, errors.New("unable to create a valid certificate with Consul")
 	}
@@ -345,5 +366,6 @@ func (s *Setup) generateCertificateAndConfig(d businessDependencies, zimbraHostn
 		Ports:                   portsConfig{Grpc: 8502},
 		Connect:                 connectConfig{Enabled: true},
 	}
+
 	return consulConfigFile, nil
 }

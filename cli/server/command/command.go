@@ -20,13 +20,15 @@ package command
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/Zextras/service-discover/cli/lib/command"
 	"github.com/Zextras/service-discover/cli/server/config"
-	"os"
 )
 
-// The ServerFlags includes flags that are specific for the server CLI. In this case only the --version flag is included,
-// since it is program specific
+// The ServerFlags includes flags that are specific for the server CLI. In
+// this case only the --version flag is included, since it is program
+// specific.
 type ServerFlags struct {
 	command.GlobalCommonFlags
 	Version versionFlag `help:"Show the version of this program" type:"bool"`
@@ -35,9 +37,10 @@ type ServerFlags struct {
 // versionFlag is a typedef for command.versionFlag in order to define a hook for the flag
 type versionFlag bool
 
-// BeforeApply implementation in order to catch any --version and printing the version, as described in CLI-7
+// BeforeApply implementation in order to catch any --version and printing the version, as described in CLI-7.
 func (g versionFlag) BeforeApply() error {
 	fmt.Printf("%s %s\n", config.ApplicationName, config.ApplicationVersion)
 	os.Exit(0)
+
 	return nil
 }

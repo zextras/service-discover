@@ -46,14 +46,17 @@ func (s *Setup) firstSetup(d businessDependencies) (formatter.Formatter, error) 
 	if err != nil {
 		return nil, err
 	}
+
 	if err := command.CheckValidBindingAddress(d, networks, s.BindAddress); err != nil {
 		return nil, err
 	}
+
 	err = s.performSetup(d, &setupConfiguration{
 		FirstInstance: s.FirstInstance,
 		Password:      s.Password,
 		BindAddress:   s.BindAddress,
 	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -73,11 +76,14 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 	if err != nil {
 		return err
 	}
+
 	ldapHandler := d.LdapHandler(zimbraLocalConfig)
 	zimbraHostname, err := command.RetrieveZimbraHostname(zimbraLocalConfig, ldapHandler)
+
 	if err != nil {
 		return err
 	}
+
 	err = command.CheckHostnameAddress(d, zimbraHostname)
 	if err != nil {
 		return err
@@ -97,10 +103,13 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 	if err != nil {
 		return err
 	}
+
 	consulFileBytes, err := json.MarshalIndent(consulConfigFile, "", "  ")
+
 	if err != nil {
 		return err
 	}
+
 	if err := os.WriteFile(s.ConsulFileConfig, consulFileBytes, os.FileMode(0600)); err != nil {
 		return errors.New(fmt.Sprintf("unable to save generated configuration file in %s: %s", s.ConsulHome, err))
 	}
@@ -126,7 +135,6 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 	isContainer := command.CheckDockerContainer()
 
 	if isContainer && !testingMode {
-
 		cmd := exec.Command("service-discoverd-docker", "server")
 
 		err = cmd.Run()
@@ -143,42 +151,54 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 	if err != nil {
 		return err
 	}
+
 	aclBootstrapUnmarshal := &command.ACLTokenCreation{}
 	err = json.Unmarshal(aclBootstrapJson, aclBootstrapUnmarshal)
+
 	if err != nil {
 		return errors.WithMessage(
 			err,
 			"unable to decode ACL bootstrap response from Consul",
 		)
 	}
+
 	serverToken, err := command.CreateACLToken(
 		d.CreateCommand,
 		command.Server,
 		zimbraHostname,
 		aclBootstrapUnmarshal.SecretID,
 	)
+
 	if err != nil {
 		return err
 	}
+
 	if err := command.SetACLToken(d.CreateCommand, serverToken, aclBootstrapUnmarshal.SecretID); err != nil {
 		return err
 	}
+
 	aclFile, err := os.CreateTemp("", command.ConsulAclBootstrap)
 	if err != nil {
 		return err
 	}
+
 	defer os.Remove(aclFile.Name())
+
 	if err = os.WriteFile(aclFile.Name(), aclBootstrapJson, 0600); err != nil {
 		return err
 	}
+
 	gossipKeyFile, err := os.CreateTemp("", command.GossipKey)
 	if err != nil {
 		return err
 	}
+
 	defer os.Remove(gossipKeyFile.Name())
+
 	if err = os.WriteFile(gossipKeyFile.Name(), []byte(consulConfigFile.Encrypt), 0600); err != nil {
 		return err
 	}
+
 	filesToCompress := map[string]string{
 		command.GossipKey:                        gossipKeyFile.Name(),
 		command.ConsulAclBootstrap:               aclFile.Name(),
@@ -216,26 +236,33 @@ func (s *Setup) createEncryptedSecret(filesToCompress map[string]string, passwor
 	if err != nil {
 		return errors.New(fmt.Sprintf("unable to create %s: %s", s.ClusterCredential, err))
 	}
+
 	defer func(encryptedSecretFiles *os.File) {
 		_ = encryptedSecretFiles.Close()
 	}(encryptedSecretFiles)
+
 	if err := encryptedSecretFiles.Chmod(os.FileMode(0600)); err != nil {
 		return errors.New(fmt.Sprintf("unable to change permission to %s: %s", s.ClusterCredential, err))
 	}
+
 	encWriter, err := credentialsEncrypter.NewWriter(encryptedSecretFiles, []byte(password))
 	if err != nil {
 		return err
 	}
+
 	defer encWriter.Close()
+
 	for name, path := range filesToCompress {
 		file, err := os.Open(path) // #nosec
 		if err != nil {
 			return errors.New(fmt.Sprintf("unable to open %s: %s", path, err))
 		}
+
 		stat, err := file.Stat()
 		if err != nil {
 			return errors.New(fmt.Sprintf("unable to stat() provided %s: %s", file.Name(), err))
 		}
+
 		if err = encWriter.AddFile(bufio.NewReader(file), stat, name, "/"); err != nil {
 			return errors.New(fmt.Sprintf("error while creating secret credentials: unable to include %s: %s", path, err))
 		}
@@ -249,11 +276,14 @@ func (s *Setup) createACLBootstrapToken(d businessDependencies) ([]byte, error) 
 		data []byte
 		err  error
 	}
+
 	result := make(chan returnResult, 1)
 	ticker := time.NewTicker(250 * time.Millisecond)
+
 	go func() {
 		for {
 			<-ticker.C
+
 			aclBootstrapJson, err := d.CreateCommand(consulBin, "acl", "bootstrap", "-format", "json").Output()
 			if err != nil {
 				if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
@@ -261,12 +291,14 @@ func (s *Setup) createACLBootstrapToken(d businessDependencies) ([]byte, error) 
 					if stderr != "Failed ACL bootstrapping: Unexpected response code: 500 (The ACL system is currently in legacy mode.)" {
 						res := returnResult{err: exec2.ErrorFromStderr(err, "unable to create ACL bootstrap token")}
 						result <- res
+
 						return
 					}
 				}
 			} else {
 				res := returnResult{data: aclBootstrapJson}
 				result <- res
+
 				return
 			}
 		}
@@ -275,9 +307,11 @@ func (s *Setup) createACLBootstrapToken(d businessDependencies) ([]byte, error) 
 	select {
 	case res := <-result:
 		ticker.Stop() // note: we don't really need this since the goroutine at this point should already be exited
+
 		return res.data, res.err
 	case <-time.After(time.Second * 30):
 		ticker.Stop()
+
 		return nil, errors.New("timeout reached while waiting for consul to be ready")
 	}
 }
@@ -293,6 +327,7 @@ func (s *Setup) generateCertificationAuthority(d businessDependencies) error {
 			"-name-constraint"),
 		s.ConsulHome,
 	)
+
 	if err != nil {
 		return exec2.ErrorFromStderr(err, "unable to create a valid CA with Consul")
 	}

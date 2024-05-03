@@ -27,6 +27,7 @@ linters:
     - gofumpt
     - gomnd
     - ireturn
+    - misspell
     - typecheck
     - wrapcheck
   # Enable specific linter

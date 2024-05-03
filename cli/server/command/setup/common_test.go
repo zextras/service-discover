@@ -19,14 +19,15 @@
 package setup
 
 import (
+	"os"
+	"testing"
+
 	"github.com/Zextras/service-discover/cli/lib/carbonio"
 	mocks2 "github.com/Zextras/service-discover/cli/lib/carbonio/mocks"
 	"github.com/Zextras/service-discover/cli/lib/test"
 	"github.com/Zextras/service-discover/cli/server/command/setup/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"os"
-	"testing"
 )
 
 func TestSetup_isFirstInstance(t *testing.T) {
@@ -36,6 +37,7 @@ func TestSetup_isFirstInstance(t *testing.T) {
 		localConfigPath        string
 		clusterCredentialsPath string
 	}
+
 	setup := func(t *testing.T, name string) (*testData, func()) {
 		localConfig := test.GenerateRandomFile(name)
 		clusterCredentials := test.GenerateRandomFile(name)
@@ -60,6 +62,7 @@ func TestSetup_isFirstInstance(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
+
 				err = os.Remove(clusterCredentials.Name())
 				if err != nil {
 					t.Fatal(err)
@@ -70,6 +73,7 @@ func TestSetup_isFirstInstance(t *testing.T) {
 	t.Run("Should give first instance", func(t *testing.T) {
 		testData, cleanup := setup(t, "Should give first instance")
 		defer cleanup()
+
 		s := &Setup{
 			ConsulConfigDir:   "",
 			ConsulHome:        "",
@@ -92,6 +96,7 @@ func TestSetup_isFirstInstance(t *testing.T) {
 	t.Run("Should return not first instance if there are members in service-discover ldap", func(t *testing.T) {
 		testData, cleanup := setup(t, "Should return not first instance if there are members in service-discover ldap")
 		defer cleanup()
+
 		s := &Setup{
 			ConsulConfigDir:   "",
 			ConsulHome:        "",
@@ -114,6 +119,7 @@ func TestSetup_isFirstInstance(t *testing.T) {
 	t.Run("Should return not first instance if cluster credentials file is present", func(t *testing.T) {
 		testData, cleanup := setup(t, "Should return not first instance if cluster credentials file is present")
 		defer cleanup()
+
 		s := &Setup{
 			ConsulConfigDir:   "",
 			ConsulHome:        "",

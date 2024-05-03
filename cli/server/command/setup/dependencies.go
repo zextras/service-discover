@@ -20,15 +20,16 @@ package setup
 
 import (
 	"context"
+	"io"
+	"net"
+	"os"
+	"os/user"
+
 	"github.com/Zextras/service-discover/cli/lib/carbonio"
 	"github.com/Zextras/service-discover/cli/lib/exec"
 	"github.com/Zextras/service-discover/cli/lib/systemd"
 	"github.com/Zextras/service-discover/cli/lib/term"
 	"github.com/coreos/go-systemd/v22/dbus"
-	"io"
-	"net"
-	"os"
-	"os/user"
 )
 
 type interactiveDependencies interface {

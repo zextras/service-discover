@@ -19,8 +19,9 @@
 package systemd
 
 import (
-	"github.com/coreos/go-systemd/v22/dbus"
 	"time"
+
+	"github.com/coreos/go-systemd/v22/dbus"
 )
 
 type UnitManager interface {
@@ -58,7 +59,8 @@ type UnitManager interface {
 	Subscribe() error
 	Unsubscribe() error
 	SubscribeUnits(interval time.Duration) (<-chan map[string]*dbus.UnitStatus, <-chan error)
-	SubscribeUnitsCustom(interval time.Duration, buffer int, isChanged func(*dbus.UnitStatus, *dbus.UnitStatus) bool, filterUnit func(string) bool) (<-chan map[string]*dbus.UnitStatus, <-chan error)
+	SubscribeUnitsCustom(interval time.Duration, buffer int, isChanged func(*dbus.UnitStatus, *dbus.UnitStatus) bool,
+		filterUnit func(string) bool) (<-chan map[string]*dbus.UnitStatus, <-chan error)
 	SetSubStateSubscriber(updateCh chan<- *dbus.SubStateUpdate, errCh chan<- error)
 	SetPropertiesSubscriber(updateCh chan<- *dbus.PropertiesUpdate, errCh chan<- error)
 }

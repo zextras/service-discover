@@ -1,16 +1,18 @@
 package main
 
 import (
-	"github.com/Zextras/service-discover/cli/lib/carbonio"
 	"fmt"
 	"os"
 	"os/user"
 	"strconv"
 	"syscall"
+
+	"github.com/Zextras/service-discover/cli/lib/carbonio"
 )
 
 const (
-	// Starting from 1000 to avoid conflicts with consul exit codes
+	consulBinPath = "/usr/bin/consul"
+	// Starting from 1000 to avoid conflicts with consul exit codes.
 	ExitCodeWrongArgs = 1001
 	ExitCodeUserStuff = 1002
 	ExitCodeLocalCfg  = 1003
@@ -24,7 +26,7 @@ func (r realDependencies) Exit(code int) {
 	os.Exit(code)
 }
 
-func (r realDependencies) Log(a ...interface{}) {
+func (r realDependencies) Log(a ...any) {
 	_, _ = fmt.Fprint(os.Stderr, a...)
 }
 
@@ -54,6 +56,7 @@ func (r realDependencies) Exec(argv0 string, argv []string, envv []string) (err 
 
 func (r realDependencies) LoadLocalConfig() (carbonio.LocalConfig, error) {
 	localConfig, err := carbonio.LoadLocalConfig(carbonio.LocalConfigPath)
+
 	return localConfig, err
 }
 
@@ -63,7 +66,7 @@ func (r realDependencies) CreateNewHandler(localConfig carbonio.LocalConfig) car
 
 type deps interface {
 	Exit(code int)
-	Log(a ...interface{})
+	Log(a ...any)
 	Getenv(key string) (env string)
 	Getuid() (uid int)
 	UserLookup(username string) (*user.User, error)
@@ -87,8 +90,10 @@ func runServiceDiscoverDaemon(d deps, args []string) {
 	if len(args) < 2 || (args[1] != "server" && args[1] != "agent") {
 		d.Log("one parameter: server or agent")
 		d.Exit(ExitCodeWrongArgs)
+
 		return
 	}
+
 	isServer := args[1] == "server"
 
 	// root privileges only serves to read the localconfig, once we have the
@@ -97,18 +102,24 @@ func runServiceDiscoverDaemon(d deps, args []string) {
 	if err != nil {
 		d.Log(err.Log)
 		d.Exit(err.ExitCode)
+
 		return
 	}
+
 	ldapHandler, localServer, err := readLocalConfig(d)
 	if err != nil {
 		d.Log(err.Log)
 		d.Exit(err.ExitCode)
+
 		return
 	}
+
 	err = changeUser(d)
+
 	if err != nil {
 		d.Log(err.Log)
 		d.Exit(err.ExitCode)
+
 		return
 	}
 
@@ -116,6 +127,7 @@ func runServiceDiscoverDaemon(d deps, args []string) {
 	if err != nil {
 		d.Log(err.Log)
 		d.Exit(err.ExitCode)
+
 		return
 	}
 
@@ -123,6 +135,7 @@ func runServiceDiscoverDaemon(d deps, args []string) {
 	if err != nil {
 		d.Log(err.Log)
 		d.Exit(err.ExitCode)
+
 		return
 	}
 
@@ -137,12 +150,11 @@ func checkRoot(d deps) *ErrorWithExitCode {
 			ExitCode: ExitCodeUserStuff,
 		}
 	}
+
 	return nil
 }
 
 func changeUser(d deps) *ErrorWithExitCode {
-	var err error = nil
-
 	serviceDiscoverUser, err := d.UserLookup("service-discover")
 	if err != nil {
 		return &ErrorWithExitCode{
@@ -158,6 +170,7 @@ func changeUser(d deps) *ErrorWithExitCode {
 			ExitCode: ExitCodeUserStuff,
 		}
 	}
+
 	gid, err := strconv.Atoi(serviceDiscoverUser.Gid)
 	if err != nil {
 		return &ErrorWithExitCode{
@@ -173,6 +186,7 @@ func changeUser(d deps) *ErrorWithExitCode {
 			ExitCode: ExitCodeUserStuff,
 		}
 	}
+
 	err = d.Setuid(uid)
 	if err != nil {
 		return &ErrorWithExitCode{
@@ -189,7 +203,7 @@ func startConsul(d deps, isServer bool, servers []string, localServer string) *E
 
 	if isServer {
 		args = []string{
-			"/usr/bin/consul",
+			consulBinPath,
 			"agent",
 			"-bootstrap-expect",
 			strconv.Itoa(len(servers)/2 + 1),
@@ -199,7 +213,7 @@ func startConsul(d deps, isServer bool, servers []string, localServer string) *E
 		}
 	} else {
 		args = []string{
-			"/usr/bin/consul",
+			consulBinPath,
 			"agent",
 			"-config-dir",
 			"/etc/zextras/service-discover/",
@@ -212,6 +226,7 @@ func startConsul(d deps, isServer bool, servers []string, localServer string) *E
 	}
 
 	found := false
+
 	for _, server := range servers {
 		if localServer != server {
 			args = append(args, fmt.Sprintf("-retry-join=%s", server))
@@ -243,12 +258,13 @@ func startConsul(d deps, isServer bool, servers []string, localServer string) *E
 	if len(d.Getenv("SHELL")) > 0 {
 		envs = append(envs, "SHELL="+d.Getenv("SHELL"))
 	}
+
 	if len(d.Getenv("NOTIFY_SOCKET")) > 0 {
 		envs = append(envs, "NOTIFY_SOCKET="+d.Getenv("NOTIFY_SOCKET"))
 	}
 
 	err := d.Exec(
-		"/usr/bin/consul",
+		consulBinPath,
 		args,
 		envs,
 	)
@@ -273,7 +289,9 @@ func readLocalConfig(d deps) (carbonio.LdapHandler, string, *ErrorWithExitCode) 
 			ExitCode: ExitCodeLocalCfg,
 		}
 	}
+
 	handler := d.CreateNewHandler(localConfig)
+
 	return handler, localConfig.Value(carbonio.LocalConfigServerHostname), nil
 }
 
@@ -285,5 +303,6 @@ func queryAllServiceDiscoverServers(ldapHandler carbonio.LdapHandler) ([]string,
 			ExitCode: ExitCodeLdapError,
 		}
 	}
+
 	return servers, nil
 }

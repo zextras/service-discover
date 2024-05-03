@@ -20,9 +20,10 @@ package command
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/Zextras/service-discover/cli/agent/config"
 	"github.com/Zextras/service-discover/cli/lib/command"
-	"os"
 )
 
 // The AgentFlags includes flags that are specific for the agent CLI. In this case only the --version flag is included,
@@ -39,5 +40,6 @@ type versionFlag bool
 func (g versionFlag) BeforeApply() error {
 	fmt.Printf("%s %s\n", config.ApplicationName, config.ApplicationVersion)
 	os.Exit(0)
+
 	return nil
 }

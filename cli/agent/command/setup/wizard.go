@@ -19,11 +19,12 @@
 package setup
 
 import (
+	"os"
+
 	"github.com/Zextras/service-discover/cli/lib/command"
 	"github.com/Zextras/service-discover/cli/lib/formatter"
 	"github.com/Zextras/service-discover/cli/lib/term"
 	"github.com/pkg/errors"
-	"os"
 )
 
 // NewWizardSetup is just a wrapper over the original setup, that performs interactive UI experience
@@ -46,6 +47,7 @@ func (s *Wizard) Run(commonFlags *command.GlobalCommonFlags) error {
 	if err != nil {
 		return err
 	}
+
 	defer ui.Close()
 	d := realDependencies{
 		ui: &ui,
@@ -59,6 +61,7 @@ func (s *Wizard) Run(commonFlags *command.GlobalCommonFlags) error {
 	if commonFlags.Format != formatter.PlainFormatOutput {
 		return errors.New("only plain formatting is supported when in wizard mode")
 	}
+
 	inputs, err := gatherInputs(d)
 	if err != nil {
 		return err

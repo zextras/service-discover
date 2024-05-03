@@ -20,13 +20,14 @@
 package main
 
 import (
+	"os"
+
 	"github.com/Zextras/service-discover/cli/lib/command"
 	"github.com/Zextras/service-discover/cli/lib/parser"
 	internalCommand "github.com/Zextras/service-discover/cli/server/command"
 	"github.com/Zextras/service-discover/cli/server/command/setup"
 	"github.com/Zextras/service-discover/cli/server/config"
 	"github.com/alecthomas/kong"
-	"os"
 )
 
 // The CLI represents the actual cli representation
@@ -70,9 +71,11 @@ func main() {
 		kong.Description(config.ApplicationDescription),
 		kong.UsageOnError(),
 	)
+
 	err := ctx.Validate()
 	if err != nil {
 		panic(err)
 	}
+
 	ctx.FatalIfErrorf(ctx.Run(&cli.GlobalCommonFlags))
 }
