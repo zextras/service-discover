@@ -3,6 +3,7 @@ package command
 import (
 	"fmt"
 	"github.com/Zextras/service-discover/cli/lib/credentialsEncrypter"
+	"github.com/Zextras/service-discover/cli/lib/formatter"
 	"github.com/Zextras/service-discover/cli/lib/term"
 	"github.com/Zextras/service-discover/cli/lib/test"
 	"github.com/stretchr/testify/assert"
@@ -20,7 +21,6 @@ func (t fakeNotTerminal) Get(writer io.Writer) (term.Terminal, error) {
 }
 
 func (t fakeNotTerminal) ReadPassword(prompt string) (string, error) {
-	println("Not a terminal!")
 	return "", term.NotATerminalError(1)
 }
 
@@ -56,7 +56,7 @@ func (t fakeTerminal) ReadLine() (string, error) {
 	return "", nil
 }
 
-func TestBootstrapToken_(t *testing.T) {
+func TestBootstrapToken_ReadToken(t *testing.T) {
 	cmd := NewCommand(
 		"TestApp",
 		"1.0",
@@ -170,4 +170,81 @@ func TestBootstrapToken_(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBootstrapToken_Run(t *testing.T) {
+	cmd := NewCommand(
+		"TestApp",
+		"1.0",
+	)
+	writer := &TestWriter{}
+	setup := aclSetup{password: "testPassword", token: "testToken"}
+	clusterCredentialFileName := setup.setUpAclTarGpg()
+	defer os.RemoveAll(clusterCredentialFileName)
+
+	tests := []struct {
+		name      string
+		testSetup aclSetup
+		setup     BootstrapToken
+		want      string
+		wantErr   assert.ErrorAssertionFunc
+	}{
+		{
+			name: "Should print Token with --password",
+			setup: BootstrapToken{
+				Command:                       *cmd,
+				writer:                        writer,
+				agentName:                     "myAgent",
+				Setup:                         false,
+				Password:                      setup.password,
+				clusterCredentialFileLocation: clusterCredentialFileName,
+			},
+			want: setup.token,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			flags := &GlobalCommonFlags{Format: formatter.PlainFormatOutput}
+			err := tt.setup.Run(flags)
+			if err != nil && tt.wantErr != nil {
+				tt.wantErr(t, err)
+			} else {
+				assert.Equal(t, tt.want, writer.Output)
+			}
+		})
+	}
+}
+
+type TestWriter struct {
+	Output string
+}
+
+func (t *TestWriter) Write(p []byte) (n int, err error) {
+	t.Output = string(p)
+	println(fmt.Sprintf("Received %s", string(p)))
+	return n, nil
+}
+
+type aclSetup struct {
+	testing  *testing.T
+	password string
+	token    string
+}
+
+// setup test to create a tar.gpg with ACLs and return its location
+func (t aclSetup) setUpAclTarGpg() string {
+	password := t.password
+	token := t.token
+
+	clusterCredentialsFile := test.GenerateRandomFile("test-bootstrap-token-cluster-credentials")
+
+	writer, _ := credentialsEncrypter.NewWriter(clusterCredentialsFile, []byte(password))
+
+	dumbAclContent, aclStat := test.CreateDumbFile([]byte(fmt.Sprintf(`{
+		"SecretID":"%s"
+	}`, token)), ConsulAclBootstrap)
+	assert.NoError(t.testing, writer.AddFile(dumbAclContent, aclStat, ConsulAclBootstrap, "/"))
+	assert.NoError(t.testing, writer.Flush())
+	assert.NoError(t.testing, writer.Close())
+	return clusterCredentialsFile.Name()
 }
