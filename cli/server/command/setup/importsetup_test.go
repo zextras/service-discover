@@ -33,8 +33,13 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 )
 
-// fakeCredentialsTar represents a valid credentials.tar.gpg file. It has been pasted as part of the codebase because golang doens't have a well defined way to point out test resources, so in order to avoid tests randomly failing I preferred pasting it here (it's still text after all luckly). You can read more here: https://web.archive.org/web/20230113095034/https://groups.google.com/g/Golang-Nuts/c/VPVlIiO5yXw
-// Archive password: `assext`
+// fakeCredentialsTar represents a valid credentials.tar.gpg file. It has
+// been pasted as part of the codebase because golang doens't have a well
+// defined way to point out test resources, so in order to avoid tests
+// randomly failing I preferred pasting it here (it's still text after all
+// luckly). You can read more here:
+// https://web.archive.org/web/20230113095034/https://groups.google.com/g/Golang-Nuts/c/VPVlIiO5yXw
+// Archive password: `assext`.
 const fakeCredentialsTar = `-----BEGIN PGP MESSAGE-----
 
 wy4ECQMIRKfwiAMvm0lggjRz5r168/5/mHXyxIjJRlfjGAAxrI05wsCbZ4mEEo/+
@@ -197,7 +202,7 @@ func (f FakeFileStat) IsDir() bool {
 	return false
 }
 
-func (f FakeFileStat) Sys() interface{} {
+func (f FakeFileStat) Sys() any {
 	panic("implement me")
 }
 

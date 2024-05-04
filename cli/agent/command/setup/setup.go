@@ -214,6 +214,7 @@ func gatherInputs(d interactiveDependencies) (*setupConfiguration, error) {
 	term.MustWrite(fmt.Fprint(d.Term(), "Specify the binding address for service discovery: "))
 	bindingAddress := term.MustRead(d.Term().ReadLine())
 	err = command.CheckValidBindingAddress(d, networks, bindingAddress)
+
 	if err != nil {
 		return nil, err
 	}
@@ -238,6 +239,7 @@ func preRun(clusterCredentialPath string, d businessDependencies) error {
 	// We need to check that the executable is in $PATH
 	cmd := d.CreateCommand(command.ConsulBin, "version")
 	err := cmd.Run()
+
 	if err != nil {
 		return errors.New(fmt.Sprintf("unable to execute consul binary: %s", err))
 	}
@@ -259,6 +261,7 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 	if err != nil {
 		return err
 	}
+
 	defer ui.Close()
 	d := realDependencies{
 		ui: &ui,
@@ -307,6 +310,7 @@ func (s *Setup) createTLSCertificate(d businessDependencies, caFile *os.File, ca
 			"-client"),
 		s.ConsulHome,
 	)
+
 	if err != nil {
 		return exec.ErrorFromStderr(err, "unable to generate correct CA certificate")
 	}
@@ -324,6 +328,7 @@ func (s *Setup) createTLSCertificate(d businessDependencies, caFile *os.File, ca
 	return nil
 }
 
+//nolint:misspell
 func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 	networks, err := command.NonLoopbackInterfaces(d)
 	if err != nil {
@@ -333,12 +338,14 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 	if err := command.CheckValidBindingAddress(d, networks, s.BindAddress); err != nil {
 		return nil, err
 	}
+
 	zimbraLocalConfig, err := carbonio.LoadLocalConfig(s.LocalConfigPath)
 	if err != nil {
 		return nil, err
 	}
 
 	ldapHandler := d.LdapHandler(zimbraLocalConfig)
+
 	zimbraHostname, err := command.RetrieveZimbraHostname(zimbraLocalConfig, ldapHandler)
 	if err != nil {
 		return nil, err

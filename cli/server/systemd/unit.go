@@ -24,7 +24,7 @@ type UnitManager interface {
 	SystemState() (*dbus.Property, error)
 	GetUnitProperty(unit string, propertyName string) (*dbus.Property, error)
 	GetServiceProperty(service string, propertyName string) (*dbus.Property, error)
-	GetUnitTypeProperties(unit string, unitType string) (map[string]interface{}, error)
+	GetUnitTypeProperties(unit string, unitType string) (map[string]any, error)
 	SetUnitProperties(name string, runtime bool, properties ...dbus.Property) error
 	GetUnitTypeProperty(unit string, unitType string, propertyName string) (*dbus.Property, error)
 	ListUnits() ([]dbus.UnitStatus, error)

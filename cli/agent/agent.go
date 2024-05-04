@@ -16,7 +16,7 @@ import (
 	"github.com/alecthomas/kong"
 )
 
-// The CLI represents the actual cli representation
+// The CLI represents the actual cli representation.
 type CLI struct {
 	internalCommand.AgentFlags
 
@@ -57,6 +57,7 @@ func main() {
 		kong.Description(config.ApplicationDescription),
 		kong.UsageOnError(),
 	)
+
 	err := ctx.Validate()
 	if err != nil {
 		panic(err)

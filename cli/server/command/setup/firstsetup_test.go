@@ -93,7 +93,7 @@ func Test_addrsToSingleString(t *testing.T) {
 }
 
 type mocked interface {
-	On(methodName string, arguments ...interface{}) *mock.Call
+	On(methodName string, arguments ...any) *mock.Call
 }
 
 func TestFirstSetup_business(t *testing.T) {

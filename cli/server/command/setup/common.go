@@ -49,7 +49,7 @@ func NewSetup() Setup {
 	}
 }
 
-// Setup command allows the final user to perform first time or add a server to an already existing cluster
+// Setup command allows the final user to perform first time or add a server to an already existing cluster.
 type Setup struct {
 	ConsulConfigDir   string `kong:"-"`
 	ConsulHome        string `kong:"-"`
@@ -108,7 +108,7 @@ type setupConfig struct {
 	Connect                 connectConfig `json:"connect"`
 }
 
-// nonInteractiveOutput is only an internal struct to output the result to the final user in an appropriate way
+// nonInteractiveOutput is only an internal struct to output the result to the final user in an appropriate way.
 type nonInteractiveOutput struct {
 	EncFilepath string `json:"cluster_credentials"`
 	Password    string `json:"credentials_password,omitempty"`
@@ -252,7 +252,7 @@ func addrsToSingleString(addrs *[]net.Addr, sep string) string {
 	return strings.Join(strAddrs, sep)
 }
 
-// generateGossipKey is directly taken from the way Consul generates it
+// generateGossipKey is directly taken from the way Consul generates it.
 func generateGossipKey() (string, error) {
 	key := make([]byte, 32)
 	n, err := rand.Reader.Read(key)
@@ -300,7 +300,7 @@ func wizardBindAddressSelection(d interactiveDependencies) (string, error) {
 
 // generateCertificateAndConfig creates the TLS certificates for consul and
 // finally it generates the gossip key. This ensure secure communications
-// inside Consul
+// inside Consul.
 func (s *Setup) generateCertificateAndConfig(d businessDependencies,
 	zimbraHostname string, gossipKey string) (*setupConfig, error) {
 	certificateDaysFlag := fmt.Sprintf("-days=%d", certificateExpiration)

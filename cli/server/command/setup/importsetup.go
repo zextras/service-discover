@@ -23,6 +23,8 @@ import (
 
 // importSetup refers to the run performed on a non-first cluster instance in a non-interactive way.
 // The output returned is always empty
+//
+//nolint:misspell
 func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error) {
 	networks, err := command.NonLoopbackInterfaces(d)
 	if err != nil {

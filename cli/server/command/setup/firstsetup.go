@@ -26,7 +26,7 @@ import (
 var testingMode bool
 
 // firstSetup specifically handles the command sent by the final user in a non-interactive way. This will print
-// as less as possible and it is intended to be used in with power users or from other programs
+// as less as possible and it is intended to be used in with power users or from other programs.
 func (s *Setup) firstSetup(d businessDependencies) (formatter.Formatter, error) {
 	networks, err := command.NonLoopbackInterfaces(d)
 	if err != nil {
@@ -57,6 +57,8 @@ func (s *Setup) firstSetup(d businessDependencies) (formatter.Formatter, error) 
 // installation (that it doesn't mean it is the hostname of the machine), then it proceeds to generate the appropriate
 // keys for the service discover to work in a secure way to finally write all the configuration in a PGP signed tarball
 // archive
+//
+//nolint:misspell
 func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration) error {
 	zimbraLocalConfig, err := carbonio.LoadLocalConfig(s.LocalConfigPath)
 	if err != nil {
@@ -216,7 +218,7 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 }
 
 // createEncryptedSecret takes the passed files as [destination in tarball]: current location and puts it in a
-// PGP encrypted tar archive
+// PGP encrypted tar archive.
 func (s *Setup) createEncryptedSecret(filesToCompress map[string]string, password string) error {
 	encryptedSecretFiles, err := os.Create(s.ClusterCredential)
 	if err != nil {

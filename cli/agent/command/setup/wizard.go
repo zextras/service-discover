@@ -13,14 +13,14 @@ import (
 	"github.com/pkg/errors"
 )
 
-// NewWizardSetup is just a wrapper over the original setup, that performs interactive UI experience
+// NewWizardSetup is just a wrapper over the original setup, that performs interactive UI experience.
 func NewWizardSetup(setup *Setup) Wizard {
 	return Wizard{
 		originalSetup: setup,
 	}
 }
 
-// Wizard si a wrap of the standard setup procedure that includes interactive setup
+// Wizard si a wrap of the standard setup procedure that includes interactive setup.
 type Wizard struct {
 	originalSetup *Setup
 
