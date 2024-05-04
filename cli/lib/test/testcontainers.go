@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	LATEST_RELEASE       = "24.1.0"
+	LATEST_RELEASE       = "24.3.0"
 	PUBLIC_IMAGE_ADDRESS = "carbonio/ce-directory-server-u20:%s"
 	CI_DOCKER_NETWORK    = "ci_agent"
 	CI_NETWORK_MODE      = "overlay"
