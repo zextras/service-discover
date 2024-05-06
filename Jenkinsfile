@@ -34,14 +34,14 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                     sh 'mkdir -p /home/agent/.gnupg'
                     def modules = [:]
                     def builds = [:]
-                    modules["agent"] = "cli/agent"
-                    modules["server"] = "cli/server"
-                    modules["command"] = "cli/lib/command"
-                    modules["credentialsEncrypter"] = "cli/lib/credentialsEncrypter"
-                    modules["exec"] = "cli/lib/exec"
-                    modules["formatter"] = "cli/lib/formatter"
-                    modules["parser"] = "cli/lib/parser"
-                    modules["carbonio"] = "cli/lib/carbonio"
+                    modules["agent"] = "cmd/agent"
+                    modules["server"] = "cmd/server"
+                    modules["command"] = "pkg/command"
+                    modules["credentialsEncrypter"] = "pkg/credentialsEncrypter"
+                    modules["exec"] = "pkg/exec"
+                    modules["formatter"] = "pkg/formatter"
+                    modules["parser"] = "pkg/parser"
+                    modules["carbonio"] = "pkg/carbonio"
                     modules.each{key, value ->
                         builds[key] = {
                             dir(value) {
@@ -60,9 +60,7 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                 script {
                     scannerHome = tool 'SonarScanner';
                 }
-                sh 'cd cli/agent; golangci-lint run --issues-exit-code 0 --out-format checkstyle > cli-agent.out'
-                sh 'cd cli/server; golangci-lint run --issues-exit-code 0 --out-format checkstyle > cli-server.out'
-                sh 'cd service-discoverd; golangci-lint run --issues-exit-code 0 --out-format checkstyle > discoverd.out'
+                sh 'golangci-lint run ./... --issues-exit-code 0 --out-format checkstyle > linter.out'
 
                 withSonarQubeEnv(credentialsId: 'sonarqube-user-token',
                     installationName: 'SonarQube instance') {
@@ -78,8 +76,9 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
             }
             steps {
                 unstash 'project'
-                sh 'sudo cp -r * /tmp'
-                sh 'sudo yap build ubuntu .'
+                sh 'mkdir -p /tmp/service-discover'
+                sh 'cp -r * /tmp/service-discover'
+                sh 'yap build ubuntu build -sd'
                 stash includes: 'artifacts/*.deb', name: 'artifacts-ubuntu'
             }
             post {
@@ -96,8 +95,9 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
             }
             steps {
                 unstash 'project'
-                sh 'sudo cp -r * /tmp'
-                sh 'sudo yap build rocky .'
+                sh 'mkdir -p /tmp/service-discover'
+                sh 'cp -r * /tmp/service-discover'
+                sh 'yap build rocky build -sd'
                 stash includes: 'artifacts/x86_64/*.rpm', name: 'artifacts-rocky'
             }
             post {
@@ -126,7 +126,7 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                                 "pattern": "artifacts/*.deb",
                                 "target": "ubuntu-devel/pool/",
                                 "props": "deb.distribution=focal;deb.distribution=jammy;deb.component=main;deb.architecture=amd64"
-                            }
+                            },
                             {
                                 "pattern": "artifacts/x86_64/(service-discover-server)-(*).x86_64.rpm",
                                 "target": "centos8-devel/zextras/{1}/{1}-{2}.x86_64.rpm",
