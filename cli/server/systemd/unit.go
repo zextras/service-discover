@@ -1,26 +1,13 @@
-/*
- * Copyright (C) 2023 Zextras srl
- *
- *     This program is free software: you can redistribute it and/or modify
- *     it under the terms of the GNU Affero General Public License as published by
- *     the Free Software Foundation, either version 3 of the License, or
- *     (at your option) any later version.
- *
- *     This program is distributed in the hope that it will be useful,
- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *     GNU Affero General Public License for more details.
- *
- *     You should have received a copy of the GNU Affero General Public License
- *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
- *
- */
+// SPDX-FileCopyrightText: 2022-2024 Zextras <https://www.zextras.com>
+//
+// SPDX-License-Identifier: AGPL-3.0-only
 
 package systemd
 
 import (
-	"github.com/coreos/go-systemd/v22/dbus"
 	"time"
+
+	"github.com/coreos/go-systemd/v22/dbus"
 )
 
 type UnitManager interface {
@@ -37,7 +24,7 @@ type UnitManager interface {
 	SystemState() (*dbus.Property, error)
 	GetUnitProperty(unit string, propertyName string) (*dbus.Property, error)
 	GetServiceProperty(service string, propertyName string) (*dbus.Property, error)
-	GetUnitTypeProperties(unit string, unitType string) (map[string]interface{}, error)
+	GetUnitTypeProperties(unit string, unitType string) (map[string]any, error)
 	SetUnitProperties(name string, runtime bool, properties ...dbus.Property) error
 	GetUnitTypeProperty(unit string, unitType string, propertyName string) (*dbus.Property, error)
 	ListUnits() ([]dbus.UnitStatus, error)
@@ -58,7 +45,8 @@ type UnitManager interface {
 	Subscribe() error
 	Unsubscribe() error
 	SubscribeUnits(interval time.Duration) (<-chan map[string]*dbus.UnitStatus, <-chan error)
-	SubscribeUnitsCustom(interval time.Duration, buffer int, isChanged func(*dbus.UnitStatus, *dbus.UnitStatus) bool, filterUnit func(string) bool) (<-chan map[string]*dbus.UnitStatus, <-chan error)
+	SubscribeUnitsCustom(interval time.Duration, buffer int, isChanged func(*dbus.UnitStatus, *dbus.UnitStatus) bool,
+		filterUnit func(string) bool) (<-chan map[string]*dbus.UnitStatus, <-chan error)
 	SetSubStateSubscriber(updateCh chan<- *dbus.SubStateUpdate, errCh chan<- error)
 	SetPropertiesSubscriber(updateCh chan<- *dbus.PropertiesUpdate, errCh chan<- error)
 }

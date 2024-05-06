@@ -1,32 +1,19 @@
-/*
- * Copyright (C) 2023 Zextras srl
- *
- *     This program is free software: you can redistribute it and/or modify
- *     it under the terms of the GNU Affero General Public License as published by
- *     the Free Software Foundation, either version 3 of the License, or
- *     (at your option) any later version.
- *
- *     This program is distributed in the hope that it will be useful,
- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *     GNU Affero General Public License for more details.
- *
- *     You should have received a copy of the GNU Affero General Public License
- *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
- *
- */
+// SPDX-FileCopyrightText: 2022-2024 Zextras <https://www.zextras.com>
+//
+// SPDX-License-Identifier: AGPL-3.0-only
 
 package setup
 
 import (
+	"os"
+
 	"github.com/Zextras/service-discover/cli/lib/command"
 	"github.com/Zextras/service-discover/cli/lib/formatter"
 	"github.com/Zextras/service-discover/cli/lib/term"
 	"github.com/pkg/errors"
-	"os"
 )
 
-// NewWizardSetup is just a wrapper over the original setup, that performs interactive UI experience
+// NewWizardSetup is just a wrapper over the original setup, that performs interactive UI experience.
 func NewWizardSetup(setup *Setup) Wizard {
 	return Wizard{
 		originalSetup: setup,
@@ -36,7 +23,7 @@ func NewWizardSetup(setup *Setup) Wizard {
 	}
 }
 
-// Wizard si a wrap of the standard setup procedure that includes interactive setup
+// Wizard si a wrap of the standard setup procedure that includes interactive setup.
 type Wizard struct {
 	originalSetup *Setup `kong:"-"`
 	Password      string `help:"Set a custom password for the encrypted secret files. If none is set, a random one will be generated and printed"`
@@ -49,6 +36,7 @@ func (s *Wizard) Run(commonFlags *command.GlobalCommonFlags) error {
 	if err != nil {
 		return err
 	}
+
 	defer ui.Close()
 	d := realDependencies{
 		ui: &ui,
@@ -95,8 +83,10 @@ func (s *Wizard) Run(commonFlags *command.GlobalCommonFlags) error {
 	} else {
 		_, err = s.originalSetup.importSetup(d)
 	}
+
 	if err != nil {
 		return err
 	}
+
 	return nil
 }

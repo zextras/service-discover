@@ -1,20 +1,6 @@
-/*
- * Copyright (C) 2023 Zextras srl
- *
- *     This program is free software: you can redistribute it and/or modify
- *     it under the terms of the GNU Affero General Public License as published by
- *     the Free Software Foundation, either version 3 of the License, or
- *     (at your option) any later version.
- *
- *     This program is distributed in the hope that it will be useful,
- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *     GNU Affero General Public License for more details.
- *
- *     You should have received a copy of the GNU Affero General Public License
- *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
- *
- */
+// SPDX-FileCopyrightText: 2022-2024 Zextras <https://www.zextras.com>
+//
+// SPDX-License-Identifier: AGPL-3.0-only
 
 package setup
 
@@ -37,11 +23,14 @@ import (
 
 // importSetup refers to the run performed on a non-first cluster instance in a non-interactive way.
 // The output returned is always empty
+//
+//nolint:misspell
 func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error) {
 	networks, err := command.NonLoopbackInterfaces(d)
 	if err != nil {
 		return nil, err
 	}
+
 	if err := command.CheckValidBindingAddress(d, networks, s.BindAddress); err != nil {
 		return nil, err
 	}
@@ -52,17 +41,21 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 	}
 
 	ldapHandler := d.LdapHandler(zimbraLocalConfig)
+
 	zimbraHostname, err := command.RetrieveZimbraHostname(zimbraLocalConfig, ldapHandler)
 	if err != nil {
 		return nil, err
 	}
+
 	err = command.CheckHostnameAddress(d, zimbraHostname)
 	if err != nil {
 		return nil, err
 	}
+
 	if err := command.DownloadCredentialsFromLDAP(ldapHandler, s.ClusterCredential); err != nil {
 		return nil, errors.WithMessage(err, "unable to download credentials from LDAP")
 	}
+
 	clusterCredential, err := command.OpenClusterCredential(s.ClusterCredential)
 	if err != nil {
 		return nil, err
@@ -78,18 +71,22 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 	if err != nil {
 		return nil, err
 	}
+
 	localCaFullPath, err := filepath.Rel("/", filepath.Join(s.ConsulHome, command.ConsulCA))
 	if err != nil {
 		return nil, err
 	}
+
 	tarballCaKeyFullPath, err := filepath.Rel("/", filepath.Join(config.ConsulHome, command.ConsulCAKey))
 	if err != nil {
 		return nil, err
 	}
+
 	localCaKeyFullPath, err := filepath.Rel("/", filepath.Join(s.ConsulHome, command.ConsulCAKey))
 	if err != nil {
 		return nil, err
 	}
+
 	extractedFiles, err := credentialsEncrypter.ReadFiles(
 		credReader,
 		tarballCaFullPath,
@@ -116,14 +113,17 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 	defer os.Remove("/" + localCaKeyFullPath)
 
 	gossipKey := string(extractedFiles[command.GossipKey])
+
 	consulConfigFile, err := s.generateCertificateAndConfig(d, zimbraHostname, gossipKey)
 	if err != nil {
 		return nil, err
 	}
+
 	consulFileBytes, err := json.MarshalIndent(consulConfigFile, "", "  ")
 	if err != nil {
 		return nil, err
 	}
+
 	if err := os.WriteFile(s.ConsulFileConfig, consulFileBytes, os.FileMode(0600)); err != nil {
 		return nil, errors.New(fmt.Sprintf("unable to save generated configuration file in %s: %s", s.ConsulHome, err))
 	}
@@ -175,6 +175,7 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 	if err != nil {
 		return nil, errors.WithMessage(err, "unable to create ACL policy for this server")
 	}
+
 	err = command.SetACLToken(d.CreateCommand, token, aclBootstrapToken.SecretID)
 	if err != nil {
 		return nil, err

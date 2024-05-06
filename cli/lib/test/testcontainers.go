@@ -1,36 +1,23 @@
-/*
- * Copyright (C) 2023 Zextras srl
- *
- *     This program is free software: you can redistribute it and/or modify
- *     it under the terms of the GNU Affero General Public License as published by
- *     the Free Software Foundation, either version 3 of the License, or
- *     (at your option) any later version.
- *
- *     This program is distributed in the hope that it will be useful,
- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *     GNU Affero General Public License for more details.
- *
- *     You should have received a copy of the GNU Affero General Public License
- *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
- *
- */
+// SPDX-FileCopyrightText: 2022-2024 Zextras <https://www.zextras.com>
+//
+// SPDX-License-Identifier: AGPL-3.0-only
 
 package test
 
 import (
 	"context"
 	"fmt"
+	"os"
+	"testing"
+
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-units"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
-	"os"
-	"testing"
 )
 
 const (
-	LATEST_RELEASE       = "24.1.0"
+	LATEST_RELEASE       = "24.3.0"
 	PUBLIC_IMAGE_ADDRESS = "carbonio/ce-directory-server-u20:%s"
 	CI_DOCKER_NETWORK    = "ci_agent"
 	CI_NETWORK_MODE      = "overlay"
@@ -53,7 +40,7 @@ func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testconta
 	for _, nNet := range nets {
 		t.Log(nNet)
 	}
-	ulimits := []*units.Ulimit{{Name: "nofile", Soft: 1024, Hard: 1024}}
+	ulimits := []*units.Ulimit{{Name: "nofile", Soft: 32678, Hard: 32678}}
 	req := testcontainers.ContainerRequest{
 		Image:        fmt.Sprintf(address, version),
 		ExposedPorts: []string{"389/tcp"},
@@ -66,6 +53,7 @@ func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testconta
 			config.Ulimits = ulimits
 		},
 		Networks: nets,
+		ShmSize:  8 * 1024 * 1024 * 1024,
 	}
 
 	ldapC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{

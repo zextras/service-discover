@@ -1,20 +1,6 @@
-/*
- * Copyright (C) 2023 Zextras srl
- *
- *     This program is free software: you can redistribute it and/or modify
- *     it under the terms of the GNU Affero General Public License as published by
- *     the Free Software Foundation, either version 3 of the License, or
- *     (at your option) any later version.
- *
- *     This program is distributed in the hope that it will be useful,
- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *     GNU Affero General Public License for more details.
- *
- *     You should have received a copy of the GNU Affero General Public License
- *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
- *
- */
+// SPDX-FileCopyrightText: 2022-2024 Zextras <https://www.zextras.com>
+//
+// SPDX-License-Identifier: AGPL-3.0-only
 
 package setup
 
@@ -63,12 +49,14 @@ func (a *addrStub) String() string {
 
 func Test_addrsToSingleString(t *testing.T) {
 	t.Parallel()
+
 	separator := ", "
 
 	type args struct {
 		addrs *[]net.Addr
 		sep   string
 	}
+
 	tests := []struct {
 		name string
 		args args
@@ -96,6 +84,7 @@ func Test_addrsToSingleString(t *testing.T) {
 			want: "127.0.0.1, 10.0.0.1",
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.want, addrsToSingleString(tt.args.addrs, tt.args.sep))
@@ -104,7 +93,7 @@ func Test_addrsToSingleString(t *testing.T) {
 }
 
 type mocked interface {
-	On(methodName string, arguments ...interface{}) *mock.Call
+	On(methodName string, arguments ...any) *mock.Call
 }
 
 func TestFirstSetup_business(t *testing.T) {
@@ -121,8 +110,10 @@ func TestFirstSetup_business(t *testing.T) {
 
 		mockLocalConfig, err := carbonio.LoadLocalConfig(setup.LocalConfigPath)
 		assert.NoError(t, err)
+
 		mockLdapHandler := new(mocks5.LdapHandler)
 		mockLdapHandler.On("UploadBinary", mock.Anything, "cn=config,cn=zimbra", "carbonioMeshCredentials").Return(nil)
+
 		mockSystemdUnit := new(mocks3.UnitManager)
 		mockDependencies := new(mocks2.BusinessDependencies)
 		mockDependencies.On("writer").Return(io.Discard)
@@ -147,16 +138,21 @@ func TestFirstSetup_business(t *testing.T) {
 
 		clusterCredentialFile, err := os.Open(setup.ClusterCredential)
 		assert.NoError(t, err, "File should exist")
+
 		defer clusterCredentialFile.Close() // It will be removed in the cleanup() function deferred before
 		encReader, err := credentialsEncrypter.NewReader(clusterCredentialFile, []byte("password"))
 		assert.NoError(t, err, "Error while opening tar reader")
+
 		listOfCompressedFiles := make([]string, 0)
+
 		for {
 			header, err := encReader.Next()
 			if err == io.EOF {
 				t.Log("Reached EOF")
+
 				break
 			}
+
 			assert.NoError(t, err, "Error while reading tar file")
 			t.Logf("Header name file: %s\n", header.Name)
 			listOfCompressedFiles = append(listOfCompressedFiles, header.Name)
@@ -198,10 +194,13 @@ func TestFirstSetup_business(t *testing.T) {
 
 		mockLocalConfig, err := carbonio.LoadLocalConfig(setup.LocalConfigPath)
 		assert.NoError(t, err)
+
 		mockLdapHandler := new(mocks5.LdapHandler)
 		mockLdapHandler.On("UploadBinary", mock.Anything, "cn=config,cn=zimbra", "carbonioMeshCredentials").Return(nil)
+
 		mockSystemdUnit := new(mocks3.UnitManager)
 		mockDependencies := new(mocks2.BusinessDependencies)
+
 		mockDependencies.On("writer").Return(io.Discard)
 		mockNetwork(mockDependencies, true, false)
 		cleanup := mockBusinessDependencies(&setup, mockDependencies, &mockLocalConfig, mockLdapHandler, mockSystemdUnit)
@@ -222,12 +221,15 @@ func mockBusinessDependencies(
 	mockSystemdUnit *mocks3.UnitManager,
 ) func() {
 	var cleanups = make([]func(), 0)
+
 	aclPolicyCreateMock := new(mocks4.Cmd)
 	aclPolicyCreateMock.On("Output").Return([]byte("something"), nil)
+
 	tokenCreateMock := new(mocks4.Cmd)
 	tokenCreateMock.On("Output").Return([]byte(`{
 		  "SecretID": "secret-token-2"
 		}`), nil)
+
 	setTokenCmd := new(mocks4.Cmd)
 	setTokenCmd.On("Output").Return(make([]byte, 0), nil)
 	mockDependencies.On("GetuidSyscall").Return(0).
@@ -375,6 +377,7 @@ func mockBusinessDependencies(
 	}).On("Close").Return(nil)
 	mockLdapHandler.On("CheckServerAvailability", true).Return(nil).
 		On("AddService", "mailbox-1.example.com", "service-discover").Return(nil)
+
 	return func() {
 		for _, f := range cleanups {
 			f()
@@ -400,14 +403,17 @@ func createSetup(t *testing.T) (Setup, func()) {
 	}
 
 	var err error
+
 	err = os.MkdirAll(setup.ConsulConfigDir, 0700)
 	if err != nil {
 		panic(err)
 	}
+
 	err = os.MkdirAll(setup.ConsulHome, 0700)
 	if err != nil {
 		panic(err)
 	}
+
 	err = os.MkdirAll(setup.ConsulData, 0700)
 	if err != nil {
 		panic(err)
@@ -447,6 +453,7 @@ func TestFirstSetup_inputs(t *testing.T) {
 			Return("10.0.0.1", nil).
 			On("ReadPassword", mock.AnythingOfType("string")).
 			Return("password", nil)
+
 		mockDependencies := new(mocks2.InteractiveDependencies)
 		mockDependencies.On("Term").Return(mockTerm)
 		mockNetwork(mockDependencies, false, false)
@@ -459,6 +466,7 @@ func TestFirstSetup_inputs(t *testing.T) {
 		assert.Equal(t, false, configurations.FirstInstance)
 		assert.Equal(t, "10.0.0.1", configurations.BindAddress)
 		assert.Equal(t, "password", configurations.Password)
+
 		allOut, _ := io.ReadAll(out)
 		assert.Equal(t, `Multiple network cards detected:
 eno1 10.0.0.2
@@ -477,6 +485,7 @@ Specify the binding address for service discovery: `, string(allOut))
 			Return("10.0.0.1", nil).
 			On("ReadPassword", mock.AnythingOfType("string")).
 			Return("password", nil)
+
 		mockDependencies := new(mocks2.InteractiveDependencies)
 		mockDependencies.On("Term").Return(mockTerm)
 		mockNetwork(mockDependencies, true, false)
@@ -489,6 +498,7 @@ Specify the binding address for service discovery: `, string(allOut))
 		assert.Equal(t, false, configurations.FirstInstance)
 		assert.Equal(t, "10.0.0.1", configurations.BindAddress)
 		assert.Equal(t, "password", configurations.Password)
+
 		allOut, _ := io.ReadAll(out)
 		assert.Equal(t, `Multiple network cards detected:
 eno0 10.0.0.1
@@ -507,6 +517,7 @@ Specify the binding address for service discovery: `, string(allOut))
 			Return("10.0.0.200", nil).
 			On("ReadPassword", mock.AnythingOfType("string")).
 			Return("password", nil)
+
 		mockDependencies := new(mocks2.InteractiveDependencies)
 		mockDependencies.On("Term").Return(mockTerm)
 		mockNetwork(mockDependencies, true, false)
@@ -514,6 +525,7 @@ Specify the binding address for service discovery: `, string(allOut))
 		configurations, err := gatherInputs(mockDependencies, true)
 		assert.EqualError(t, err, "invalid binding address selected")
 		assert.Nil(t, configurations)
+
 		allOut, _ := io.ReadAll(out)
 		assert.Equal(t, `Multiple network cards detected:
 eno0 10.0.0.1
@@ -532,6 +544,7 @@ Specify the binding address for service discovery: `, string(allOut))
 			Return("10.0.0.1", nil).
 			On("ReadPassword", mock.AnythingOfType("string")).
 			Return("password", nil)
+
 		mockDependencies := new(mocks2.InteractiveDependencies)
 		mockDependencies.On("Term").Return(mockTerm)
 		mockNetwork(mockDependencies, true, true)
@@ -544,6 +557,7 @@ Specify the binding address for service discovery: `, string(allOut))
 		assert.Equal(t, false, configurations.FirstInstance)
 		assert.Equal(t, "10.0.0.1", configurations.BindAddress)
 		assert.Equal(t, "password", configurations.Password)
+
 		allOut, _ := io.ReadAll(out)
 		assert.Equal(t, `Multiple network cards detected:
 eno0 10.0.0.1/8
@@ -634,9 +648,11 @@ func TestSetup_createEncryptedSecret(t *testing.T) {
 		ClusterCredential string
 		NumberOfFiles     int
 	}
+
 	type args struct {
 		password string
 	}
+
 	tests := []struct {
 		name    string
 		fields  fields
@@ -666,6 +682,7 @@ func TestSetup_createEncryptedSecret(t *testing.T) {
 			wantErr: false,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			defer os.Remove(tt.fields.ClusterCredential)
@@ -673,6 +690,7 @@ func TestSetup_createEncryptedSecret(t *testing.T) {
 				ClusterCredential: tt.fields.ClusterCredential,
 			}
 			filesToInclude := make(map[string]string, 0)
+
 			defer func() {
 				for _, path := range filesToInclude {
 					if err := os.Remove(path); err != nil {
@@ -680,20 +698,26 @@ func TestSetup_createEncryptedSecret(t *testing.T) {
 					}
 				}
 			}()
+
 			for i := 0; i < tt.fields.NumberOfFiles; i++ {
 				file := test.GenerateRandomFile(tt.name)
 				defer file.Close()
+
 				content := make([]byte, (i+1)*4096)
 				_, err := rand.Read(content)
+
 				if err != nil {
 					panic(err)
 				}
+
 				err = os.WriteFile(file.Name(), content, 0644)
 				if err != nil {
 					panic(err)
 				}
+
 				filesToInclude[filepath.Base(file.Name())] = file.Name()
 			}
+
 			if tt.wantErr {
 				assert.Error(t, s.createEncryptedSecret(filesToInclude, tt.args.password))
 			} else {
@@ -703,15 +727,20 @@ func TestSetup_createEncryptedSecret(t *testing.T) {
 				assert.NoError(t, err)
 				reader, err := credentialsEncrypter.NewReader(cc, []byte(tt.args.password))
 				assert.NoError(t, err)
+
 				actualNumberOfFiles := 0
+
 				for {
 					header, err := reader.Next()
 					if err == io.EOF {
 						t.Log("Reached EOF")
+
 						break
 					}
+
 					assert.NoError(t, err, "Error while reading tar file")
 					t.Logf("Header name file: %s\n", header.Name)
+
 					actualBytesBuf := &bytes.Buffer{}
 					_, err = io.Copy(actualBytesBuf, reader)
 					assert.NoError(t, err)
@@ -725,6 +754,7 @@ func TestSetup_createEncryptedSecret(t *testing.T) {
 						actualBytes,
 						"The content of the two files are different",
 					)
+
 					actualNumberOfFiles++
 				}
 				assert.Equal(

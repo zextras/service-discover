@@ -1,20 +1,6 @@
-/*
- * Copyright (C) 2023 Zextras srl
- *
- *     This program is free software: you can redistribute it and/or modify
- *     it under the terms of the GNU Affero General Public License as published by
- *     the Free Software Foundation, either version 3 of the License, or
- *     (at your option) any later version.
- *
- *     This program is distributed in the hope that it will be useful,
- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *     GNU Affero General Public License for more details.
- *
- *     You should have received a copy of the GNU Affero General Public License
- *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
- *
- */
+// SPDX-FileCopyrightText: 2022-2024 Zextras <https://www.zextras.com>
+//
+// SPDX-License-Identifier: AGPL-3.0-only
 
 package setup
 
@@ -228,6 +214,7 @@ func gatherInputs(d interactiveDependencies) (*setupConfiguration, error) {
 	term.MustWrite(fmt.Fprint(d.Term(), "Specify the binding address for service discovery: "))
 	bindingAddress := term.MustRead(d.Term().ReadLine())
 	err = command.CheckValidBindingAddress(d, networks, bindingAddress)
+
 	if err != nil {
 		return nil, err
 	}
@@ -252,6 +239,7 @@ func preRun(clusterCredentialPath string, d businessDependencies) error {
 	// We need to check that the executable is in $PATH
 	cmd := d.CreateCommand(command.ConsulBin, "version")
 	err := cmd.Run()
+
 	if err != nil {
 		return errors.New(fmt.Sprintf("unable to execute consul binary: %s", err))
 	}
@@ -273,6 +261,7 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 	if err != nil {
 		return err
 	}
+
 	defer ui.Close()
 	d := realDependencies{
 		ui: &ui,
@@ -297,8 +286,10 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 		if err != nil {
 			return err
 		}
+
 		term.MustWrite(d.Term().WriteString(render))
 	}
+
 	return nil
 }
 
@@ -319,6 +310,7 @@ func (s *Setup) createTLSCertificate(d businessDependencies, caFile *os.File, ca
 			"-client"),
 		s.ConsulHome,
 	)
+
 	if err != nil {
 		return exec.ErrorFromStderr(err, "unable to generate correct CA certificate")
 	}
@@ -332,36 +324,46 @@ func (s *Setup) createTLSCertificate(d businessDependencies, caFile *os.File, ca
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
+//nolint:misspell
 func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 	networks, err := command.NonLoopbackInterfaces(d)
 	if err != nil {
 		return nil, err
 	}
+
 	if err := command.CheckValidBindingAddress(d, networks, s.BindAddress); err != nil {
 		return nil, err
 	}
+
 	zimbraLocalConfig, err := carbonio.LoadLocalConfig(s.LocalConfigPath)
 	if err != nil {
 		return nil, err
 	}
+
 	ldapHandler := d.LdapHandler(zimbraLocalConfig)
+
 	zimbraHostname, err := command.RetrieveZimbraHostname(zimbraLocalConfig, ldapHandler)
 	if err != nil {
 		return nil, err
 	}
+
 	if err := command.DownloadCredentialsFromLDAP(ldapHandler, s.ClusterCredential); err != nil {
 		return nil, errors.WithMessage(err, "unable to download credentials from LDAP")
 	}
+
 	clusterCredentialFile, err := command.OpenClusterCredential(s.ClusterCredential)
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("unable to open %s: %s", s.ClusterCredential, err))
 	}
+
 	defer func(clusterCredentialFile *os.File) {
 		_ = clusterCredentialFile.Close()
 	}(clusterCredentialFile)
+
 	credReader, err := credentialsEncrypter.NewReader(clusterCredentialFile, []byte(s.Password))
 	if err != nil {
 		return nil, errors.WithMessagef(err, "unable to read %s", clusterCredentialFile.Name())
@@ -372,18 +374,23 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	caKeyPath, err := filepath.Rel("/", filepath.Join(s.ConsulHome, command.ConsulCAKey))
 	if err != nil {
 		return nil, err
 	}
-	extractedFiles, err := credentialsEncrypter.ReadFiles(credReader, caPath, caKeyPath, command.GossipKey, command.ConsulAclBootstrap)
+
+	extractedFiles, err := credentialsEncrypter.ReadFiles(credReader,
+		caPath, caKeyPath, command.GossipKey, command.ConsulAclBootstrap)
 	if err != nil {
 		return nil, err
 	}
+
 	caFile, err := os.Create(s.ConsulHome + "/" + command.ConsulCA)
 	if err != nil {
 		return nil, err
 	}
+
 	if err := os.WriteFile(caFile.Name(), extractedFiles[caPath], os.FileMode(0600)); err != nil {
 		return nil, err
 	}
@@ -397,7 +404,9 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	defer os.Remove(caKeyFile.Name())
+
 	if err := os.WriteFile(caKeyFile.Name(), extractedFiles[caKeyPath], os.FileMode(0600)); err != nil {
 		return nil, err
 	}
@@ -488,6 +497,7 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 	if err != nil {
 		return nil, errors.WithMessage(err, "unable to create ACL policy for this agent")
 	}
+
 	err = command.SetACLToken(d.CreateCommand, token, aclBootstrapToken.SecretID)
 	if err != nil {
 		return nil, err

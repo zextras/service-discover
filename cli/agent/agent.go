@@ -1,35 +1,22 @@
-/*
- * Copyright (C) 2023 Zextras srl
- *
- *     This program is free software: you can redistribute it and/or modify
- *     it under the terms of the GNU Affero General Public License as published by
- *     the Free Software Foundation, either version 3 of the License, or
- *     (at your option) any later version.
- *
- *     This program is distributed in the hope that it will be useful,
- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *     GNU Affero General Public License for more details.
- *
- *     You should have received a copy of the GNU Affero General Public License
- *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
- *
- */
+// SPDX-FileCopyrightText: 2022-2024 Zextras <https://www.zextras.com>
+//
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package main represents the main entrypoint of the whole agent CLI application
 package main
 
 import (
+	"os"
+
 	internalCommand "github.com/Zextras/service-discover/cli/agent/command"
 	"github.com/Zextras/service-discover/cli/agent/command/setup"
 	"github.com/Zextras/service-discover/cli/agent/config"
 	"github.com/Zextras/service-discover/cli/lib/command"
 	"github.com/Zextras/service-discover/cli/lib/parser"
 	"github.com/alecthomas/kong"
-	"os"
 )
 
-// The CLI represents the actual cli representation
+// The CLI represents the actual cli representation.
 type CLI struct {
 	internalCommand.AgentFlags
 
@@ -70,9 +57,11 @@ func main() {
 		kong.Description(config.ApplicationDescription),
 		kong.UsageOnError(),
 	)
+
 	err := ctx.Validate()
 	if err != nil {
 		panic(err)
 	}
+
 	ctx.FatalIfErrorf(ctx.Run(&cli.GlobalCommonFlags))
 }

@@ -1,20 +1,6 @@
-/*
- * Copyright (C) 2023 Zextras srl
- *
- *     This program is free software: you can redistribute it and/or modify
- *     it under the terms of the GNU Affero General Public License as published by
- *     the Free Software Foundation, either version 3 of the License, or
- *     (at your option) any later version.
- *
- *     This program is distributed in the hope that it will be useful,
- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *     GNU Affero General Public License for more details.
- *
- *     You should have received a copy of the GNU Affero General Public License
- *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
- *
- */
+// SPDX-FileCopyrightText: 2022-2024 Zextras <https://www.zextras.com>
+//
+// SPDX-License-Identifier: AGPL-3.0-only
 
 package setup
 
@@ -22,6 +8,11 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"net"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/Zextras/service-discover/cli/lib/carbonio"
 	"github.com/Zextras/service-discover/cli/lib/command"
 	"github.com/Zextras/service-discover/cli/lib/exec"
@@ -30,10 +21,6 @@ import (
 	"github.com/Zextras/service-discover/cli/lib/term"
 	"github.com/Zextras/service-discover/cli/server/config"
 	"github.com/pkg/errors"
-	"net"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 const (
@@ -62,7 +49,7 @@ func NewSetup() Setup {
 	}
 }
 
-// Setup command allows the final user to perform first time or add a server to an already existing cluster
+// Setup command allows the final user to perform first time or add a server to an already existing cluster.
 type Setup struct {
 	ConsulConfigDir   string `kong:"-"`
 	ConsulHome        string `kong:"-"`
@@ -121,7 +108,7 @@ type setupConfig struct {
 	Connect                 connectConfig `json:"connect"`
 }
 
-// nonInteractiveOutput is only an internal struct to output the result to the final user in an appropriate way
+// nonInteractiveOutput is only an internal struct to output the result to the final user in an appropriate way.
 type nonInteractiveOutput struct {
 	EncFilepath string `json:"cluster_credentials"`
 	Password    string `json:"credentials_password,omitempty"`
@@ -142,9 +129,12 @@ func gatherInputs(d interactiveDependencies, firstInstance bool) (*setupConfigur
 	}
 
 	var password string
+
 	if firstInstance {
-		firstPassword := term.MustRead(d.Term().ReadPassword("Create the cluster credentials password (will be used for setups): "))
+		firstPassword :=
+			term.MustRead(d.Term().ReadPassword("Create the cluster credentials password (will be used for setups): "))
 		password = term.MustRead(d.Term().ReadPassword("Type the credential password again: "))
+
 		if password != firstPassword {
 			return nil, errors.New("passwords do not match")
 		}
@@ -164,6 +154,7 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 	if err != nil {
 		return err
 	}
+
 	defer ui.Close()
 	d := realDependencies{
 		ui: &ui,
@@ -192,6 +183,7 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 	} else {
 		out, err = s.importSetup(d)
 	}
+
 	if err != nil {
 		return err
 	}
@@ -200,7 +192,9 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 	if err != nil {
 		return err
 	}
+
 	fmt.Fprint(d.Writer(), render)
+
 	return nil
 }
 
@@ -211,11 +205,14 @@ func (s *Setup) isFirstInstance(d businessDependencies) (bool, error) {
 		if err != nil {
 			return false, err
 		}
+
 		ldapHandler := d.LdapHandler(zimbraLocalConfig)
 		servers, err := ldapHandler.QueryAllServersWithService(carbonio.ServiceDiscoverServiceName)
+
 		if err != nil {
 			return false, err
 		}
+
 		return len(servers) == 0, nil
 	} else {
 		return false, nil
@@ -226,6 +223,7 @@ func preRun(d businessDependencies) error {
 	// We need to check that the executable is in $PATH
 	cmd := d.CreateCommand(consulBin, "version")
 	err := cmd.Run()
+
 	if err != nil {
 		return errors.New(fmt.Sprintf("unable to execute consul binary: %s", err))
 	}
@@ -244,21 +242,25 @@ func preRun(d businessDependencies) error {
 
 func addrsToSingleString(addrs *[]net.Addr, sep string) string {
 	strAddrs := make([]string, len(*addrs))
+
 	for i, a := range *addrs {
 		if a.String() != "" {
 			strAddrs[i] = a.String()
 		}
 	}
+
 	return strings.Join(strAddrs, sep)
 }
 
-// generateGossipKey is directly taken from the way Consul generates it
+// generateGossipKey is directly taken from the way Consul generates it.
 func generateGossipKey() (string, error) {
 	key := make([]byte, 32)
 	n, err := rand.Reader.Read(key)
+
 	if err != nil {
 		return "", errors.New(fmt.Sprintf("error reading random data: %s", err))
 	}
+
 	if n != 32 {
 		return "", errors.New("couldn't read enough entropy. Generate more entropy!")
 	}
@@ -287,16 +289,20 @@ func wizardBindAddressSelection(d interactiveDependencies) (string, error) {
 
 	term.MustWrite(fmt.Fprintf(d.Term(), "Specify the binding address for service discovery: "))
 	bindingAddress := term.MustRead(d.Term().ReadLine())
+
 	err = command.CheckValidBindingAddress(d, networks, bindingAddress)
 	if err != nil {
 		return "", err
 	}
+
 	return bindingAddress, nil
 }
 
-// generateCertificateAndConfig creates the TLS certificates for consul and finally it generates the gossip key. This ensure secure
-// communications inside Consul
-func (s *Setup) generateCertificateAndConfig(d businessDependencies, zimbraHostname string, gossipKey string) (*setupConfig, error) {
+// generateCertificateAndConfig creates the TLS certificates for consul and
+// finally it generates the gossip key. This ensure secure communications
+// inside Consul.
+func (s *Setup) generateCertificateAndConfig(d businessDependencies,
+	zimbraHostname string, gossipKey string) (*setupConfig, error) {
 	certificateDaysFlag := fmt.Sprintf("-days=%d", certificateExpiration)
 	err := exec.InPath(
 		d.CreateCommand(consulBin,
@@ -307,6 +313,7 @@ func (s *Setup) generateCertificateAndConfig(d businessDependencies, zimbraHostn
 			"-server"),
 		s.ConsulHome,
 	)
+
 	if err != nil {
 		return nil, errors.New("unable to create a valid certificate with Consul")
 	}
@@ -345,5 +352,6 @@ func (s *Setup) generateCertificateAndConfig(d businessDependencies, zimbraHostn
 		Ports:                   portsConfig{Grpc: 8502},
 		Connect:                 connectConfig{Enabled: true},
 	}
+
 	return consulConfigFile, nil
 }
