@@ -83,7 +83,7 @@ func TestBootstrapToken_ReadToken(t *testing.T) {
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
-			name: "Bootstrap Token with --Password should return token",
+			name: "Bootstrap Token with --password should return token",
 			setup: BootstrapToken{
 				Command:                       *cmd,
 				writer:                        os.Stdout,
@@ -131,7 +131,7 @@ func TestBootstrapToken_ReadToken(t *testing.T) {
 		},
 		// Failures
 		{
-			name: "Bootstrap Token with --Password and default credentials should fail if not found",
+			name: "Bootstrap Token with --password and default credentials should fail if not found",
 			setup: BootstrapToken{
 				Command:                       *cmd,
 				writer:                        os.Stdout,
@@ -145,7 +145,7 @@ func TestBootstrapToken_ReadToken(t *testing.T) {
 			},
 		},
 		{
-			name: "Bootstrap Token with wrong --Password should fail",
+			name: "Bootstrap Token with wrong --password should fail",
 			setup: BootstrapToken{
 				Command:                       *cmd,
 				writer:                        os.Stdout,
