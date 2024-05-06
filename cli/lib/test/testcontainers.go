@@ -40,7 +40,7 @@ func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testconta
 	for _, nNet := range nets {
 		t.Log(nNet)
 	}
-	ulimits := []*units.Ulimit{{Name: "nofile", Soft: 1024, Hard: 1024}}
+	ulimits := []*units.Ulimit{{Name: "nofile", Soft: 32678, Hard: 32678}}
 	req := testcontainers.ContainerRequest{
 		Image:        fmt.Sprintf(address, version),
 		ExposedPorts: []string{"389/tcp"},
