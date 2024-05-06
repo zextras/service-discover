@@ -53,6 +53,7 @@ func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testconta
 			config.Ulimits = ulimits
 		},
 		Networks: nets,
+		ShmSize:  8 * 1024 * 1024 * 1024,
 	}
 
 	ldapC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
