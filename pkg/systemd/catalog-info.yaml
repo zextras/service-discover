@@ -1,0 +1,24 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: service-discover-systemd-lib
+  title: Service Discover System Daemon Library
+  description: |
+    A library which allows communication between multiple processes running concurrently on
+    the same machine. Basically to establish connection to systemd via D-Bus.
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+  tags:
+    - service-discover
+    - cli
+    - lib
+    - library
+    - systemd
+    - D-Bus
+    - consul
+    - go
+    - backend
+spec:
+  type: library
+  lifecycle: production
+  owner: keyboard-crackers

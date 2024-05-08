@@ -3,9 +3,10 @@
 # Learn more about .gitignore:
 #     https://www.atlassian.com/git/tutorials/saving-changes/gitignore
 
-/cli/agent/agent
-/cli/server/server
-/service-discoverd/service-discoverd
+/agent
+/server
+/service-discoverd
+/tests.xml
 
 # Node artifact files
 node_modules/
