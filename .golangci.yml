@@ -8,10 +8,12 @@ linters:
     - deadcode
     - execinquery
     - exhaustivestruct
+    - godox
     - golint
     - ifshort
     - interfacer
     - maligned
+    - mnd
     - nosnakecase
     - scopelint
     - structcheck

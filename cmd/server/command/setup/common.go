@@ -150,17 +150,17 @@ func gatherInputs(d interactiveDependencies, firstInstance bool) (*setupConfigur
 
 // Run method runs the Setup command with the flags and settings passed by Kong.
 func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
-	ui, err := term.New(os.Stdin, os.Stdout, term.DefaultTermPrompt)
+	userInterface, err := term.New(os.Stdin, os.Stdout, term.DefaultTermPrompt)
 	if err != nil {
 		return err
 	}
 
-	defer ui.Close()
-	d := realDependencies{
-		ui: &ui,
+	defer userInterface.Close()
+	dependency := realDependencies{
+		ui: &userInterface,
 	}
 
-	err = preRun(d)
+	err = preRun(dependency)
 	if err != nil {
 		return err
 	}
@@ -171,7 +171,7 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 
 	// if manually specified do not check it
 	if !s.FirstInstance {
-		s.FirstInstance, err = s.isFirstInstance(d)
+		s.FirstInstance, err = s.isFirstInstance(dependency)
 		if err != nil {
 			return err
 		}
@@ -179,9 +179,9 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 
 	var out formatter.Formatter
 	if s.FirstInstance {
-		out, err = s.firstSetup(d)
+		out, err = s.firstSetup(dependency)
 	} else {
-		out, err = s.importSetup(d)
+		out, err = s.importSetup(dependency)
 	}
 
 	if err != nil {
@@ -193,7 +193,7 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 		return err
 	}
 
-	fmt.Fprint(d.Writer(), render)
+	fmt.Fprint(dependency.Writer(), render)
 
 	return nil
 }
@@ -234,7 +234,7 @@ func preRun(d businessDependencies) error {
 
 	_, err = os.Stat(config.ConsultFileConfig)
 	if err == nil {
-		return errors.New("setup of service-discover already performed, manually reset and try again.")
+		return errors.New("setup of service-discover already performed, manually reset and try again")
 	}
 
 	return nil
@@ -255,13 +255,13 @@ func addrsToSingleString(addrs *[]net.Addr, sep string) string {
 // generateGossipKey is directly taken from the way Consul generates it.
 func generateGossipKey() (string, error) {
 	key := make([]byte, 32)
-	n, err := rand.Reader.Read(key)
+	num, err := rand.Reader.Read(key)
 
 	if err != nil {
 		return "", errors.Errorf("error reading random data: %s", err)
 	}
 
-	if n != 32 {
+	if num != 32 {
 		return "", errors.New("couldn't read enough entropy. Generate more entropy!")
 	}
 

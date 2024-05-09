@@ -79,7 +79,8 @@ type ACLTokenCreation struct {
 	SecretID    string        `json:"SecretID"`
 }
 
-// OpenClusterCredential checks that the given path, s.ClusterCredential exists and it is readable
+// OpenClusterCredential checks that the given path, s.ClusterCredential
+// exists and it is readable.
 func OpenClusterCredential(clusterCredential string) (*os.File, error) {
 	clusterCredentialFile, err := os.Open(clusterCredential) // #nosec
 	if err != nil {
@@ -126,7 +127,7 @@ func CheckValidBindingAddress(resolver NetworkInterfaces, networks []net.Interfa
 	return nil
 }
 
-// NonLoopbackInterfaces returns all the network interfaces but the loopback one
+// NonLoopbackInterfaces returns all the network interfaces but the loopback one.
 func NonLoopbackInterfaces(d NetworkInterfaces) ([]net.Interface, error) {
 	networks, err := d.NetInterfaces()
 	if err != nil {
@@ -142,7 +143,7 @@ func NonLoopbackInterfaces(d NetworkInterfaces) ([]net.Interface, error) {
 	return networks, nil
 }
 
-// UploadCredentialsToLDAP uploads the credentials tarball file into LDAP
+// UploadCredentialsToLDAP uploads the credentials tarball file into LDAP.
 func UploadCredentialsToLDAP(ldapHandler carbonio.LdapHandler, credentials string) error {
 	if err := ldapHandler.CheckServerAvailability(true); err != nil {
 		return errors.WithMessage(err, "unable to connect to ldap")
@@ -159,7 +160,7 @@ func UploadCredentialsToLDAP(ldapHandler carbonio.LdapHandler, credentials strin
 	return nil
 }
 
-// DownloadCredentialsFromLDAP downloads the credentials from ldap and puts them into the given destination
+// DownloadCredentialsFromLDAP downloads the credentials from ldap and puts them into the given destination.
 func DownloadCredentialsFromLDAP(ldapHandler carbonio.LdapHandler, destination string) error {
 	if err := ldapHandler.CheckServerAvailability(false); err != nil {
 		return errors.WithMessage(err, "unable to connect to ldap")
@@ -174,7 +175,7 @@ func DownloadCredentialsFromLDAP(ldapHandler carbonio.LdapHandler, destination s
 }
 
 // RetrieveZimbraHostname returns the zimbra.LocalConfigServerHostname value, but only after checking that the
-// LDAP server is up
+// LDAP server is up.
 func RetrieveZimbraHostname(localConfig carbonio.LocalConfig, ldapHandler carbonio.LdapHandler) (string, error) {
 	err := ldapHandler.CheckServerAvailability(true)
 	if err != nil {
@@ -191,7 +192,7 @@ func AddServiceInLDAP(ldap carbonio.LdapHandler, zimbraHostname string) error {
 	return nil
 }
 
-// SaveBindAddressConfiguration adds the bindAddress to the Consul configuration file
+// SaveBindAddressConfiguration adds the bindAddress to the Consul configuration file.
 func SaveBindAddressConfiguration(mutableConfig string, bindAddress string) error {
 	if strings.Contains(bindAddress, "/") {
 		bindAddress = strings.Split(bindAddress, "/")[0]
@@ -206,7 +207,7 @@ func SaveBindAddressConfiguration(mutableConfig string, bindAddress string) erro
 	return os.WriteFile(mutableConfig, bs, os.FileMode(0600))
 }
 
-// ConsulNodeName allows you to retrieve the Consul node name based on the hostname and its role
+// ConsulNodeName allows you to retrieve the Consul node name based on the hostname and its role.
 func ConsulNodeName(prefix ConsulRole, hostname string) string {
 	return strings.ReplaceAll(fmt.Sprintf("%s-%s", prefix, hostname), ".", "-")
 }
@@ -278,13 +279,14 @@ func CreateACLToken(
 		if err := json.Unmarshal(tokenCmdResp, &token); err != nil {
 			return "", errors.WithMessage(err, "unable to decode response from consul agent")
 		}
+
 		break
 	}
 
 	return token.SecretID, nil
 }
 
-func SetACLToken(commandCreator func(name string, args ...string) exec.Cmd, token string, rootToken string) error {
+func SetACLToken(commandCreator func(name string, args ...string) exec.Cmd, token, rootToken string) error {
 	if err := os.Setenv(ConsulHTTPToken, rootToken); err != nil {
 		return errors.WithMessage(err, "unable to set correct env variable before starting ACL token creation")
 	}

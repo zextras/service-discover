@@ -118,7 +118,7 @@ func (r realDependencies) LookupGroup(name string) (*user.Group, error) {
 	return user.LookupGroup(name)
 }
 
-func (r realDependencies) Chown(path string, userUID int, groupUID int) error {
+func (r realDependencies) Chown(path string, userUID, groupUID int) error {
 	return os.Chown(path, userUID, groupUID)
 }
 
@@ -250,21 +250,21 @@ func preRun(clusterCredentialPath string, d businessDependencies) error {
 
 	_, err = os.Stat(config.ConsultFileConfig)
 	if err == nil {
-		return errors.New("setup of service-discover already performed, manually reset and try again.")
+		return errors.New("setup of service-discover already performed, manually reset and try again")
 	}
 
 	return nil
 }
 
 func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
-	ui, err := term.New(os.Stdin, os.Stdout, term.DefaultTermPrompt)
+	userInterface, err := term.New(os.Stdin, os.Stdout, term.DefaultTermPrompt)
 	if err != nil {
 		return err
 	}
 
-	defer ui.Close()
+	defer userInterface.Close()
 	d := realDependencies{
-		ui: &ui,
+		ui: &userInterface,
 	}
 
 	err = preRun(s.ClusterCredential, &d)

@@ -29,17 +29,17 @@ type Wizard struct {
 }
 
 func (s *Wizard) Run(commonFlags *command.GlobalCommonFlags) error {
-	ui, err := term.New(os.Stdin, os.Stdout, term.DefaultTermPrompt)
+	userInterface, err := term.New(os.Stdin, os.Stdout, term.DefaultTermPrompt)
 	if err != nil {
 		return err
 	}
 
-	defer ui.Close()
-	d := realDependencies{
-		ui: &ui,
+	defer userInterface.Close()
+	dependency := realDependencies{
+		ui: &userInterface,
 	}
 
-	err = preRun(s.originalSetup.ClusterCredential, &d)
+	err = preRun(s.originalSetup.ClusterCredential, &dependency)
 	if err != nil {
 		return err
 	}
@@ -48,7 +48,7 @@ func (s *Wizard) Run(commonFlags *command.GlobalCommonFlags) error {
 		return errors.New("only plain formatting is supported when in wizard mode")
 	}
 
-	inputs, err := gatherInputs(d)
+	inputs, err := gatherInputs(dependency)
 	if err != nil {
 		return err
 	}
@@ -60,7 +60,7 @@ func (s *Wizard) Run(commonFlags *command.GlobalCommonFlags) error {
 	s.originalSetup.Password = s.Password
 	s.originalSetup.BindAddress = s.BindAddress
 
-	_, err = s.originalSetup.setup(&d)
+	_, err = s.originalSetup.setup(&dependency)
 	if err != nil {
 		return err
 	}

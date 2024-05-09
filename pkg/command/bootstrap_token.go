@@ -74,20 +74,20 @@ func (v *BootstrapToken) ReadToken() (string, error) {
 	if v.Password == "" {
 		var err error
 
-		ui, err := v.termUIProvider.Get(wrapper)
+		userInterface, err := v.termUIProvider.Get(wrapper)
 		if err != nil {
 			return "", err
 		}
 
 		defer func(ui term.Terminal) {
 			_ = ui.Close()
-		}(ui)
+		}(userInterface)
 
-		password, err = ui.ReadPassword(prompt)
+		password, err = userInterface.ReadPassword(prompt)
 		if err != nil {
 			switch err.(type) {
 			case term.NotATerminalError:
-				password = term.MustRead(ui.ReadLine())
+				password = term.MustRead(userInterface.ReadLine())
 			default:
 				return "", err
 			}

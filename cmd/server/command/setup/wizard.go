@@ -32,14 +32,14 @@ type Wizard struct {
 }
 
 func (s *Wizard) Run(commonFlags *command.GlobalCommonFlags) error {
-	ui, err := term.New(os.Stdin, os.Stdout, term.DefaultTermPrompt)
+	userInterface, err := term.New(os.Stdin, os.Stdout, term.DefaultTermPrompt)
 	if err != nil {
 		return err
 	}
 
-	defer ui.Close()
+	defer userInterface.Close()
 	d := realDependencies{
-		ui: &ui,
+		ui: &userInterface,
 	}
 
 	err = preRun(d)
@@ -60,9 +60,9 @@ func (s *Wizard) Run(commonFlags *command.GlobalCommonFlags) error {
 	}
 
 	if s.FirstInstance {
-		term.MustWrite(ui.WriteString("Setup of first service-discover server instance\r\n"))
+		term.MustWrite(userInterface.WriteString("Setup of first service-discover server instance\r\n"))
 	} else {
-		term.MustWrite(ui.WriteString("Setup of secondary service-discover server instance\r\n"))
+		term.MustWrite(userInterface.WriteString("Setup of secondary service-discover server instance\r\n"))
 	}
 
 	inputs, err := gatherInputs(d, s.FirstInstance)

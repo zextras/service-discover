@@ -108,7 +108,7 @@ func (l *ldapContext) DownloadBinary(dn string, attribute string) ([]byte, error
 	return base64.StdEncoding.DecodeString(encodedContent)
 }
 
-// CreateNewHandler Returns a new context to execute ldap queries
+// CreateNewHandler Returns a new context to execute ldap queries.
 func CreateNewHandler(localConfig LocalConfig) LdapHandler {
 	return &ldapContext{
 		readLdapCredentials(localConfig),
@@ -134,17 +134,17 @@ func (l *ldapContext) CheckServerAvailability(write bool) error {
 	return nil
 }
 
-// AddService Adds to the provided server the service
-func (l *ldapContext) AddService(server string, service string) error {
+// AddService Adds to the provided server the service.
+func (l *ldapContext) AddService(server, service string) error {
 	return modifyEnabledServices(l, server, service, changeAdd)
 }
 
-// RemoveService Removes from the provided server the service
-func (l *ldapContext) RemoveService(server string, service string) error {
+// RemoveService Removes from the provided server the service.
+func (l *ldapContext) RemoveService(server, service string) error {
 	return modifyEnabledServices(l, server, service, changeRemove)
 }
 
-// QueryAllServersWithService Returns an array of all servers with the provided service
+// QueryAllServersWithService Returns an array of all servers with the provided service.
 func (l *ldapContext) QueryAllServersWithService(service string) ([]string, error) {
 	connection, err := connect(l, false)
 	if err != nil {
@@ -208,9 +208,9 @@ func connect(context *ldapContext, writeAccess bool) (ldapConnInterface, error) 
 	if connection == nil {
 		if lastErr == nil {
 			return nil, errors.New("no ldap defined in localconfig")
-		} else {
-			return nil, lastErr
 		}
+
+		return nil, lastErr
 	}
 
 	err = connection.Bind(context.Credentials.Username, context.Credentials.Password)

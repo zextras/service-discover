@@ -44,7 +44,7 @@ func (e *Writer) Close() error {
 	return nil
 }
 
-// Flush method allows to flush the underlying tarball reader into the destination
+// Flush method allows to flush the underlying tarball reader into the destination.
 func (e *Writer) Flush() error {
 	return e.tarballWriter.Flush()
 }
@@ -82,6 +82,7 @@ func (e *Writer) AddFile(reader io.Reader, stat os.FileInfo, customFilename stri
 	if _, err := io.Copy(e.tarballWriter, reader); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -104,6 +105,7 @@ func NewWriter(writer io.Writer, passphrase []byte) (*Writer, error) {
 	}
 
 	tarWriter := tar.NewWriter(openGpgWriter)
+
 	return &Writer{
 		armorWriter:   armorWriter,
 		openPgpWriter: openGpgWriter,

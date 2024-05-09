@@ -27,16 +27,18 @@ func NewReader(reader io.Reader, passphrase []byte) (*tar.Reader, error) {
 	passGenerator := func(keys []openpgp.Key, symmetric bool) ([]byte, error) {
 		if firstTime == true {
 			firstTime = false
+
 			return passphrase, nil
-		} else {
-			return nil, pgpErrors.ErrKeyIncorrect
 		}
+
+		return nil, pgpErrors.ErrKeyIncorrect
 	}
 
 	message, err := openpgp.ReadMessage(decoder.Body, nil, passGenerator, nil)
 	if err != nil {
 		return nil, err
 	}
+
 	return tar.NewReader(message.UnverifiedBody), nil
 }
 
@@ -94,7 +96,9 @@ func ReadFiles(tarReader *tar.Reader, files ...string) (map[string][]byte, error
 		for _, f := range remainingFiles {
 			missingFiles += " " + f
 		}
+
 		return nil, errors.Errorf("not all files where found in the archive:%s", missingFiles)
 	}
+
 	return result, nil
 }

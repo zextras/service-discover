@@ -180,7 +180,7 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 		return nil, err
 	}
 
-	if err = os.WriteFile(s.ConsulHome+"/password", []byte(s.Password), 0400); err != nil {
+	if err := os.WriteFile(s.ConsulHome+"/password", []byte(s.Password), 0400); err != nil {
 		return nil, err
 	}
 

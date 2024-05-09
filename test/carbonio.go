@@ -62,7 +62,7 @@ func GenerateLocalConfig(
 	res := bytes.Buffer{}
 	ldapData := &localConfigFields{
 		Hostname:      hostname,
-		LdapMasterURL: ldapMasterUrl,
+		LdapMasterURL: ldapMasterURL,
 		LdapURL:       ldapURL,
 		LdapUserDN:    ldapUserDN,
 		LdapPassword:  ldapPassword,

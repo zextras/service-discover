@@ -33,7 +33,8 @@ type Terminal interface {
 	ReadLine() (string, error)
 }
 
-// terminal is an internal structure representing a terminal with takes inputs from os.Stdin
+// terminal is an internal structure representing a terminal with takes
+// inputs from os.Stdin.
 type terminal struct {
 	term         *term.Terminal
 	oldStateTerm *term.State
@@ -41,15 +42,16 @@ type terminal struct {
 }
 
 // MustRead simply checks that no error is present after the read. If it is, the function panics. Note that this
-// function fails even if EOF is reached (e.g. an user pressed Ctrl+C while the program was waiting for an input)
+// function fails even if EOF is reached (e.g. an user pressed Ctrl+C while the program was waiting for an input).
 func MustRead(out string, err error) string {
 	if err != nil {
 		panic(err)
 	}
+
 	return out
 }
 
-// MustWrite simply checks that no error is present after the write. If it is, the function panics
+// MustWrite simply checks that no error is present after the write. If it is, the function panics.
 func MustWrite(bs int, err error) int {
 	if err != nil {
 		panic(err)
@@ -57,27 +59,28 @@ func MustWrite(bs int, err error) int {
 	return bs
 }
 
-// Write writes down the array of bytes in the user terminal
-func (t *terminal) Write(p []byte) (n int, err error) {
+// Write writes down the array of bytes in the user terminal.
+func (t *terminal) Write(p []byte) (int, error) {
 	return t.term.Write(p)
 }
 
-// WriteString writes down the given string in the user terminal
-func (t *terminal) WriteString(s string) (n int, err error) {
+// WriteString writes down the given string in the user terminal.
+func (t *terminal) WriteString(s string) (int, error) {
 	return fmt.Fprint(t.term, s)
 }
 
-// ReadPassword allows the user to enter a secret string without displaying it in the terminal (e.g. like `sudo` does)
+// ReadPassword allows the user to enter a secret string without displaying
+// it in the terminal (e.g. like `sudo` does).
 func (t *terminal) ReadPassword(prompt string) (string, error) {
 	return t.term.ReadPassword(prompt)
 }
 
-// ReadLine reads the current line until a line break is found
+// ReadLine reads the current line until a line break is found.
 func (t *terminal) ReadLine() (string, error) {
 	return t.term.ReadLine()
 }
 
-// Close restores the file descriptor provided initially to its initial status
+// Close restores the file descriptor provided initially to its initial status.
 func (t *terminal) Close() error {
 	return term.Restore(t.stdIn, t.oldStateTerm)
 }

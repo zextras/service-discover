@@ -19,8 +19,8 @@ type PermissionInterface interface {
 	Chmod(path string, mode os.FileMode) error
 }
 
-// SetStrictPermissions change permissions to 600 and change ownership, only of the specific
-// path, to 'service-discover' user and group
+// SetStrictPermissions change permissions to 600 and change ownership,
+// only of the specific path, to 'service-discover' user and group.
 func SetStrictPermissions(d PermissionInterface, path string) error {
 	serviceDiscoverUser, err := d.LookupUser("service-discover")
 	if err != nil {
