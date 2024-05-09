@@ -11,6 +11,7 @@ import (
 	"text/template"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const localConfigTemplate = `<?xml version="1.0" encoding="UTF-8"?>
@@ -68,7 +69,7 @@ func GenerateLocalConfig(
 		LdapPassword:  ldapPassword,
 	}
 	localConfigTemplate := template.Must(template.New("localconfig").Parse(localConfigTemplate))
-	assert.NoError(t, localConfigTemplate.Execute(&res, ldapData))
+	require.NoError(t, localConfigTemplate.Execute(&res, ldapData))
 	data, err := io.ReadAll(&res)
 	assert.NoError(t, err)
 

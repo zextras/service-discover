@@ -18,7 +18,7 @@ type Command struct {
 	applicationVersion string `kong:"-"`
 }
 
-func NewCommand(applicationName string, applicationVersion string) *Command {
+func NewCommand(applicationName, applicationVersion string) *Command {
 	return &Command{
 		applicationName:    applicationName,
 		applicationVersion: applicationVersion,

@@ -24,13 +24,13 @@ import (
 // The output returned is always empty
 //
 //nolint:misspell
-func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error) {
-	networks, err := command.NonLoopbackInterfaces(d)
+func (s *Setup) importSetup(deps businessDependencies) (formatter.Formatter, error) {
+	networks, err := command.NonLoopbackInterfaces(deps)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := command.CheckValidBindingAddress(d, networks, s.BindAddress); err != nil {
+	if err := command.CheckValidBindingAddress(deps, networks, s.BindAddress); err != nil {
 		return nil, err
 	}
 
@@ -39,14 +39,14 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 		return nil, err
 	}
 
-	ldapHandler := d.LdapHandler(zimbraLocalConfig)
+	ldapHandler := deps.LdapHandler(zimbraLocalConfig)
 
 	zimbraHostname, err := command.RetrieveZimbraHostname(zimbraLocalConfig, ldapHandler)
 	if err != nil {
 		return nil, err
 	}
 
-	err = command.CheckHostnameAddress(d, zimbraHostname)
+	err = command.CheckHostnameAddress(deps, zimbraHostname)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 		return nil, err
 	}
 
-	err = permissions.SetStrictPermissions(d, "/"+localCaFullPath)
+	err = permissions.SetStrictPermissions(deps, "/"+localCaFullPath)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +113,7 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 
 	gossipKey := string(extractedFiles[command.GossipKey])
 
-	consulConfigFile, err := s.generateCertificateAndConfig(d, zimbraHostname, gossipKey)
+	consulConfigFile, err := s.generateCertificateAndConfig(deps, zimbraHostname, gossipKey)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +127,7 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 		return nil, errors.Errorf("unable to save generated configuration file in %s: %s", s.ConsulHome, err)
 	}
 
-	err = permissions.SetStrictPermissions(d, s.ConsulFileConfig)
+	err = permissions.SetStrictPermissions(deps, s.ConsulFileConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +136,7 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 		return nil, err
 	}
 
-	err = permissions.SetStrictPermissions(d, s.MutableConfigFile)
+	err = permissions.SetStrictPermissions(deps, s.MutableConfigFile)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +155,7 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 			return nil, errors.WithMessage(err, "unable to start service-discoverd server")
 		}
 	} else {
-		if err := systemd.StartSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit); err != nil {
+		if err := systemd.StartSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit); err != nil {
 			return nil, errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
 		}
 	}
@@ -166,7 +166,7 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 	}
 
 	token, err := command.CreateACLToken(
-		d.CreateCommand,
+		deps.CreateCommand,
 		command.Server,
 		zimbraHostname,
 		aclBootstrapToken.SecretID,
@@ -175,7 +175,7 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 		return nil, errors.WithMessage(err, "unable to create ACL policy for this server")
 	}
 
-	err = command.SetACLToken(d.CreateCommand, token, aclBootstrapToken.SecretID)
+	err = command.SetACLToken(deps.CreateCommand, token, aclBootstrapToken.SecretID)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +185,7 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 	}
 
 	if !isContainer {
-		err = systemd.EnableSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit)
+		err = systemd.EnableSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
 		if err != nil {
 			return nil, errors.Errorf("unable to enable %s unit: %s", serviceDiscoverUnit, err)
 		}

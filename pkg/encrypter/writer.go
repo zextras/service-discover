@@ -24,7 +24,7 @@ type Writer struct {
 	tarballWriter *tar.Writer
 }
 
-func (e *Writer) Write(p []byte) (n int, err error) {
+func (e *Writer) Write(p []byte) (int, error) {
 	return e.tarballWriter.Write(p)
 }
 
@@ -54,7 +54,7 @@ func (e *Writer) Flush() error {
 // existing will result in an undefined behaviour. The path can be absolute, and in this case it will refer to the root
 // of the tarball. Please note that all the resulting paths in the archive will be relative though, in order to avoid
 // problems with extraction programs (e.g. Ark), so writing "/" and "" as third parameter will have the same result.
-func (e *Writer) AddFile(reader io.Reader, stat os.FileInfo, customFilename string, directoryOnArchive string) error {
+func (e *Writer) AddFile(reader io.Reader, stat os.FileInfo, customFilename, directoryOnArchive string) error {
 	filename := customFilename
 	if filename == "" {
 		filename = stat.Name()

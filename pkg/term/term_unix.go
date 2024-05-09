@@ -56,6 +56,7 @@ func MustWrite(bs int, err error) int {
 	if err != nil {
 		panic(err)
 	}
+
 	return bs
 }
 

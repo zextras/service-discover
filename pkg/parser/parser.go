@@ -40,6 +40,7 @@ func (format) Decode(ctx *kong.DecodeContext, target reflect.Value) error {
 			return errors.Errorf("expected string but got %q (%T)", token.Value, token.Value)
 		}
 	}
+
 	return nil
 }
 
@@ -47,5 +48,6 @@ func (format) Decode(ctx *kong.DecodeContext, target reflect.Value) error {
 // function and will return its result.
 func Parse(cli any, options ...kong.Option) *kong.Context {
 	formatModule := kong.NamedMapper(formatType, &format{})
+
 	return kong.Parse(cli, append(options, formatModule)...)
 }

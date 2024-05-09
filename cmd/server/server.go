@@ -20,13 +20,13 @@ import (
 type CLI struct {
 	internalCommand.ServerFlags
 
-	Setup          setup.Setup            `cmd help:"Perform first time setup of the server installation"`
-	WizardSetup    setup.Wizard           `cmd help:"Perform first time setup of the server installation in an interactive way" name:"setup-wizard"`
-	Config         command.Config         `cmd help:"Manage service-discover configuration"`
-	BootstrapToken command.BootstrapToken `cmd help:"Print the bootstrap-token" name:"bootstrap-token"`
+	Setup          setup.Setup            `cmd:"" help:"Perform first time setup of the server installation"`
+	WizardSetup    setup.Wizard           `cmd:"" help:"Perform first time setup of the server installation in an interactive way" name:"setup-wizard"`
+	Config         command.Config         `cmd:"" help:"Manage service-discover configuration"`
+	BootstrapToken command.BootstrapToken `cmd:"" help:"Print the bootstrap-token" name:"bootstrap-token"`
 
-	Version command.Version `cmd help:"Show the version of this CLI and of the agent running in the host"`
-	Help    command.Help    `cmd help:"Print the program help"`
+	Version command.Version `cmd:"" help:"Show the version of this CLI and of the agent running in the host"`
+	Help    command.Help    `cmd:"" help:"Print the program help"`
 }
 
 func main() {

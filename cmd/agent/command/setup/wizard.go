@@ -25,7 +25,7 @@ type Wizard struct {
 	originalSetup *Setup
 
 	Password    string `help:"Set a custom password for the encrypted secret files. If none is set, a random one will be generated and printed"`
-	BindAddress string `arg optional help:"The binding address to bind service-discoverd daemon"`
+	BindAddress string `arg:"" optional:"" help:"The binding address to bind service-discoverd daemon"`
 }
 
 func (s *Wizard) Run(commonFlags *command.GlobalCommonFlags) error {

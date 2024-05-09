@@ -24,8 +24,8 @@ func NewReader(reader io.Reader, passphrase []byte) (*tar.Reader, error) {
 	}
 
 	firstTime := true
-	passGenerator := func(keys []openpgp.Key, symmetric bool) ([]byte, error) {
-		if firstTime == true {
+	passGenerator := func(_ []openpgp.Key, _ bool) ([]byte, error) {
+		if firstTime {
 			firstTime = false
 
 			return passphrase, nil

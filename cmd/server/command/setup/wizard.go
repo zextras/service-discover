@@ -27,8 +27,8 @@ func NewWizardSetup(setup *Setup) Wizard {
 type Wizard struct {
 	originalSetup *Setup `kong:"-"`
 	Password      string `help:"Set a custom password for the encrypted secret files. If none is set, a random one will be generated and printed"`
-	BindAddress   string `arg optional help:"The binding address to bind service-discoverd daemon"`
-	FirstInstance bool   `optional default:"false" help:"Force the setup to behave as this was the first server setup"`
+	BindAddress   string `arg:"" optional:"" help:"The binding address to bind service-discoverd daemon"`
+	FirstInstance bool   `optional:"" default:"false" help:"Force the setup to behave as this was the first server setup"`
 }
 
 func (s *Wizard) Run(commonFlags *command.GlobalCommonFlags) error {
@@ -38,11 +38,11 @@ func (s *Wizard) Run(commonFlags *command.GlobalCommonFlags) error {
 	}
 
 	defer userInterface.Close()
-	d := realDependencies{
+	deps := realDependencies{
 		ui: &userInterface,
 	}
 
-	err = preRun(d)
+	err = preRun(deps)
 	if err != nil {
 		return err
 	}
@@ -51,9 +51,9 @@ func (s *Wizard) Run(commonFlags *command.GlobalCommonFlags) error {
 		return errors.New("only plain formatting is supported when in wizard mode")
 	}
 
-	//if manually specified do not check it
+	// if manually specified do not check it
 	if !s.FirstInstance {
-		s.FirstInstance, err = s.originalSetup.isFirstInstance(d)
+		s.FirstInstance, err = s.originalSetup.isFirstInstance(deps)
 		if err != nil {
 			return err
 		}
@@ -65,7 +65,7 @@ func (s *Wizard) Run(commonFlags *command.GlobalCommonFlags) error {
 		term.MustWrite(userInterface.WriteString("Setup of secondary service-discover server instance\r\n"))
 	}
 
-	inputs, err := gatherInputs(d, s.FirstInstance)
+	inputs, err := gatherInputs(deps, s.FirstInstance)
 	if err != nil {
 		return err
 	}
@@ -79,9 +79,9 @@ func (s *Wizard) Run(commonFlags *command.GlobalCommonFlags) error {
 	s.originalSetup.FirstInstance = s.FirstInstance
 
 	if s.FirstInstance {
-		_, err = s.originalSetup.firstSetup(d)
+		_, err = s.originalSetup.firstSetup(deps)
 	} else {
-		_, err = s.originalSetup.importSetup(d)
+		_, err = s.originalSetup.importSetup(deps)
 	}
 
 	if err != nil {

@@ -27,8 +27,8 @@ type BootstrapToken struct {
 	Command                       `kong:"-"`
 	writer                        io.Writer `kong:"-"`
 	agentName                     string    `kong:"-"`
-	Setup                         bool      `optional name:"setup" help:"Used in setup scripts, doesn't prompt anything and returns $SETUP_CONSUL_TOKEN if defined."`
-	Password                      string    `optional name:"password" help:"feed bootstrap password"`
+	Setup                         bool      `optional:"" name:"setup" help:"Used in setup scripts, doesn't prompt anything and returns $SETUP_CONSUL_TOKEN if defined."`
+	Password                      string    `optional:"" name:"password" help:"feed bootstrap password"`
 }
 
 type outputBootstrapToken struct {
@@ -47,12 +47,13 @@ type OutputWrapper struct {
 	writer *os.File
 }
 
-func (o OutputWrapper) Write(buffer []byte) (n int, err error) {
+func (o OutputWrapper) Write(buffer []byte) (int, error) {
 	replaced := bytes.ReplaceAll(buffer, []byte("\r\n"), []byte(""))
-	n, err = o.writer.Write(replaced)
+	numBytes, err := o.writer.Write(replaced)
 	// report \r\n as written
-	n += len(buffer) - len(replaced)
-	return
+	numBytes += len(buffer) - len(replaced)
+
+	return numBytes, err
 }
 
 func (v *BootstrapToken) ReadToken() (string, error) {
@@ -125,7 +126,7 @@ func (v *BootstrapToken) ReadToken() (string, error) {
 
 func (v *BootstrapToken) Run(globalFlags *GlobalCommonFlags) error {
 	token, present := os.LookupEnv(SetupConsulToken)
-	if !v.Setup || !present || len(token) == 0 {
+	if !v.Setup || !present || token == "" {
 		var err error
 
 		token, err = v.ReadToken()

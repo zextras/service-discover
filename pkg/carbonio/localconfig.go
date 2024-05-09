@@ -50,6 +50,7 @@ func loadLocalConfig(path string) (*rawLocalConfig, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return carbonioLocalConfig, nil
 }
 
@@ -114,6 +115,7 @@ func (l *indexedLocalConfig) Values(key string) []string {
 		strings.Trim(l.localConfigIndex[key].Value, " "),
 		" ",
 	)
+
 	return values
 }
 

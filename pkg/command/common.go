@@ -89,10 +89,11 @@ func OpenClusterCredential(clusterCredential string) (*os.File, error) {
 				"cannot find Cluster credential in %s, please copy the file from the existing server or upload it to LDAP",
 				clusterCredential,
 			)
-		} else {
-			return nil, errors.WithMessage(err, "unable to open cluster credential file. Is it corrupted?")
 		}
+
+		return nil, errors.WithMessage(err, "unable to open cluster credential file. Is it corrupted?")
 	}
+
 	return clusterCredentialFile, nil
 }
 
@@ -135,11 +136,12 @@ func NonLoopbackInterfaces(d NetworkInterfaces) ([]net.Interface, error) {
 	}
 
 	for i, n := range networks {
-		if strings.ToLower(n.Name) == "lo" {
+		if strings.EqualFold(n.Name, "lo") {
 			networks[i] = networks[len(networks)-1]
 			networks = networks[:len(networks)-1]
 		}
 	}
+
 	return networks, nil
 }
 
@@ -157,6 +159,7 @@ func UploadCredentialsToLDAP(ldapHandler carbonio.LdapHandler, credentials strin
 	if err := ldapHandler.UploadBinary(file, carbonio.LdapConfigBaseDn, carbonio.AttrCarbonioCredentials); err != nil {
 		return errors.WithMessage(err, "unable to upload data to ldap")
 	}
+
 	return nil
 }
 
@@ -181,6 +184,7 @@ func RetrieveZimbraHostname(localConfig carbonio.LocalConfig, ldapHandler carbon
 	if err != nil {
 		return "", errors.WithMessage(err, "unable to connect to ldap")
 	}
+
 	return localConfig.Value(carbonio.LocalConfigServerHostname), nil
 }
 
@@ -189,11 +193,12 @@ func AddServiceInLDAP(ldap carbonio.LdapHandler, zimbraHostname string) error {
 	if err != nil {
 		return errors.New("cannot add service in ldap: " + err.Error())
 	}
+
 	return nil
 }
 
 // SaveBindAddressConfiguration adds the bindAddress to the Consul configuration file.
-func SaveBindAddressConfiguration(mutableConfig string, bindAddress string) error {
+func SaveBindAddressConfiguration(mutableConfig, bindAddress string) error {
 	if strings.Contains(bindAddress, "/") {
 		bindAddress = strings.Split(bindAddress, "/")[0]
 	}
@@ -204,6 +209,7 @@ func SaveBindAddressConfiguration(mutableConfig string, bindAddress string) erro
 	if err != nil {
 		return err
 	}
+
 	return os.WriteFile(mutableConfig, bs, os.FileMode(0600))
 }
 
@@ -325,7 +331,7 @@ func CheckHostnameAddress(d NetworkInterfaces, hostname string) error {
 }
 
 func CheckDockerContainer() bool {
-	_, error := os.Stat(DockerMarker)
+	_, err := os.Stat(DockerMarker)
 
-	return !errors.Is(error, os.ErrNotExist)
+	return !errors.Is(err, os.ErrNotExist)
 }

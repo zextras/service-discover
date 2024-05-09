@@ -29,7 +29,7 @@ type businessDependencies interface {
 	NetInterfaces() ([]net.Interface, error)
 	AddrResolver(n net.Interface) ([]net.Addr, error)
 	LookupIP(s string) ([]net.IP, error)
-	LdapHandler(carbonio.LocalConfig) carbonio.LdapHandler
+	LdapHandler(ldapHandler carbonio.LocalConfig) carbonio.LdapHandler
 	LocalConfigLoader(path string) (carbonio.LocalConfig, error)
 	SystemdUnitHandler() (systemd.UnitManager, error)
 	CreateCommand(name string, args ...string) exec.Cmd
@@ -96,7 +96,7 @@ func (r realDependencies) LookupGroup(name string) (*user.Group, error) {
 	return user.LookupGroup(name)
 }
 
-func (r realDependencies) Chown(path string, userUID int, groupUID int) error {
+func (r realDependencies) Chown(path string, userUID, groupUID int) error {
 	return os.Chown(path, userUID, groupUID)
 }
 

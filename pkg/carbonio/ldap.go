@@ -31,8 +31,8 @@ type LdapHandler interface {
 }
 
 type ldapConnInterface interface {
-	Add(*ldap.AddRequest) error
-	Del(*ldap.DelRequest) error
+	Add(request *ldap.AddRequest) error
+	Del(request *ldap.DelRequest) error
 	Bind(username, password string) error
 	Modify(modifyRequest *ldap.ModifyRequest) error
 	Search(searchRequest *ldap.SearchRequest) (*ldap.SearchResult, error)
@@ -51,7 +51,7 @@ type ldapContext struct {
 	Connect     func(url string) (ldapConnInterface, error)
 }
 
-func (l *ldapContext) UploadBinary(reader io.Reader, dn string, attribute string) error {
+func (l *ldapContext) UploadBinary(reader io.Reader, baseDN, attribute string) error {
 	connection, err := connect(l, true)
 	if err != nil {
 		return err
@@ -65,13 +65,13 @@ func (l *ldapContext) UploadBinary(reader io.Reader, dn string, attribute string
 		return err
 	}
 
-	addRequest := ldap.NewModifyRequest(dn, []ldap.Control{})
+	addRequest := ldap.NewModifyRequest(baseDN, []ldap.Control{})
 	addRequest.Replace(attribute, []string{encodedContent})
 
 	return connection.Modify(addRequest)
 }
 
-func (l *ldapContext) DownloadBinary(dn string, attribute string) ([]byte, error) {
+func (l *ldapContext) DownloadBinary(baseDN, attribute string) ([]byte, error) {
 	connection, err := connect(l, false)
 	if err != nil {
 		return nil, err
@@ -79,7 +79,7 @@ func (l *ldapContext) DownloadBinary(dn string, attribute string) ([]byte, error
 	defer connection.Close()
 
 	searchRequest := ldap.NewSearchRequest(
-		dn,
+		baseDN,
 		ldap.ScopeWholeSubtree,
 		ldap.ScopeBaseObject,
 		1,
@@ -216,6 +216,7 @@ func connect(context *ldapContext, writeAccess bool) (ldapConnInterface, error) 
 	err = connection.Bind(context.Credentials.Username, context.Credentials.Password)
 	if err != nil {
 		connection.Close()
+
 		return nil, err
 	}
 
@@ -229,7 +230,7 @@ const (
 
 type operationType = uint8
 
-func modifyEnabledServices(context *ldapContext, server string, service string, change operationType) error {
+func modifyEnabledServices(context *ldapContext, server, service string, change operationType) error {
 	connection, err := connect(context, true)
 	if err != nil {
 		return err

@@ -5,7 +5,6 @@ linters:
   disable:
     # here some dropped deprecated checks
     # reduce warning messages
-    - deadcode
     - execinquery
     - exhaustivestruct
     - godox
@@ -17,6 +16,8 @@ linters:
     - nosnakecase
     - scopelint
     - structcheck
+    - tagalign
+    - tagliatelle
     - varcheck
     # here some custom dropped checks temporary disabled
     # they will be enabled

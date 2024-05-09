@@ -51,6 +51,7 @@ func (e EmptyFormatter) JSONRender() (string, error) {
 // DefaultJSONRender wrappers a call to json.Marshal function, saving up time and keeping your code DRY.
 func DefaultJSONRender(v any) (string, error) {
 	bytes, err := json.Marshal(v)
+
 	return string(bytes), err
 }
 

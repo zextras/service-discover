@@ -61,5 +61,6 @@ func ErrorFromStderr(err error, reason string) error {
 	if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
 		stderr = string(ee.Stderr)
 	}
+
 	return errors.Errorf("%s: %s", reason, stderr)
 }

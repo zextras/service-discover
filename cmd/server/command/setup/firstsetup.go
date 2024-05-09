@@ -27,17 +27,17 @@ var testingMode bool
 
 // firstSetup specifically handles the command sent by the final user in a non-interactive way. This will print
 // as less as possible and it is intended to be used in with power users or from other programs.
-func (s *Setup) firstSetup(d businessDependencies) (formatter.Formatter, error) {
-	networks, err := command.NonLoopbackInterfaces(d)
+func (s *Setup) firstSetup(deps businessDependencies) (formatter.Formatter, error) {
+	networks, err := command.NonLoopbackInterfaces(deps)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := command.CheckValidBindingAddress(d, networks, s.BindAddress); err != nil {
+	if err := command.CheckValidBindingAddress(deps, networks, s.BindAddress); err != nil {
 		return nil, err
 	}
 
-	err = s.performSetup(d, &setupConfiguration{
+	err = s.performSetup(deps, &setupConfiguration{
 		FirstInstance: s.FirstInstance,
 		Password:      s.Password,
 		BindAddress:   s.BindAddress,
@@ -59,25 +59,25 @@ func (s *Setup) firstSetup(d businessDependencies) (formatter.Formatter, error) 
 // archive
 //
 //nolint:misspell
-func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration) error {
+func (s *Setup) performSetup(deps businessDependencies, inputs *setupConfiguration) error {
 	zimbraLocalConfig, err := carbonio.LoadLocalConfig(s.LocalConfigPath)
 	if err != nil {
 		return err
 	}
 
-	ldapHandler := d.LdapHandler(zimbraLocalConfig)
+	ldapHandler := deps.LdapHandler(zimbraLocalConfig)
 	zimbraHostname, err := command.RetrieveZimbraHostname(zimbraLocalConfig, ldapHandler)
 
 	if err != nil {
 		return err
 	}
 
-	err = command.CheckHostnameAddress(d, zimbraHostname)
+	err = command.CheckHostnameAddress(deps, zimbraHostname)
 	if err != nil {
 		return err
 	}
 
-	err = s.generateCertificationAuthority(d)
+	err = s.generateCertificationAuthority(deps)
 	if err != nil {
 		return err
 	}
@@ -87,7 +87,7 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 		return err
 	}
 
-	consulConfigFile, err := s.generateCertificateAndConfig(d, zimbraHostname, gossipKey)
+	consulConfigFile, err := s.generateCertificateAndConfig(deps, zimbraHostname, gossipKey)
 	if err != nil {
 		return err
 	}
@@ -102,7 +102,7 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 		return errors.Errorf("unable to save generated configuration file in %s: %s", s.ConsulHome, err)
 	}
 
-	err = permissions.SetStrictPermissions(d, s.ConsulFileConfig)
+	err = permissions.SetStrictPermissions(deps, s.ConsulFileConfig)
 	if err != nil {
 		return err
 	}
@@ -111,7 +111,7 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 		return err
 	}
 
-	err = permissions.SetStrictPermissions(d, s.MutableConfigFile)
+	err = permissions.SetStrictPermissions(deps, s.MutableConfigFile)
 	if err != nil {
 		return err
 	}
@@ -130,12 +130,12 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 			return errors.WithMessage(err, "unable to start service-discoverd server")
 		}
 	} else {
-		if err := systemd.StartSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit); err != nil {
+		if err := systemd.StartSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit); err != nil {
 			return errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
 		}
 	}
 
-	aclBootstrapJSON, err := s.createACLBootstrapToken(d)
+	aclBootstrapJSON, err := s.createACLBootstrapToken(deps)
 	if err != nil {
 		return err
 	}
@@ -151,7 +151,7 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 	}
 
 	serverToken, err := command.CreateACLToken(
-		d.CreateCommand,
+		deps.CreateCommand,
 		command.Server,
 		zimbraHostname,
 		aclBootstrapUnmarshal.SecretID,
@@ -161,7 +161,7 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 		return err
 	}
 
-	if err := command.SetACLToken(d.CreateCommand, serverToken, aclBootstrapUnmarshal.SecretID); err != nil {
+	if err := command.SetACLToken(deps.CreateCommand, serverToken, aclBootstrapUnmarshal.SecretID); err != nil {
 		return err
 	}
 
@@ -172,7 +172,7 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 
 	defer os.Remove(aclFile.Name())
 
-	if err = os.WriteFile(aclFile.Name(), aclBootstrapJSON, 0600); err != nil {
+	if err := os.WriteFile(aclFile.Name(), aclBootstrapJSON, 0600); err != nil {
 		return err
 	}
 
@@ -183,7 +183,7 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 
 	defer os.Remove(gossipKeyFile.Name())
 
-	if err = os.WriteFile(gossipKeyFile.Name(), []byte(consulConfigFile.Encrypt), 0600); err != nil {
+	if err := os.WriteFile(gossipKeyFile.Name(), []byte(consulConfigFile.Encrypt), 0600); err != nil {
 		return err
 	}
 
@@ -194,11 +194,11 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 		s.ConsulHome + "/" + command.ConsulCAKey: s.ConsulHome + "/" + command.ConsulCAKey,
 	}
 
-	if err = s.createEncryptedSecret(filesToCompress, inputs.Password); err != nil {
+	if err := s.createEncryptedSecret(filesToCompress, inputs.Password); err != nil {
 		return err
 	}
 
-	if err = os.WriteFile(s.ConsulHome+"/password", []byte(s.Password), 0400); err != nil {
+	if err := os.WriteFile(s.ConsulHome+"/password", []byte(s.Password), 0400); err != nil {
 		return err
 	}
 
@@ -208,7 +208,7 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 	}
 
 	if !isContainer {
-		err = systemd.EnableSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit)
+		err = systemd.EnableSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
 		if err != nil {
 			return errors.Errorf("unable to enable %s unit: %s", serviceDiscoverUnit, err)
 		}
@@ -259,7 +259,7 @@ func (s *Setup) createEncryptedSecret(filesToCompress map[string]string, passwor
 	return encWriter.Flush()
 }
 
-func (s *Setup) createACLBootstrapToken(d businessDependencies) ([]byte, error) {
+func (s *Setup) createACLBootstrapToken(deps businessDependencies) ([]byte, error) {
 	type returnResult struct {
 		data []byte
 		err  error
@@ -272,7 +272,7 @@ func (s *Setup) createACLBootstrapToken(d businessDependencies) ([]byte, error) 
 		for {
 			<-ticker.C
 
-			aclBootstrapJSON, err := d.CreateCommand(consulBin, "acl", "bootstrap", "-format", "json").Output()
+			aclBootstrapJSON, err := deps.CreateCommand(consulBin, "acl", "bootstrap", "-format", "json").Output()
 			if err != nil {
 				if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
 					stderr := strings.TrimSpace(string(ee.Stderr))
@@ -304,10 +304,10 @@ func (s *Setup) createACLBootstrapToken(d businessDependencies) ([]byte, error) 
 	}
 }
 
-func (s *Setup) generateCertificationAuthority(d businessDependencies) error {
+func (s *Setup) generateCertificationAuthority(deps businessDependencies) error {
 	certificateDaysFlag := fmt.Sprintf("-days=%d", certificateExpiration)
 	err := exec2.InPath(
-		d.CreateCommand(consulBin,
+		deps.CreateCommand(consulBin,
 			"tls",
 			"ca",
 			"create",
@@ -320,12 +320,12 @@ func (s *Setup) generateCertificationAuthority(d businessDependencies) error {
 		return exec2.ErrorFromStderr(err, "unable to create a valid CA with Consul")
 	}
 
-	err = permissions.SetStrictPermissions(d, s.ConsulHome+"/consul-agent-ca-key.pem")
+	err = permissions.SetStrictPermissions(deps, s.ConsulHome+"/consul-agent-ca-key.pem")
 	if err != nil {
 		return err
 	}
 
-	err = permissions.SetStrictPermissions(d, s.ConsulHome+"/consul-agent-ca.pem")
+	err = permissions.SetStrictPermissions(deps, s.ConsulHome+"/consul-agent-ca.pem")
 	if err != nil {
 		return err
 	}

@@ -27,7 +27,7 @@ const (
 // version. It returns the LDAP instance context and the container itself.
 // Note it is necessary to defer the container stop otherwise the instance
 // will be hanging forever `defer ldapContainer.Terminate()`!
-func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testcontainers.Container, context.Context) {
+func SpinUpCarbonioLdap(t *testing.T, address, version string) (testcontainers.Container, context.Context) {
 	ctx := context.Background()
 
 	var nets []string
@@ -47,6 +47,7 @@ func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testconta
 	for _, nNet := range nets {
 		t.Log(nNet)
 	}
+
 	ulimits := []*units.Ulimit{{Name: "nofile", Soft: 32678, Hard: 32678}}
 	req := testcontainers.ContainerRequest{
 		Image:        fmt.Sprintf(address, version),
