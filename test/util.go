@@ -17,6 +17,7 @@ func GenerateRandomFile(testName string) *os.File {
 	if err != nil {
 		panic(err)
 	}
+
 	return file
 }
 
@@ -25,6 +26,7 @@ func GenerateRandomFolder(prefix string) string {
 	if err != nil {
 		panic(err)
 	}
+
 	return file
 }
 
@@ -39,5 +41,6 @@ func CreateDumbFile(content []byte, name string) (*bytes.Buffer, *mocks.FileInfo
 		Return(os.FileMode(0644)).
 		On("ModTime").
 		Return(time.Now())
+
 	return dumbContent, caStat
 }

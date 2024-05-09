@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-only
 
-package credentialsEncrypter
+package encrypter
 
 import (
 	"archive/tar"
@@ -24,7 +24,7 @@ type Writer struct {
 	tarballWriter *tar.Writer
 }
 
-func (e *Writer) Write(p []byte) (n int, err error) {
+func (e *Writer) Write(p []byte) (int, error) {
 	return e.tarballWriter.Write(p)
 }
 
@@ -44,7 +44,7 @@ func (e *Writer) Close() error {
 	return nil
 }
 
-// Flush method allows to flush the underlying tarball reader into the destination
+// Flush method allows to flush the underlying tarball reader into the destination.
 func (e *Writer) Flush() error {
 	return e.tarballWriter.Flush()
 }
@@ -54,7 +54,7 @@ func (e *Writer) Flush() error {
 // existing will result in an undefined behaviour. The path can be absolute, and in this case it will refer to the root
 // of the tarball. Please note that all the resulting paths in the archive will be relative though, in order to avoid
 // problems with extraction programs (e.g. Ark), so writing "/" and "" as third parameter will have the same result.
-func (e *Writer) AddFile(reader io.Reader, stat os.FileInfo, customFilename string, directoryOnArchive string) error {
+func (e *Writer) AddFile(reader io.Reader, stat os.FileInfo, customFilename, directoryOnArchive string) error {
 	filename := customFilename
 	if filename == "" {
 		filename = stat.Name()
@@ -82,6 +82,7 @@ func (e *Writer) AddFile(reader io.Reader, stat os.FileInfo, customFilename stri
 	if _, err := io.Copy(e.tarballWriter, reader); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -89,7 +90,7 @@ func (e *Writer) AddFile(reader io.Reader, stat os.FileInfo, customFilename stri
 // is wrapped around with a PGP armor, making the file text-based and easier to manipulate.
 // The encryption defaults are the "sane defaults" set by the openpgp package this reader is based on. Please check
 // https://pkg.go.dev/golang.org/x/crypto/openpgp#SymmetricallyEncrypt for more details about the encryption
-// configuration
+// configuration.
 func NewWriter(writer io.Writer, passphrase []byte) (*Writer, error) {
 	armorWriter, err := armor.Encode(writer, "PGP MESSAGE", nil)
 	if err != nil {
@@ -104,6 +105,7 @@ func NewWriter(writer io.Writer, passphrase []byte) (*Writer, error) {
 	}
 
 	tarWriter := tar.NewWriter(openGpgWriter)
+
 	return &Writer{
 		armorWriter:   armorWriter,
 		openPgpWriter: openGpgWriter,

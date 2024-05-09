@@ -30,11 +30,11 @@ const (
 	ConsulServerCertificateKey = "dc1-server-consul-0-key.pem"
 	ConsulAgentCertificate     = "dc1-client-consul-0.pem"
 	ConsulAgentCertificateKey  = "dc1-client-consul-0-key.pem"
-	ConsulAclBootstrap         = "consul-acl-secret.json"
+	ConsulACLBootstrap         = "consul-acl-secret.json"
 	GossipKey                  = "gossip-key"
-	ConsulHttpToken            = "CONSUL_HTTP_TOKEN" // #nosec
+	ConsulHTTPToken            = "CONSUL_HTTP_TOKEN" // #nosec
 	ConsulBin                  = "/usr/bin/consul"
-	AclPolicyTemplateText      = `{
+	ACLPolicyTemplateText      = `{
    "node":{
       "{{ .ZimbraHostname }}":{
          "policy":"write"
@@ -79,7 +79,8 @@ type ACLTokenCreation struct {
 	SecretID    string        `json:"SecretID"`
 }
 
-// OpenClusterCredential checks that the given path, s.ClusterCredential exists and it is readable
+// OpenClusterCredential checks that the given path, s.ClusterCredential
+// exists and it is readable.
 func OpenClusterCredential(clusterCredential string) (*os.File, error) {
 	clusterCredentialFile, err := os.Open(clusterCredential) // #nosec
 	if err != nil {
@@ -88,10 +89,11 @@ func OpenClusterCredential(clusterCredential string) (*os.File, error) {
 				"cannot find Cluster credential in %s, please copy the file from the existing server or upload it to LDAP",
 				clusterCredential,
 			)
-		} else {
-			return nil, errors.WithMessage(err, "unable to open cluster credential file. Is it corrupted?")
 		}
+
+		return nil, errors.WithMessage(err, "unable to open cluster credential file. Is it corrupted?")
 	}
+
 	return clusterCredentialFile, nil
 }
 
@@ -126,7 +128,7 @@ func CheckValidBindingAddress(resolver NetworkInterfaces, networks []net.Interfa
 	return nil
 }
 
-// NonLoopbackInterfaces returns all the network interfaces but the loopback one
+// NonLoopbackInterfaces returns all the network interfaces but the loopback one.
 func NonLoopbackInterfaces(d NetworkInterfaces) ([]net.Interface, error) {
 	networks, err := d.NetInterfaces()
 	if err != nil {
@@ -134,15 +136,16 @@ func NonLoopbackInterfaces(d NetworkInterfaces) ([]net.Interface, error) {
 	}
 
 	for i, n := range networks {
-		if strings.ToLower(n.Name) == "lo" {
+		if strings.EqualFold(n.Name, "lo") {
 			networks[i] = networks[len(networks)-1]
 			networks = networks[:len(networks)-1]
 		}
 	}
+
 	return networks, nil
 }
 
-// UploadCredentialsToLDAP uploads the credentials tarball file into LDAP
+// UploadCredentialsToLDAP uploads the credentials tarball file into LDAP.
 func UploadCredentialsToLDAP(ldapHandler carbonio.LdapHandler, credentials string) error {
 	if err := ldapHandler.CheckServerAvailability(true); err != nil {
 		return errors.WithMessage(err, "unable to connect to ldap")
@@ -156,10 +159,11 @@ func UploadCredentialsToLDAP(ldapHandler carbonio.LdapHandler, credentials strin
 	if err := ldapHandler.UploadBinary(file, carbonio.LdapConfigBaseDn, carbonio.AttrCarbonioCredentials); err != nil {
 		return errors.WithMessage(err, "unable to upload data to ldap")
 	}
+
 	return nil
 }
 
-// DownloadCredentialsFromLDAP downloads the credentials from ldap and puts them into the given destination
+// DownloadCredentialsFromLDAP downloads the credentials from ldap and puts them into the given destination.
 func DownloadCredentialsFromLDAP(ldapHandler carbonio.LdapHandler, destination string) error {
 	if err := ldapHandler.CheckServerAvailability(false); err != nil {
 		return errors.WithMessage(err, "unable to connect to ldap")
@@ -174,12 +178,13 @@ func DownloadCredentialsFromLDAP(ldapHandler carbonio.LdapHandler, destination s
 }
 
 // RetrieveZimbraHostname returns the zimbra.LocalConfigServerHostname value, but only after checking that the
-// LDAP server is up
+// LDAP server is up.
 func RetrieveZimbraHostname(localConfig carbonio.LocalConfig, ldapHandler carbonio.LdapHandler) (string, error) {
 	err := ldapHandler.CheckServerAvailability(true)
 	if err != nil {
 		return "", errors.WithMessage(err, "unable to connect to ldap")
 	}
+
 	return localConfig.Value(carbonio.LocalConfigServerHostname), nil
 }
 
@@ -188,11 +193,12 @@ func AddServiceInLDAP(ldap carbonio.LdapHandler, zimbraHostname string) error {
 	if err != nil {
 		return errors.New("cannot add service in ldap: " + err.Error())
 	}
+
 	return nil
 }
 
-// SaveBindAddressConfiguration adds the bindAddress to the Consul configuration file
-func SaveBindAddressConfiguration(mutableConfig string, bindAddress string) error {
+// SaveBindAddressConfiguration adds the bindAddress to the Consul configuration file.
+func SaveBindAddressConfiguration(mutableConfig, bindAddress string) error {
 	if strings.Contains(bindAddress, "/") {
 		bindAddress = strings.Split(bindAddress, "/")[0]
 	}
@@ -203,10 +209,11 @@ func SaveBindAddressConfiguration(mutableConfig string, bindAddress string) erro
 	if err != nil {
 		return err
 	}
+
 	return os.WriteFile(mutableConfig, bs, os.FileMode(0600))
 }
 
-// ConsulNodeName allows you to retrieve the Consul node name based on the hostname and its role
+// ConsulNodeName allows you to retrieve the Consul node name based on the hostname and its role.
 func ConsulNodeName(prefix ConsulRole, hostname string) string {
 	return strings.ReplaceAll(fmt.Sprintf("%s-%s", prefix, hostname), ".", "-")
 }
@@ -217,16 +224,16 @@ func CreateACLToken(
 	zimbraHostname string,
 	rootToken string,
 ) (string, error) {
-	if err := os.Setenv(ConsulHttpToken, rootToken); err != nil {
+	if err := os.Setenv(ConsulHTTPToken, rootToken); err != nil {
 		return "", errors.WithMessage(err, "unable to set correct env variable before starting ACL token creation")
 	}
-	defer os.Unsetenv(ConsulHttpToken)
+	defer os.Unsetenv(ConsulHTTPToken)
 
 	agentPolicyName := ConsulNodeName(prefix, zimbraHostname)
 	templateRender := struct {
 		ZimbraHostname string
 	}{ZimbraHostname: agentPolicyName}
-	aclPolicyTemplate := template.Must(template.New("agent-config").Parse(AclPolicyTemplateText))
+	aclPolicyTemplate := template.Must(template.New("agent-config").Parse(ACLPolicyTemplateText))
 
 	aclPolicyRenderBuffer := bytes.Buffer{}
 	if err := aclPolicyTemplate.Execute(&aclPolicyRenderBuffer, templateRender); err != nil {
@@ -278,25 +285,26 @@ func CreateACLToken(
 		if err := json.Unmarshal(tokenCmdResp, &token); err != nil {
 			return "", errors.WithMessage(err, "unable to decode response from consul agent")
 		}
+
 		break
 	}
 
 	return token.SecretID, nil
 }
 
-func SetACLToken(commandCreator func(name string, args ...string) exec.Cmd, token string, rootToken string) error {
-	if err := os.Setenv(ConsulHttpToken, rootToken); err != nil {
+func SetACLToken(commandCreator func(name string, args ...string) exec.Cmd, token, rootToken string) error {
+	if err := os.Setenv(ConsulHTTPToken, rootToken); err != nil {
 		return errors.WithMessage(err, "unable to set correct env variable before starting ACL token creation")
 	}
-	defer os.Unsetenv(ConsulHttpToken)
+	defer os.Unsetenv(ConsulHTTPToken)
 
-	setupAclCmd := commandCreator(ConsulBin,
+	setupACLCmd := commandCreator(ConsulBin,
 		"acl",
 		"set-agent-token",
 		"default",
 		token,
 	)
-	if _, err := setupAclCmd.Output(); err != nil {
+	if _, err := setupACLCmd.Output(); err != nil {
 		return exec.ErrorFromStderr(err, "unable to set agent token")
 	}
 
@@ -323,7 +331,7 @@ func CheckHostnameAddress(d NetworkInterfaces, hostname string) error {
 }
 
 func CheckDockerContainer() bool {
-	_, error := os.Stat(DockerMarker)
+	_, err := os.Stat(DockerMarker)
 
-	return !errors.Is(error, os.ErrNotExist)
+	return !errors.Is(err, os.ErrNotExist)
 }

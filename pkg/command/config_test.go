@@ -38,7 +38,7 @@ func TestListConfig(t *testing.T) {
 			agentName: "",
 		}
 		flags := GlobalCommonFlags{
-			Format: formatter.JsonFormatOutput,
+			Format: formatter.JSONFormatOutput,
 		}
 		err := cmd.Run(&flags)
 		assert.Nil(t, err)
@@ -80,7 +80,7 @@ func TestGetConfig(t *testing.T) {
 			Config: "bind-address",
 		}
 		flags := GlobalCommonFlags{
-			Format: formatter.JsonFormatOutput,
+			Format: formatter.JSONFormatOutput,
 		}
 		err := cmd.Run(&flags)
 		assert.Nil(t, err)

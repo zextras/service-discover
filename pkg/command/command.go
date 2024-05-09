@@ -18,14 +18,15 @@ type Command struct {
 	applicationVersion string `kong:"-"`
 }
 
-func NewCommand(applicationName string, applicationVersion string) *Command {
+func NewCommand(applicationName, applicationVersion string) *Command {
 	return &Command{
 		applicationName:    applicationName,
 		applicationVersion: applicationVersion,
 	}
 }
 
-// Version generates a Version structure that can is ready to be integrated as CLI command
+// Version generates a Version structure that can is ready to be integrated
+// as CLI command.
 func (c *Command) Version(writer io.Writer, agentName string) Version {
 	return Version{
 		*c,
@@ -34,7 +35,8 @@ func (c *Command) Version(writer io.Writer, agentName string) Version {
 	}
 }
 
-// BootstrapToken generates a BootstrapToken structure that can is ready to be integrated as CLI command
+// BootstrapToken generates a BootstrapToken structure that can is ready to
+// be integrated as CLI command.
 func (c *Command) BootstrapToken(writer io.Writer, agentName string) BootstrapToken {
 	return BootstrapToken{
 		Command:                       *c,
@@ -43,12 +45,12 @@ func (c *Command) BootstrapToken(writer io.Writer, agentName string) BootstrapTo
 		Setup:                         false,
 		Password:                      "",
 		clusterCredentialFileLocation: "/etc/zextras/service-discover/cluster-credentials.tar.gpg",
-		termUiProvider:                &term2.TermUiProvider{},
+		termUIProvider:                &term2.TermUIProvider{},
 	}
 }
 
-// Help generates a Help command that open up the man pages on unix compatible machines. The command will always be
-// "man <applicationName>"
+// Help generates a Help command that open up the man pages on unix
+// compatible machines. The command will always be "man <applicationName>".
 func (c *Command) Help() Help {
 	return Help{*c}
 }

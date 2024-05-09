@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	rootUid               = 0
+	rootUID               = 0
 	consulBin             = "/usr/bin/consul"
 	certificateExpiration = 365 * 30
 	defaultLogLevel       = "INFO"
@@ -60,8 +60,8 @@ type Setup struct {
 	MutableConfigFile string `kong:"-"`
 
 	Password      string `help:"Set a custom password for the encrypted secret files. If none is set, a random one will be generated and printed"`
-	BindAddress   string `arg optional help:"The binding address to bind service-discoverd daemon"`
-	FirstInstance bool   `optional default:"false" help:"Force the setup to behave as this was the first server setup"`
+	BindAddress   string `arg:"" optional:"" help:"The binding address to bind service-discoverd daemon"`
+	FirstInstance bool   `optional:"" default:"false" help:"Force the setup to behave as this was the first server setup"`
 }
 
 type autoEncrypt struct {
@@ -89,7 +89,7 @@ type connectConfig struct {
 }
 
 type setupConfig struct {
-	AclConfig               aclConfig     `json:"acl"`
+	ACLConfig               aclConfig     `json:"acl"`
 	AutoEncrypt             autoEncrypt   `json:"auto_encrypt,omitempty"`
 	CaFile                  string        `json:"ca_file"`
 	CertFile                string        `json:"cert_file"`
@@ -103,7 +103,7 @@ type setupConfig struct {
 	VerifyIncoming          bool          `json:"verify_incoming"`
 	VerifyOutgoing          bool          `json:"verify_outgoing"`
 	VerifyServerHostname    bool          `json:"verify_server_hostname"`
-	UiConfig                uiConfig      `json:"ui_config"`
+	UIConfig                uiConfig      `json:"ui_config"`
 	Ports                   portsConfig   `json:"ports"`
 	Connect                 connectConfig `json:"connect"`
 }
@@ -118,12 +118,12 @@ func (n *nonInteractiveOutput) PlainRender() (string, error) {
 	return n.Password, nil
 }
 
-func (n *nonInteractiveOutput) JsonRender() (string, error) {
+func (n *nonInteractiveOutput) JSONRender() (string, error) {
 	return formatter.DefaultJSONRender(n)
 }
 
-func gatherInputs(d interactiveDependencies, firstInstance bool) (*setupConfiguration, error) {
-	bindAddress, err := wizardBindAddressSelection(d)
+func gatherInputs(deps interactiveDependencies, firstInstance bool) (*setupConfiguration, error) {
+	bindAddress, err := wizardBindAddressSelection(deps)
 	if err != nil {
 		return nil, err
 	}
@@ -132,14 +132,14 @@ func gatherInputs(d interactiveDependencies, firstInstance bool) (*setupConfigur
 
 	if firstInstance {
 		firstPassword :=
-			term.MustRead(d.Term().ReadPassword("Create the cluster credentials password (will be used for setups): "))
-		password = term.MustRead(d.Term().ReadPassword("Type the credential password again: "))
+			term.MustRead(deps.Term().ReadPassword("Create the cluster credentials password (will be used for setups): "))
+		password = term.MustRead(deps.Term().ReadPassword("Type the credential password again: "))
 
 		if password != firstPassword {
 			return nil, errors.New("passwords do not match")
 		}
 	} else {
-		password = term.MustRead(d.Term().ReadPassword("Insert the cluster credential password: "))
+		password = term.MustRead(deps.Term().ReadPassword("Insert the cluster credential password: "))
 	}
 
 	return &setupConfiguration{
@@ -150,17 +150,17 @@ func gatherInputs(d interactiveDependencies, firstInstance bool) (*setupConfigur
 
 // Run method runs the Setup command with the flags and settings passed by Kong.
 func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
-	ui, err := term.New(os.Stdin, os.Stdout, term.DefaultTermPrompt)
+	userInterface, err := term.New(os.Stdin, os.Stdout, term.DefaultTermPrompt)
 	if err != nil {
 		return err
 	}
 
-	defer ui.Close()
-	d := realDependencies{
-		ui: &ui,
+	defer userInterface.Close()
+	dependency := realDependencies{
+		ui: &userInterface,
 	}
 
-	err = preRun(d)
+	err = preRun(dependency)
 	if err != nil {
 		return err
 	}
@@ -171,7 +171,7 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 
 	// if manually specified do not check it
 	if !s.FirstInstance {
-		s.FirstInstance, err = s.isFirstInstance(d)
+		s.FirstInstance, err = s.isFirstInstance(dependency)
 		if err != nil {
 			return err
 		}
@@ -179,9 +179,9 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 
 	var out formatter.Formatter
 	if s.FirstInstance {
-		out, err = s.firstSetup(d)
+		out, err = s.firstSetup(dependency)
 	} else {
-		out, err = s.importSetup(d)
+		out, err = s.importSetup(dependency)
 	}
 
 	if err != nil {
@@ -193,12 +193,12 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 		return err
 	}
 
-	fmt.Fprint(d.Writer(), render)
+	fmt.Fprint(dependency.Writer(), render)
 
 	return nil
 }
 
-func (s *Setup) isFirstInstance(d businessDependencies) (bool, error) {
+func (s *Setup) isFirstInstance(deps businessDependencies) (bool, error) {
 	_, err := command.OpenClusterCredential(s.ClusterCredential)
 	if err != nil {
 		zimbraLocalConfig, err := carbonio.LoadLocalConfig(s.LocalConfigPath)
@@ -206,7 +206,7 @@ func (s *Setup) isFirstInstance(d businessDependencies) (bool, error) {
 			return false, err
 		}
 
-		ldapHandler := d.LdapHandler(zimbraLocalConfig)
+		ldapHandler := deps.LdapHandler(zimbraLocalConfig)
 		servers, err := ldapHandler.QueryAllServersWithService(carbonio.ServiceDiscoverServiceName)
 
 		if err != nil {
@@ -214,27 +214,27 @@ func (s *Setup) isFirstInstance(d businessDependencies) (bool, error) {
 		}
 
 		return len(servers) == 0, nil
-	} else {
-		return false, nil
 	}
+
+	return false, nil
 }
 
-func preRun(d businessDependencies) error {
+func preRun(deps businessDependencies) error {
 	// We need to check that the executable is in $PATH
-	cmd := d.CreateCommand(consulBin, "version")
+	cmd := deps.CreateCommand(consulBin, "version")
 	err := cmd.Run()
 
 	if err != nil {
 		return errors.Errorf("unable to execute consul binary: %s", err)
 	}
 
-	if d.GetuidSyscall() != rootUid {
+	if deps.GetuidSyscall() != rootUID {
 		return errors.New("this command must be executed as root")
 	}
 
 	_, err = os.Stat(config.ConsultFileConfig)
 	if err == nil {
-		return errors.New("setup of service-discover already performed, manually reset and try again.")
+		return errors.New("setup of service-discover already performed, manually reset and try again")
 	}
 
 	return nil
@@ -255,42 +255,42 @@ func addrsToSingleString(addrs *[]net.Addr, sep string) string {
 // generateGossipKey is directly taken from the way Consul generates it.
 func generateGossipKey() (string, error) {
 	key := make([]byte, 32)
-	n, err := rand.Reader.Read(key)
+	num, err := rand.Reader.Read(key)
 
 	if err != nil {
 		return "", errors.Errorf("error reading random data: %s", err)
 	}
 
-	if n != 32 {
-		return "", errors.New("couldn't read enough entropy. Generate more entropy!")
+	if num != 32 {
+		return "", errors.New("couldn't read enough entropy. Generate more entropy")
 	}
 
 	return base64.StdEncoding.EncodeToString(key), nil
 }
 
-func wizardBindAddressSelection(d interactiveDependencies) (string, error) {
-	networks, err := command.NonLoopbackInterfaces(d)
+func wizardBindAddressSelection(deps interactiveDependencies) (string, error) {
+	networks, err := command.NonLoopbackInterfaces(deps)
 	if err != nil {
 		return "", err
 	}
 
 	if len(networks) > 1 {
-		term.MustWrite(fmt.Fprintf(d.Term(), "Multiple network cards detected:\n"))
+		term.MustWrite(fmt.Fprintf(deps.Term(), "Multiple network cards detected:\n"))
 	}
 
-	for _, n := range networks {
-		addrs, err := d.AddrResolver(n)
+	for _, net := range networks {
+		addrs, err := deps.AddrResolver(net)
 		if err != nil {
 			return "", err
 		}
 
-		term.MustWrite(fmt.Fprintf(d.Term(), "%s %s\n", n.Name, addrsToSingleString(&addrs, ", ")))
+		term.MustWrite(fmt.Fprintf(deps.Term(), "%s %s\n", net.Name, addrsToSingleString(&addrs, ", ")))
 	}
 
-	term.MustWrite(fmt.Fprintf(d.Term(), "Specify the binding address for service discovery: "))
-	bindingAddress := term.MustRead(d.Term().ReadLine())
+	term.MustWrite(fmt.Fprintf(deps.Term(), "Specify the binding address for service discovery: "))
+	bindingAddress := term.MustRead(deps.Term().ReadLine())
 
-	err = command.CheckValidBindingAddress(d, networks, bindingAddress)
+	err = command.CheckValidBindingAddress(deps, networks, bindingAddress)
 	if err != nil {
 		return "", err
 	}
@@ -301,11 +301,11 @@ func wizardBindAddressSelection(d interactiveDependencies) (string, error) {
 // generateCertificateAndConfig creates the TLS certificates for consul and
 // finally it generates the gossip key. This ensure secure communications
 // inside Consul.
-func (s *Setup) generateCertificateAndConfig(d businessDependencies,
+func (s *Setup) generateCertificateAndConfig(deps businessDependencies,
 	zimbraHostname string, gossipKey string) (*setupConfig, error) {
 	certificateDaysFlag := fmt.Sprintf("-days=%d", certificateExpiration)
 	err := exec.InPath(
-		d.CreateCommand(consulBin,
+		deps.CreateCommand(consulBin,
 			"tls",
 			"cert",
 			"create",
@@ -318,18 +318,18 @@ func (s *Setup) generateCertificateAndConfig(d businessDependencies,
 		return nil, errors.New("unable to create a valid certificate with Consul")
 	}
 
-	err = permissions.SetStrictPermissions(d, filepath.Join(s.ConsulHome, command.ConsulServerCertificateKey))
+	err = permissions.SetStrictPermissions(deps, filepath.Join(s.ConsulHome, command.ConsulServerCertificateKey))
 	if err != nil {
 		return nil, err
 	}
 
-	err = permissions.SetStrictPermissions(d, filepath.Join(s.ConsulHome, command.ConsulServerCertificate))
+	err = permissions.SetStrictPermissions(deps, filepath.Join(s.ConsulHome, command.ConsulServerCertificate))
 	if err != nil {
 		return nil, err
 	}
 
 	consulConfigFile := &setupConfig{
-		AclConfig: aclConfig{
+		ACLConfig: aclConfig{
 			Enabled:                true,
 			EnableTokenPersistence: true,
 			DefaultPolicy:          "deny",
@@ -348,7 +348,7 @@ func (s *Setup) generateCertificateAndConfig(d businessDependencies,
 		VerifyIncoming:          true,
 		VerifyOutgoing:          true,
 		VerifyServerHostname:    true,
-		UiConfig:                uiConfig{Enabled: true},
+		UIConfig:                uiConfig{Enabled: true},
 		Ports:                   portsConfig{Grpc: 8502},
 		Connect:                 connectConfig{Enabled: true},
 	}

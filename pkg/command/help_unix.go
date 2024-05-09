@@ -14,7 +14,7 @@ import (
 )
 
 // The Help command will redirect the user to a proper man page. If the user wants a quick help he can use --help.
-// This command uses specific unix-syscall and for this is Unix only
+// This command uses specific unix-syscall and for this is Unix only.
 type Help struct {
 	Command `kong:"-"`
 }

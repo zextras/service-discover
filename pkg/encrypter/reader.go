@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-only
 
-package credentialsEncrypter
+package encrypter
 
 import (
 	"archive/tar"
@@ -24,19 +24,21 @@ func NewReader(reader io.Reader, passphrase []byte) (*tar.Reader, error) {
 	}
 
 	firstTime := true
-	passGenerator := func(keys []openpgp.Key, symmetric bool) ([]byte, error) {
-		if firstTime == true {
+	passGenerator := func(_ []openpgp.Key, _ bool) ([]byte, error) {
+		if firstTime {
 			firstTime = false
+
 			return passphrase, nil
-		} else {
-			return nil, pgpErrors.ErrKeyIncorrect
 		}
+
+		return nil, pgpErrors.ErrKeyIncorrect
 	}
 
 	message, err := openpgp.ReadMessage(decoder.Body, nil, passGenerator, nil)
 	if err != nil {
 		return nil, err
 	}
+
 	return tar.NewReader(message.UnverifiedBody), nil
 }
 
@@ -94,7 +96,9 @@ func ReadFiles(tarReader *tar.Reader, files ...string) (map[string][]byte, error
 		for _, f := range remainingFiles {
 			missingFiles += " " + f
 		}
+
 		return nil, errors.Errorf("not all files where found in the archive:%s", missingFiles)
 	}
+
 	return result, nil
 }

@@ -12,7 +12,7 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
-	"github.com/zextras/service-discover/pkg/credentialsEncrypter"
+	"github.com/zextras/service-discover/pkg/encrypter"
 	"github.com/zextras/service-discover/pkg/formatter"
 	"github.com/zextras/service-discover/pkg/term"
 )
@@ -22,13 +22,13 @@ const (
 )
 
 type BootstrapToken struct {
-	termUiProvider                term.UiProvider
+	termUIProvider                term.UIProvider
 	clusterCredentialFileLocation string `kong:"-"`
 	Command                       `kong:"-"`
 	writer                        io.Writer `kong:"-"`
 	agentName                     string    `kong:"-"`
-	Setup                         bool      `optional name:"setup" help:"Used in setup scripts, doesn't prompt anything and returns $SETUP_CONSUL_TOKEN if defined."`
-	Password                      string    `optional name:"password" help:"feed bootstrap password"`
+	Setup                         bool      `optional:"" name:"setup" help:"Used in setup scripts, doesn't prompt anything and returns $SETUP_CONSUL_TOKEN if defined."`
+	Password                      string    `optional:"" name:"password" help:"feed bootstrap password"`
 }
 
 type outputBootstrapToken struct {
@@ -39,7 +39,7 @@ func (o *outputBootstrapToken) PlainRender() (string, error) {
 	return o.Token, nil
 }
 
-func (o *outputBootstrapToken) JsonRender() (string, error) {
+func (o *outputBootstrapToken) JSONRender() (string, error) {
 	return formatter.DefaultJSONRender(o)
 }
 
@@ -47,12 +47,13 @@ type OutputWrapper struct {
 	writer *os.File
 }
 
-func (o OutputWrapper) Write(buffer []byte) (n int, err error) {
+func (o OutputWrapper) Write(buffer []byte) (int, error) {
 	replaced := bytes.ReplaceAll(buffer, []byte("\r\n"), []byte(""))
-	n, err = o.writer.Write(replaced)
+	numBytes, err := o.writer.Write(replaced)
 	// report \r\n as written
-	n += len(buffer) - len(replaced)
-	return
+	numBytes += len(buffer) - len(replaced)
+
+	return numBytes, err
 }
 
 func (v *BootstrapToken) ReadToken() (string, error) {
@@ -74,20 +75,20 @@ func (v *BootstrapToken) ReadToken() (string, error) {
 	if v.Password == "" {
 		var err error
 
-		ui, err := v.termUiProvider.Get(wrapper)
+		userInterface, err := v.termUIProvider.Get(wrapper)
 		if err != nil {
 			return "", err
 		}
 
 		defer func(ui term.Terminal) {
 			_ = ui.Close()
-		}(ui)
+		}(userInterface)
 
-		password, err = ui.ReadPassword(prompt)
+		password, err = userInterface.ReadPassword(prompt)
 		if err != nil {
 			switch err.(type) {
 			case term.NotATerminalError:
-				password = term.MustRead(ui.ReadLine())
+				password = term.MustRead(userInterface.ReadLine())
 			default:
 				return "", err
 			}
@@ -105,18 +106,18 @@ func (v *BootstrapToken) ReadToken() (string, error) {
 		_ = clusterCredentialFile.Close()
 	}(clusterCredentialFile)
 
-	credReader, err := credentialsEncrypter.NewReader(clusterCredentialFile, []byte(password))
+	credReader, err := encrypter.NewReader(clusterCredentialFile, []byte(password))
 	if err != nil {
 		return "", err
 	}
 
-	extractedFiles, err := credentialsEncrypter.ReadFiles(credReader, ConsulAclBootstrap)
+	extractedFiles, err := encrypter.ReadFiles(credReader, ConsulACLBootstrap)
 	if err != nil {
 		return "", err
 	}
 
 	aclBootstrapToken := ACLTokenCreation{}
-	if err := json.Unmarshal(extractedFiles[ConsulAclBootstrap], &aclBootstrapToken); err != nil {
+	if err := json.Unmarshal(extractedFiles[ConsulACLBootstrap], &aclBootstrapToken); err != nil {
 		return "", errors.WithMessagef(err, "unable to decode ACL Bootstrap token")
 	}
 
@@ -125,7 +126,7 @@ func (v *BootstrapToken) ReadToken() (string, error) {
 
 func (v *BootstrapToken) Run(globalFlags *GlobalCommonFlags) error {
 	token, present := os.LookupEnv(SetupConsulToken)
-	if !v.Setup || !present || len(token) == 0 {
+	if !v.Setup || !present || token == "" {
 		var err error
 
 		token, err = v.ReadToken()

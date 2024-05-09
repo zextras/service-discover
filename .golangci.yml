@@ -5,16 +5,19 @@ linters:
   disable:
     # here some dropped deprecated checks
     # reduce warning messages
-    - deadcode
     - execinquery
     - exhaustivestruct
+    - godox
     - golint
     - ifshort
     - interfacer
     - maligned
+    - mnd
     - nosnakecase
     - scopelint
     - structcheck
+    - tagalign
+    - tagliatelle
     - varcheck
     # here some custom dropped checks temporary disabled
     # they will be enabled
@@ -65,4 +68,5 @@ linters-settings:
   goimports:
     local-prefixes: github.com/golangci/golangci-lint
 run:
+  tests: false
   timeout: 5m

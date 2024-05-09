@@ -32,10 +32,11 @@ type outputVersion struct {
 func (o *outputVersion) PlainRender() (string, error) {
 	out := fmt.Sprintf("%s version: %s\n", o.ApplicationName, o.CliVersion)
 	out += fmt.Sprintf("%s version: %s\n", o.AgentName, o.AgentVersion)
+
 	return out, nil
 }
 
-func (o *outputVersion) JsonRender() (string, error) {
+func (o *outputVersion) JSONRender() (string, error) {
 	return formatter.DefaultJSONRender(o)
 }
 

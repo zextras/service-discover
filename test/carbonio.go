@@ -11,6 +11,7 @@ import (
 	"text/template"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const localConfigTemplate = `<?xml version="1.0" encoding="UTF-8"?>
@@ -20,14 +21,14 @@ const localConfigTemplate = `<?xml version="1.0" encoding="UTF-8"?>
   <value>{{.Hostname}}</value>
 </key>
 {{- end}}
-{{if ne .LdapMasterUrl ""}}
+{{if ne .LdapMasterURL ""}}
 <key name="ldap_master_url">
-  <value>{{.LdapMasterUrl}}</value>
+  <value>{{.LdapMasterURL}}</value>
 </key>
 {{- end}}
-{{if ne .LdapUrl ""}}
+{{if ne .LdapURL ""}}
 <key name="ldap_url">
-  <value>{{.LdapUrl}}</value>
+  <value>{{.LdapURL}}</value>
 </key>
 {{- end}}
 {{if ne .LdapUserDN ""}}
@@ -45,8 +46,8 @@ const DefaultLdapUserDN = "uid=zimbra,cn=admins,cn=zimbra"
 
 type localConfigFields struct {
 	Hostname      string
-	LdapMasterUrl string
-	LdapUrl       string
+	LdapMasterURL string
+	LdapURL       string
 	LdapUserDN    string
 	LdapPassword  string
 }
@@ -54,22 +55,23 @@ type localConfigFields struct {
 func GenerateLocalConfig(
 	t *testing.T,
 	hostname string,
-	ldapMaserUrl string,
-	ldapUrl string,
+	ldapMasterURL string,
+	ldapURL string,
 	ldapUserDN string,
 	ldapPassword string,
 ) []byte {
 	res := bytes.Buffer{}
 	ldapData := &localConfigFields{
 		Hostname:      hostname,
-		LdapMasterUrl: ldapMaserUrl,
-		LdapUrl:       ldapUrl,
+		LdapMasterURL: ldapMasterURL,
+		LdapURL:       ldapURL,
 		LdapUserDN:    ldapUserDN,
 		LdapPassword:  ldapPassword,
 	}
 	localConfigTemplate := template.Must(template.New("localconfig").Parse(localConfigTemplate))
-	assert.NoError(t, localConfigTemplate.Execute(&res, ldapData))
+	require.NoError(t, localConfigTemplate.Execute(&res, ldapData))
 	data, err := io.ReadAll(&res)
 	assert.NoError(t, err)
+
 	return data
 }

@@ -19,7 +19,7 @@ import (
 	"github.com/zextras/service-discover/cmd/agent/config"
 	"github.com/zextras/service-discover/pkg/carbonio"
 	"github.com/zextras/service-discover/pkg/command"
-	"github.com/zextras/service-discover/pkg/credentialsEncrypter"
+	"github.com/zextras/service-discover/pkg/encrypter"
 	"github.com/zextras/service-discover/pkg/exec"
 	"github.com/zextras/service-discover/pkg/formatter"
 	"github.com/zextras/service-discover/pkg/permissions"
@@ -30,7 +30,7 @@ import (
 var testingMode bool
 
 const (
-	rootUid               = 0
+	rootUID               = 0
 	certificateExpiration = 365 * 30
 	serviceDiscoverUnit   = "service-discover.service"
 	defaultLogLevel       = "INFO"
@@ -59,14 +59,14 @@ type businessDependencies interface {
 	NetInterfaces() ([]net.Interface, error)
 	AddrResolver(n net.Interface) ([]net.Addr, error)
 	LookupIP(s string) ([]net.IP, error)
-	LdapHandler(carbonio.LocalConfig) carbonio.LdapHandler
+	LdapHandler(ldapHandler carbonio.LocalConfig) carbonio.LdapHandler
 	LocalConfigLoader(path string) (carbonio.LocalConfig, error)
 	SystemdUnitHandler() (systemd.UnitManager, error)
 	CreateCommand(name string, args ...string) exec.Cmd
 	GetuidSyscall() int
 	LookupUser(name string) (*user.User, error)
 	LookupGroup(name string) (*user.Group, error)
-	Chown(path string, userUid int, groupUid int) error
+	Chown(path string, userUID int, groupUID int) error
 	Chmod(path string, mode os.FileMode) error
 }
 
@@ -90,8 +90,8 @@ func (r realDependencies) LookupIP(s string) ([]net.IP, error) {
 	return net.LookupIP(s)
 }
 
-func (r realDependencies) LdapHandler(config carbonio.LocalConfig) carbonio.LdapHandler {
-	return carbonio.CreateNewHandler(config)
+func (r realDependencies) LdapHandler(localConfig carbonio.LocalConfig) carbonio.LdapHandler {
+	return carbonio.CreateNewHandler(localConfig)
 }
 
 func (r realDependencies) LocalConfigLoader(path string) (carbonio.LocalConfig, error) {
@@ -118,8 +118,8 @@ func (r realDependencies) LookupGroup(name string) (*user.Group, error) {
 	return user.LookupGroup(name)
 }
 
-func (r realDependencies) Chown(path string, userUid int, groupUid int) error {
-	return os.Chown(path, userUid, groupUid)
+func (r realDependencies) Chown(path string, userUID, groupUID int) error {
+	return os.Chown(path, userUID, groupUID)
 }
 
 func (r realDependencies) Chmod(path string, mode os.FileMode) error {
@@ -147,7 +147,7 @@ type portsConfig struct {
 }
 
 type setupConfig struct {
-	AclConfig               aclConfig   `json:"acl"`
+	ACLConfig               aclConfig   `json:"acl"`
 	CaFile                  string      `json:"ca_file"`
 	CertFile                string      `json:"cert_file"`
 	DataDir                 string      `json:"data_dir"`
@@ -160,7 +160,7 @@ type setupConfig struct {
 	VerifyIncoming          bool        `json:"verify_incoming"`
 	VerifyOutgoing          bool        `json:"verify_outgoing"`
 	VerifyServerHostname    bool        `json:"verify_server_hostname"`
-	UiConfig                uiConfig    `json:"ui_config"`
+	UIConfig                uiConfig    `json:"ui_config"`
 	Ports                   portsConfig `json:"ports"`
 }
 
@@ -176,54 +176,54 @@ type Setup struct {
 	Wizard bool `help:"Initialize the setup in interactive mode. All the non interactive flags will be ignored if this is set"`
 
 	Password    string `help:"Set a custom password for the encrypted secret files. If none is set, a random one will be generated and printed"`
-	BindAddress string `arg optional help:"The binding address to bind service-discoverd daemon"`
+	BindAddress string `arg:"" optional:"" help:"The binding address to bind service-discoverd daemon"`
 }
 
-func gatherInputs(d interactiveDependencies) (*setupConfiguration, error) {
-	networks, err := d.NetInterfaces()
+func gatherInputs(deps interactiveDependencies) (*setupConfiguration, error) {
+	networks, err := deps.NetInterfaces()
 	if err != nil {
 		return nil, err
 	}
 
 	for i, n := range networks {
-		if strings.ToLower(n.Name) == "lo" {
+		if strings.EqualFold(n.Name, "lo") {
 			networks[i] = networks[len(networks)-1]
 			networks = networks[:len(networks)-1]
 		}
 	}
 
 	if len(networks) > 1 {
-		term.MustWrite(fmt.Fprint(d.Term(), "Multiple network cards detected:"+term.LineBreak))
+		term.MustWrite(fmt.Fprint(deps.Term(), "Multiple network cards detected:"+term.LineBreak))
 	}
 
-	for _, n := range networks {
-		addrs, err := d.AddrResolver(n)
+	for _, net := range networks {
+		addrs, err := deps.AddrResolver(net)
 		if err != nil {
 			return nil, err
 		}
 
 		term.MustWrite(fmt.Fprintf(
-			d.Term(),
+			deps.Term(),
 			"%s %s%s",
-			n.Name,
+			net.Name,
 			command.AddrsToSingleString(&addrs, ", "),
 			term.LineBreak,
 		))
 	}
 
-	term.MustWrite(fmt.Fprint(d.Term(), "Specify the binding address for service discovery: "))
-	bindingAddress := term.MustRead(d.Term().ReadLine())
-	err = command.CheckValidBindingAddress(d, networks, bindingAddress)
+	term.MustWrite(fmt.Fprint(deps.Term(), "Specify the binding address for service discovery: "))
+	bindingAddress := term.MustRead(deps.Term().ReadLine())
+	err = command.CheckValidBindingAddress(deps, networks, bindingAddress)
 
 	if err != nil {
 		return nil, err
 	}
 
-	pass, err := d.Term().ReadPassword("Insert the cluster credential password: ")
+	pass, err := deps.Term().ReadPassword("Insert the cluster credential password: ")
 	if err != nil {
 		switch err.(type) {
 		case term.NotATerminalError:
-			pass = term.MustRead(d.Term().ReadLine())
+			pass = term.MustRead(deps.Term().ReadLine())
 		default:
 			return nil, err
 		}
@@ -235,39 +235,39 @@ func gatherInputs(d interactiveDependencies) (*setupConfiguration, error) {
 	}, nil
 }
 
-func preRun(clusterCredentialPath string, d businessDependencies) error {
+func preRun(clusterCredentialPath string, deps businessDependencies) error {
 	// We need to check that the executable is in $PATH
-	cmd := d.CreateCommand(command.ConsulBin, "version")
+	cmd := deps.CreateCommand(command.ConsulBin, "version")
 	err := cmd.Run()
 
 	if err != nil {
 		return errors.Errorf("unable to execute consul binary: %s", err)
 	}
 
-	if d.GetuidSyscall() != rootUid {
+	if deps.GetuidSyscall() != rootUID {
 		return errors.New("this command must be executed as root")
 	}
 
 	_, err = os.Stat(config.ConsultFileConfig)
 	if err == nil {
-		return errors.New("setup of service-discover already performed, manually reset and try again.")
+		return errors.New("setup of service-discover already performed, manually reset and try again")
 	}
 
 	return nil
 }
 
 func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
-	ui, err := term.New(os.Stdin, os.Stdout, term.DefaultTermPrompt)
+	userInterface, err := term.New(os.Stdin, os.Stdout, term.DefaultTermPrompt)
 	if err != nil {
 		return err
 	}
 
-	defer ui.Close()
-	d := realDependencies{
-		ui: &ui,
+	defer userInterface.Close()
+	deps := realDependencies{
+		ui: &userInterface,
 	}
 
-	err = preRun(s.ClusterCredential, &d)
+	err = preRun(s.ClusterCredential, &deps)
 	if err != nil {
 		return err
 	}
@@ -276,7 +276,7 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 		return errors.New("missing arguments")
 	}
 
-	out, err := s.setup(&d)
+	out, err := s.setup(&deps)
 	if err != nil {
 		return err
 	}
@@ -287,18 +287,18 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 			return err
 		}
 
-		term.MustWrite(d.Term().WriteString(render))
+		term.MustWrite(deps.Term().WriteString(render))
 	}
 
 	return nil
 }
 
-func (s *Setup) createTLSCertificate(d businessDependencies, caFile *os.File, caKeyFile *os.File) error {
+func (s *Setup) createTLSCertificate(deps businessDependencies, caFile, caKeyFile *os.File) error {
 	certificateDaysFlag := fmt.Sprintf("-days=%d", certificateExpiration)
 	err := exec.InPath(
 		// FIXME idea: what if we try to pass the caFile by pipe instead of passing a file?
 		// we save I/O and speed up the whole stuff 🤙
-		d.CreateCommand(command.ConsulBin,
+		deps.CreateCommand(command.ConsulBin,
 			"tls",
 			"cert",
 			"create",
@@ -315,12 +315,12 @@ func (s *Setup) createTLSCertificate(d businessDependencies, caFile *os.File, ca
 		return exec.ErrorFromStderr(err, "unable to generate correct CA certificate")
 	}
 
-	err = permissions.SetStrictPermissions(d, filepath.Join(s.ConsulHome, command.ConsulAgentCertificate))
+	err = permissions.SetStrictPermissions(deps, filepath.Join(s.ConsulHome, command.ConsulAgentCertificate))
 	if err != nil {
 		return err
 	}
 
-	err = permissions.SetStrictPermissions(d, filepath.Join(s.ConsulHome, command.ConsulAgentCertificateKey))
+	err = permissions.SetStrictPermissions(deps, filepath.Join(s.ConsulHome, command.ConsulAgentCertificateKey))
 	if err != nil {
 		return err
 	}
@@ -329,13 +329,13 @@ func (s *Setup) createTLSCertificate(d businessDependencies, caFile *os.File, ca
 }
 
 //nolint:misspell
-func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
-	networks, err := command.NonLoopbackInterfaces(d)
+func (s *Setup) setup(deps businessDependencies) (formatter.Formatter, error) {
+	networks, err := command.NonLoopbackInterfaces(deps)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := command.CheckValidBindingAddress(d, networks, s.BindAddress); err != nil {
+	if err := command.CheckValidBindingAddress(deps, networks, s.BindAddress); err != nil {
 		return nil, err
 	}
 
@@ -344,7 +344,7 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 		return nil, err
 	}
 
-	ldapHandler := d.LdapHandler(zimbraLocalConfig)
+	ldapHandler := deps.LdapHandler(zimbraLocalConfig)
 
 	zimbraHostname, err := command.RetrieveZimbraHostname(zimbraLocalConfig, ldapHandler)
 	if err != nil {
@@ -364,7 +364,7 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 		_ = clusterCredentialFile.Close()
 	}(clusterCredentialFile)
 
-	credReader, err := credentialsEncrypter.NewReader(clusterCredentialFile, []byte(s.Password))
+	credReader, err := encrypter.NewReader(clusterCredentialFile, []byte(s.Password))
 	if err != nil {
 		return nil, errors.WithMessagef(err, "unable to read %s", clusterCredentialFile.Name())
 	}
@@ -380,8 +380,8 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 		return nil, err
 	}
 
-	extractedFiles, err := credentialsEncrypter.ReadFiles(credReader,
-		caPath, caKeyPath, command.GossipKey, command.ConsulAclBootstrap)
+	extractedFiles, err := encrypter.ReadFiles(credReader,
+		caPath, caKeyPath, command.GossipKey, command.ConsulACLBootstrap)
 	if err != nil {
 		return nil, err
 	}
@@ -395,7 +395,7 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 		return nil, err
 	}
 
-	err = permissions.SetStrictPermissions(d, caFile.Name())
+	err = permissions.SetStrictPermissions(deps, caFile.Name())
 	if err != nil {
 		return nil, err
 	}
@@ -411,12 +411,12 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 		return nil, err
 	}
 
-	err = permissions.SetStrictPermissions(d, caKeyFile.Name())
+	err = permissions.SetStrictPermissions(deps, caKeyFile.Name())
 	if err != nil {
 		return nil, err
 	}
 
-	if err := s.createTLSCertificate(d, caFile, caKeyFile); err != nil {
+	if err := s.createTLSCertificate(deps, caFile, caKeyFile); err != nil {
 		return nil, err
 	}
 
@@ -424,13 +424,13 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 		return nil, errors.WithMessage(err, "cannot remove secret "+caKeyFile.Name()+" please remove it manually")
 	}
 
-	err = command.CheckHostnameAddress(d, zimbraHostname)
+	err = command.CheckHostnameAddress(deps, zimbraHostname)
 	if err != nil {
 		return nil, err
 	}
 
 	consulAgentConfig := &setupConfig{
-		AclConfig: aclConfig{
+		ACLConfig: aclConfig{
 			Enabled:                true,
 			DefaultPolicy:          "deny",
 			DownPolicy:             "extend-cache",
@@ -448,7 +448,7 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 		VerifyIncoming:          true,
 		VerifyOutgoing:          true,
 		VerifyServerHostname:    true,
-		UiConfig: uiConfig{
+		UIConfig: uiConfig{
 			Enabled: true,
 		},
 		Ports: portsConfig{
@@ -460,7 +460,7 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 		return nil, err
 	}
 
-	err = permissions.SetStrictPermissions(d, s.ConsulFileConfig)
+	err = permissions.SetStrictPermissions(deps, s.ConsulFileConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -469,7 +469,7 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 		return nil, err
 	}
 
-	err = permissions.SetStrictPermissions(d, s.MutableConfigFile)
+	err = permissions.SetStrictPermissions(deps, s.MutableConfigFile)
 	if err != nil {
 		return nil, err
 	}
@@ -483,28 +483,28 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 			return nil, errors.WithMessage(err, "unable to start service-discoverd")
 		}
 	} else {
-		if err := systemd.StartSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit); err != nil {
+		if err := systemd.StartSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit); err != nil {
 			return nil, errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
 		}
 	}
 
 	aclBootstrapToken := command.ACLTokenCreation{}
-	if err := json.Unmarshal(extractedFiles[command.ConsulAclBootstrap], &aclBootstrapToken); err != nil {
+	if err := json.Unmarshal(extractedFiles[command.ConsulACLBootstrap], &aclBootstrapToken); err != nil {
 		return nil, errors.WithMessagef(err, "unable to decode ACL Bootstrap token")
 	}
 
-	token, err := command.CreateACLToken(d.CreateCommand, command.Agent, zimbraHostname, aclBootstrapToken.SecretID)
+	token, err := command.CreateACLToken(deps.CreateCommand, command.Agent, zimbraHostname, aclBootstrapToken.SecretID)
 	if err != nil {
 		return nil, errors.WithMessage(err, "unable to create ACL policy for this agent")
 	}
 
-	err = command.SetACLToken(d.CreateCommand, token, aclBootstrapToken.SecretID)
+	err = command.SetACLToken(deps.CreateCommand, token, aclBootstrapToken.SecretID)
 	if err != nil {
 		return nil, err
 	}
 
 	if !isContainer || testingMode {
-		err = systemd.EnableSystemdUnit(d.SystemdUnitHandler, serviceDiscoverUnit)
+		err = systemd.EnableSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
 		if err != nil {
 			return nil, errors.Errorf("unable to enable %s unit: %s", serviceDiscoverUnit, err)
 		}

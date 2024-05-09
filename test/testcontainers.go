@@ -17,17 +17,17 @@ import (
 )
 
 const (
-	LATEST_RELEASE       = "24.3.0"
-	PUBLIC_IMAGE_ADDRESS = "carbonio/ce-directory-server-u20:%s"
-	CI_DOCKER_NETWORK    = "ci_agent"
-	CI_NETWORK_MODE      = "overlay"
+	LatestRelease      = "24.3.0"
+	PublicImageAddress = "carbonio/ce-directory-server-u20:%s"
+	CIDockerNetwork    = "ci_agent"
+	CINetworkMode      = "overlay"
 )
 
 // SpinUpCarbonioLdap launches a Carbonio LDAP instance with the desired
 // version. It returns the LDAP instance context and the container itself.
 // Note it is necessary to defer the container stop otherwise the instance
 // will be hanging forever `defer ldapContainer.Terminate()`!
-func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testcontainers.Container, context.Context) {
+func SpinUpCarbonioLdap(t *testing.T, address, version string) (testcontainers.Container, context.Context) {
 	ctx := context.Background()
 
 	var nets []string
@@ -35,9 +35,9 @@ func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testconta
 	var netMode string
 
 	if os.Getenv("CI") == "true" {
-		t.Log("Using " + CI_DOCKER_NETWORK + " as network for LDAP")
-		nets = append(nets, CI_DOCKER_NETWORK)
-		netMode = CI_NETWORK_MODE
+		t.Log("Using " + CIDockerNetwork + " as network for LDAP")
+		nets = append(nets, CIDockerNetwork)
+		netMode = CINetworkMode
 	} else {
 		t.Log("Use standard local network for spinning LDAP")
 	}
@@ -47,6 +47,7 @@ func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testconta
 	for _, nNet := range nets {
 		t.Log(nNet)
 	}
+
 	ulimits := []*units.Ulimit{{Name: "nofile", Soft: 32678, Hard: 32678}}
 	req := testcontainers.ContainerRequest{
 		Image:        fmt.Sprintf(address, version),

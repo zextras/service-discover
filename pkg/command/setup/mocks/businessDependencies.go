@@ -60,13 +60,13 @@ func (_m *BusinessDependencies) Chmod(path string, mode fs.FileMode) error {
 	return r0
 }
 
-// Chown provides a mock function with given fields: path, userUid, groupUid
-func (_m *BusinessDependencies) Chown(path string, userUid int, groupUid int) error {
-	ret := _m.Called(path, userUid, groupUid)
+// Chown provides a mock function with given fields: path, userUID, groupUID
+func (_m *BusinessDependencies) Chown(path string, userUID int, groupUID int) error {
+	ret := _m.Called(path, userUID, groupUID)
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(string, int, int) error); ok {
-		r0 = rf(path, userUid, groupUid)
+		r0 = rf(path, userUID, groupUID)
 	} else {
 		r0 = ret.Error(0)
 	}

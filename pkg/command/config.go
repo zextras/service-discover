@@ -25,9 +25,9 @@ type Config struct {
 	writer    io.Writer `kong:"-"`
 	agentName string    `kong:"-"`
 
-	Get  GetConfig  `cmd help:"Get a specific configuration"`
-	Set  SetConfig  `cmd help:"Set a specific configuration"`
-	List ListConfig `cmd help:"List available configurations"`
+	Get  GetConfig  `cmd:"" help:"Get a specific configuration"`
+	Set  SetConfig  `cmd:"" help:"Set a specific configuration"`
+	List ListConfig `cmd:"" help:"List available configurations"`
 }
 
 func (v *Config) Run(_globalFlags *GlobalCommonFlags) error {
@@ -39,7 +39,7 @@ type GetConfig struct {
 	ReadFile  func(filename string) ([]byte, error) `kong:"-"`
 	writer    io.Writer                             `kong:"-"`
 	agentName string                                `kong:"-"`
-	Config    string                                `arg required name:"config" help:"Config to get."`
+	Config    string                                `arg:"" required:"" name:"config" help:"Config to get."`
 }
 
 type getConfigOutput struct {
@@ -48,13 +48,14 @@ type getConfigOutput struct {
 
 func (o *getConfigOutput) PlainRender() (string, error) {
 	var out = ""
-	if len(o.BindAddress) > 0 {
-		out += fmt.Sprintf("%s\n", o.BindAddress)
+	if o.BindAddress != "" {
+		out += o.BindAddress + "\n"
 	}
+
 	return out, nil
 }
 
-func (o *getConfigOutput) JsonRender() (string, error) {
+func (o *getConfigOutput) JSONRender() (string, error) {
 	return formatter.DefaultJSONRender(o)
 }
 
@@ -94,8 +95,8 @@ type SetConfig struct {
 	WriteFile func(filename string, data []byte, perm fs.FileMode) error `kong:"-"`
 	writer    io.Writer                                                  `kong:"-"`
 	agentName string                                                     `kong:"-"`
-	Config    string                                                     `arg required help:"Config to set."`
-	Value     string                                                     `arg required help:"Config value."`
+	Config    string                                                     `arg:"" required:"" help:"Config to set."`
+	Value     string                                                     `arg:"" required:"" help:"Config value."`
 }
 
 func (v *SetConfig) Run(_globalFlags *GlobalCommonFlags) error {
@@ -105,7 +106,7 @@ func (v *SetConfig) Run(_globalFlags *GlobalCommonFlags) error {
 	}
 
 	config := MutableConsulConfig{}
-	if err = json.Unmarshal(data, &config); err != nil {
+	if err := json.Unmarshal(data, &config); err != nil {
 		return err
 	}
 
@@ -143,11 +144,13 @@ func (o *listConfigOutput) PlainRender() (string, error) {
 	for _, config := range o.configs {
 		out += config + "\n"
 	}
+
 	return out, nil
 }
 
-func (o *listConfigOutput) JsonRender() (string, error) {
+func (o *listConfigOutput) JSONRender() (string, error) {
 	out, err := json.MarshalIndent(o.configs, "", "  ")
+
 	return string(out), err
 }
 

@@ -11,28 +11,28 @@ import (
 	"strings"
 )
 
-const LocalConfigLdapMasterUrl = "ldap_master_url"
-const LocalConfigLdapUrl = "ldap_url"
+const LocalConfigLdapMasterURL = "ldap_master_url"
+const LocalConfigLdapURL = "ldap_url"
 const LocalConfigLdapUserDn = "zimbra_ldap_userdn"
 const LocalConfigLdapPassword = "zimbra_ldap_password" // #nosec
 const LocalConfigServerHostname = "zimbra_server_hostname"
 const LocalConfigPath = "/opt/zextras/conf/localconfig.xml"
 
-// rawKey represents an entry in the Zimbra local config
+// rawKey represents an entry in the Zimbra local config.
 type rawKey struct {
 	Text  string `xml:",chardata"`
 	Name  string `xml:"name,attr"`
 	Value string `xml:"value"`
 }
 
-// rawLocalConfig represent the whole Zimbra local config structure
+// rawLocalConfig represent the whole Zimbra local config structure.
 type rawLocalConfig struct {
 	XMLName xml.Name `xml:"localconfig"`
 	Text    string   `xml:",chardata"`
 	Key     []rawKey `xml:"key"`
 }
 
-// LocalConfigEntry represent a possible value that a Zimbra local config can have
+// LocalConfigEntry represent a possible value that a Zimbra local config can have.
 type LocalConfigEntry struct {
 	Text  string // Represents a possible description for that entry
 	Value string // Represents the actual value for that entry
@@ -50,6 +50,7 @@ func loadLocalConfig(path string) (*rawLocalConfig, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return carbonioLocalConfig, nil
 }
 
@@ -63,13 +64,13 @@ type LocalConfig interface {
 }
 
 // indexedLocalConfig is a Zimbra local config that has already been parsed. This provides a fast access since each
-// entry is stored in a map
+// entry is stored in a map.
 type indexedLocalConfig struct {
 	localConfigIndex map[string]*LocalConfigEntry
 }
 
 // LoadLocalConfig loads a Zimbra local configuration located at the desired path. The current behavior is to load the
-// XML file and parse it storing all the values in RAM. This allows for faster retrieval during the program execution
+// XML file and parse it storing all the values in RAM. This allows for faster retrieval during the program execution.
 func LoadLocalConfig(path string) (LocalConfig, error) {
 	rawLocalConfig, err := loadLocalConfig(path)
 	if err != nil {
@@ -85,8 +86,8 @@ func LoadLocalConfig(path string) (LocalConfig, error) {
 	}
 
 	requiredFields := []string{
-		LocalConfigLdapMasterUrl,
-		LocalConfigLdapUrl,
+		LocalConfigLdapMasterURL,
+		LocalConfigLdapURL,
 		LocalConfigLdapUserDn,
 		LocalConfigLdapPassword,
 		LocalConfigServerHostname,
@@ -102,22 +103,23 @@ func LoadLocalConfig(path string) (LocalConfig, error) {
 	return &indexedLocalConfig{localConfigIndex: localConfigIndex}, nil
 }
 
-// Value perform a value lookup in the Zimbra local configuration
+// Value perform a value lookup in the Zimbra local configuration.
 func (l *indexedLocalConfig) Value(key string) string {
 	return l.localConfigIndex[key].Value
 }
 
 // Value perform a value lookup in the Zimbra local configuration
-// and extracts one or multiple values, split by a space ' '
+// and extracts one or multiple values, split by a space ' '.
 func (l *indexedLocalConfig) Values(key string) []string {
 	values := strings.Split(
 		strings.Trim(l.localConfigIndex[key].Value, " "),
 		" ",
 	)
+
 	return values
 }
 
-// Text represents an additional description for that key
+// Text represents an additional description for that key.
 func (l *indexedLocalConfig) Text(key string) string {
 	return l.localConfigIndex[key].Text
 }

@@ -27,6 +27,7 @@ func StartSystemdUnit(systemdHandler func() (UnitManager, error), unitName strin
 	if opOutput := <-unitOutput; opOutput != "done" {
 		return errors.New("systemd unit startup finished with a code different than 'done'. Systemd returned: " + opOutput)
 	}
+
 	return nil
 }
 

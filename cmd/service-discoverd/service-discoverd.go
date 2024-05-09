@@ -30,11 +30,11 @@ func (r realDependencies) Log(a ...any) {
 	_, _ = fmt.Fprint(os.Stderr, a...)
 }
 
-func (r realDependencies) Getenv(key string) (env string) {
+func (r realDependencies) Getenv(key string) string {
 	return os.Getenv(key)
 }
 
-func (r realDependencies) Getuid() (uid int) {
+func (r realDependencies) Getuid() int {
 	return os.Getuid()
 }
 
@@ -42,15 +42,15 @@ func (r realDependencies) UserLookup(username string) (*user.User, error) {
 	return user.Lookup(username)
 }
 
-func (r realDependencies) Setuid(uid int) (err error) {
+func (r realDependencies) Setuid(uid int) error {
 	return syscall.Setuid(uid)
 }
 
-func (r realDependencies) Setgid(gid int) (err error) {
+func (r realDependencies) Setgid(gid int) error {
 	return syscall.Setgid(gid)
 }
 
-func (r realDependencies) Exec(argv0 string, argv []string, envv []string) (err error) {
+func (r realDependencies) Exec(argv0 string, argv, envv []string) error {
 	return syscall.Exec(argv0, argv, envv)
 }
 
@@ -86,10 +86,10 @@ func main() {
 	runServiceDiscoverDaemon(realDependencies{}, os.Args)
 }
 
-func runServiceDiscoverDaemon(d deps, args []string) {
+func runServiceDiscoverDaemon(deps deps, args []string) {
 	if len(args) < 2 || (args[1] != "server" && args[1] != "agent") {
-		d.Log("one parameter: server or agent")
-		d.Exit(ExitCodeWrongArgs)
+		deps.Log("one parameter: server or agent")
+		deps.Exit(ExitCodeWrongArgs)
 
 		return
 	}
@@ -98,43 +98,43 @@ func runServiceDiscoverDaemon(d deps, args []string) {
 
 	// root privileges only serves to read the localconfig, once we have the
 	// necessary credentials we can drop privileges to reduce the attack surface
-	err := checkRoot(d)
+	err := checkRoot(deps)
 	if err != nil {
-		d.Log(err.Log)
-		d.Exit(err.ExitCode)
+		deps.Log(err.Log)
+		deps.Exit(err.ExitCode)
 
 		return
 	}
 
-	ldapHandler, localServer, err := readLocalConfig(d)
+	ldapHandler, localServer, err := readLocalConfig(deps)
 	if err != nil {
-		d.Log(err.Log)
-		d.Exit(err.ExitCode)
+		deps.Log(err.Log)
+		deps.Exit(err.ExitCode)
 
 		return
 	}
 
-	err = changeUser(d)
+	err = changeUser(deps)
 
 	if err != nil {
-		d.Log(err.Log)
-		d.Exit(err.ExitCode)
+		deps.Log(err.Log)
+		deps.Exit(err.ExitCode)
 
 		return
 	}
 
 	servers, err := queryAllServiceDiscoverServers(ldapHandler)
 	if err != nil {
-		d.Log(err.Log)
-		d.Exit(err.ExitCode)
+		deps.Log(err.Log)
+		deps.Exit(err.ExitCode)
 
 		return
 	}
 
-	err = startConsul(d, isServer, servers, localServer)
+	err = startConsul(deps, isServer, servers, localServer)
 	if err != nil {
-		d.Log(err.Log)
-		d.Exit(err.ExitCode)
+		deps.Log(err.Log)
+		deps.Exit(err.ExitCode)
 
 		return
 	}
@@ -154,8 +154,8 @@ func checkRoot(d deps) *ErrorWithExitCode {
 	return nil
 }
 
-func changeUser(d deps) *ErrorWithExitCode {
-	serviceDiscoverUser, err := d.UserLookup("service-discover")
+func changeUser(deps deps) *ErrorWithExitCode {
+	serviceDiscoverUser, err := deps.UserLookup("service-discover")
 	if err != nil {
 		return &ErrorWithExitCode{
 			Log:      "cannot find user 'service-discover': " + err.Error(),
@@ -179,7 +179,7 @@ func changeUser(d deps) *ErrorWithExitCode {
 		}
 	}
 
-	err = d.Setgid(gid)
+	err = deps.Setgid(gid)
 	if err != nil {
 		return &ErrorWithExitCode{
 			Log:      "cannot change gid: " + err.Error(),
@@ -187,7 +187,7 @@ func changeUser(d deps) *ErrorWithExitCode {
 		}
 	}
 
-	err = d.Setuid(uid)
+	err = deps.Setuid(uid)
 	if err != nil {
 		return &ErrorWithExitCode{
 			Log:      "cannot change uid: " + err.Error(),
@@ -198,7 +198,7 @@ func changeUser(d deps) *ErrorWithExitCode {
 	return nil
 }
 
-func startConsul(d deps, isServer bool, servers []string, localServer string) *ErrorWithExitCode {
+func startConsul(deps deps, isServer bool, servers []string, localServer string) *ErrorWithExitCode {
 	var args []string
 
 	if isServer {
@@ -222,14 +222,14 @@ func startConsul(d deps, isServer bool, servers []string, localServer string) *E
 
 	// HACK: consul doesn't notify readiness to systemd if the list of servers is empty
 	if isServer {
-		args = append(args, fmt.Sprintf("-retry-join=%s", localServer))
+		args = append(args, ("-retry-join=%" + localServer))
 	}
 
 	found := false
 
 	for _, server := range servers {
 		if localServer != server {
-			args = append(args, fmt.Sprintf("-retry-join=%s", server))
+			args = append(args, "-retry-join="+server)
 		} else {
 			found = true
 		}
@@ -255,15 +255,15 @@ func startConsul(d deps, isServer bool, servers []string, localServer string) *E
 
 	envs := make([]string, 0)
 
-	if len(d.Getenv("SHELL")) > 0 {
-		envs = append(envs, "SHELL="+d.Getenv("SHELL"))
+	if deps.Getenv("SHELL") != "" {
+		envs = append(envs, "SHELL="+deps.Getenv("SHELL"))
 	}
 
-	if len(d.Getenv("NOTIFY_SOCKET")) > 0 {
-		envs = append(envs, "NOTIFY_SOCKET="+d.Getenv("NOTIFY_SOCKET"))
+	if deps.Getenv("NOTIFY_SOCKET") != "" {
+		envs = append(envs, "NOTIFY_SOCKET="+deps.Getenv("NOTIFY_SOCKET"))
 	}
 
-	err := d.Exec(
+	err := deps.Exec(
 		consulBinPath,
 		args,
 		envs,
@@ -281,8 +281,8 @@ func startConsul(d deps, isServer bool, servers []string, localServer string) *E
 	}
 }
 
-func readLocalConfig(d deps) (carbonio.LdapHandler, string, *ErrorWithExitCode) {
-	localConfig, err := d.LoadLocalConfig()
+func readLocalConfig(deps deps) (carbonio.LdapHandler, string, *ErrorWithExitCode) {
+	localConfig, err := deps.LoadLocalConfig()
 	if err != nil {
 		return nil, "", &ErrorWithExitCode{
 			Log:      "unable to read ldap configuration: " + err.Error(),
@@ -290,7 +290,7 @@ func readLocalConfig(d deps) (carbonio.LdapHandler, string, *ErrorWithExitCode) 
 		}
 	}
 
-	handler := d.CreateNewHandler(localConfig)
+	handler := deps.CreateNewHandler(localConfig)
 
 	return handler, localConfig.Value(carbonio.LocalConfigServerHostname), nil
 }

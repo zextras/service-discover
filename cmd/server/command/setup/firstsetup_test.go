@@ -23,7 +23,7 @@ import (
 	mocks5 "github.com/zextras/service-discover/pkg/carbonio/mocks"
 	"github.com/zextras/service-discover/pkg/command"
 	mocks2 "github.com/zextras/service-discover/pkg/command/setup/mocks"
-	"github.com/zextras/service-discover/pkg/credentialsEncrypter"
+	"github.com/zextras/service-discover/pkg/encrypter"
 	"github.com/zextras/service-discover/pkg/exec"
 	mocks4 "github.com/zextras/service-discover/pkg/exec/mocks"
 	mocks3 "github.com/zextras/service-discover/pkg/systemd/mocks"
@@ -124,7 +124,7 @@ func TestFirstSetup_business(t *testing.T) {
 		text, err := out.PlainRender()
 		assert.NoError(t, err)
 		assert.Equal(t, "", text)
-		text, err = out.JsonRender()
+		text, err = out.JSONRender()
 		assert.NoError(t, err)
 		assert.Equal(t, "{\"cluster_credentials\":\""+setup.ClusterCredential+"\"}", text)
 
@@ -136,7 +136,7 @@ func TestFirstSetup_business(t *testing.T) {
 		assert.NoError(t, err, "File should exist")
 
 		defer clusterCredentialFile.Close() // It will be removed in the cleanup() function deferred before
-		encReader, err := credentialsEncrypter.NewReader(clusterCredentialFile, []byte("password"))
+		encReader, err := encrypter.NewReader(clusterCredentialFile, []byte("password"))
 		assert.NoError(t, err, "Error while opening tar reader")
 
 		listOfCompressedFiles := make([]string, 0)
@@ -160,7 +160,7 @@ func TestFirstSetup_business(t *testing.T) {
 		caKeyFileNameRel, _ := filepath.Rel("/", setup.ConsulHome+"/"+command.ConsulCAKey)
 
 		expectedFileList = append(expectedFileList, command.GossipKey)
-		expectedFileList = append(expectedFileList, command.ConsulAclBootstrap)
+		expectedFileList = append(expectedFileList, command.ConsulACLBootstrap)
 		expectedFileList = append(expectedFileList, caKeyFileNameRel)
 		expectedFileList = append(expectedFileList, caFileNameRel)
 		assert.Equal(
@@ -721,7 +721,7 @@ func TestSetup_createEncryptedSecret(t *testing.T) {
 				// We need to assert the content of the files are correct too
 				cc, err := os.Open(tt.fields.ClusterCredential)
 				assert.NoError(t, err)
-				reader, err := credentialsEncrypter.NewReader(cc, []byte(tt.args.password))
+				reader, err := encrypter.NewReader(cc, []byte(tt.args.password))
 				assert.NoError(t, err)
 
 				actualNumberOfFiles := 0

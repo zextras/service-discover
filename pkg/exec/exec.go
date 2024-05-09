@@ -30,7 +30,7 @@ func Command(name string, arg ...string) Cmd {
 }
 
 // InPath change directory in the desired path before executing the desired command. It then proceed to return to
-// the original folder
+// the original folder.
 func InPath(cmd Cmd, path string) error {
 	executionPath, err := os.Executable()
 	if err != nil {
@@ -39,7 +39,7 @@ func InPath(cmd Cmd, path string) error {
 
 	originalPath := filepath.Dir(executionPath)
 
-	if err = os.Chdir(path); err != nil {
+	if err := os.Chdir(path); err != nil {
 		return err
 	}
 
@@ -48,7 +48,7 @@ func InPath(cmd Cmd, path string) error {
 		return err
 	}
 
-	if err = os.Chdir(originalPath); err != nil {
+	if err := os.Chdir(originalPath); err != nil {
 		return err
 	}
 
@@ -61,5 +61,6 @@ func ErrorFromStderr(err error, reason string) error {
 	if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
 		stderr = string(ee.Stderr)
 	}
+
 	return errors.Errorf("%s: %s", reason, stderr)
 }
