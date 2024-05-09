@@ -17,10 +17,10 @@ import (
 )
 
 const (
-	LATEST_RELEASE       = "24.3.0"
-	PUBLIC_IMAGE_ADDRESS = "carbonio/ce-directory-server-u20:%s"
-	CI_DOCKER_NETWORK    = "ci_agent"
-	CI_NETWORK_MODE      = "overlay"
+	LatestRelease      = "24.3.0"
+	PublicImageAddress = "carbonio/ce-directory-server-u20:%s"
+	CIDockerNetwork    = "ci_agent"
+	CINetworkMode      = "overlay"
 )
 
 // SpinUpCarbonioLdap launches a Carbonio LDAP instance with the desired
@@ -35,9 +35,9 @@ func SpinUpCarbonioLdap(t *testing.T, address string, version string) (testconta
 	var netMode string
 
 	if os.Getenv("CI") == "true" {
-		t.Log("Using " + CI_DOCKER_NETWORK + " as network for LDAP")
-		nets = append(nets, CI_DOCKER_NETWORK)
-		netMode = CI_NETWORK_MODE
+		t.Log("Using " + CIDockerNetwork + " as network for LDAP")
+		nets = append(nets, CIDockerNetwork)
+		netMode = CINetworkMode
 	} else {
 		t.Log("Use standard local network for spinning LDAP")
 	}

@@ -24,7 +24,7 @@ func TestErrorWithRandomFormat(t *testing.T) {
 		expectsError        bool
 	}{
 		{"PlainRender format", "plain", 0, false},
-		{"JsonRender format", "json", 1, false},
+		{"JSONRender format", "json", 1, false},
 		// The expectedParsedValue here is random, it doesn't have sense!
 		{"Non valid format", "invalidStuff", 1, true},
 	}

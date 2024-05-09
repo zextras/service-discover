@@ -11,8 +11,8 @@ import (
 	"strings"
 )
 
-const LocalConfigLdapMasterUrl = "ldap_master_url"
-const LocalConfigLdapUrl = "ldap_url"
+const LocalConfigLdapMasterURL = "ldap_master_url"
+const LocalConfigLdapURL = "ldap_url"
 const LocalConfigLdapUserDn = "zimbra_ldap_userdn"
 const LocalConfigLdapPassword = "zimbra_ldap_password" // #nosec
 const LocalConfigServerHostname = "zimbra_server_hostname"
@@ -85,8 +85,8 @@ func LoadLocalConfig(path string) (LocalConfig, error) {
 	}
 
 	requiredFields := []string{
-		LocalConfigLdapMasterUrl,
-		LocalConfigLdapUrl,
+		LocalConfigLdapMasterURL,
+		LocalConfigLdapURL,
 		LocalConfigLdapUserDn,
 		LocalConfigLdapPassword,
 		LocalConfigServerHostname,

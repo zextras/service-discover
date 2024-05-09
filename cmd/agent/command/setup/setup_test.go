@@ -30,7 +30,7 @@ import (
 	mocks5 "github.com/zextras/service-discover/pkg/carbonio/mocks"
 	"github.com/zextras/service-discover/pkg/command"
 	"github.com/zextras/service-discover/pkg/command/setup/mocks"
-	"github.com/zextras/service-discover/pkg/credentialsEncrypter"
+	"github.com/zextras/service-discover/pkg/encrypter"
 	mocks2 "github.com/zextras/service-discover/pkg/exec/mocks"
 	mocks4 "github.com/zextras/service-discover/pkg/systemd/mocks"
 	"github.com/zextras/service-discover/test"
@@ -126,7 +126,7 @@ func TestSetup_setup(t *testing.T) {
 
 	setup := func(t *testing.T, testName string, credentialsContent []byte) (*testDependencies, func()) {
 		t.Log("Starting LDAP container")
-		container, ctxContainer := test.SpinUpCarbonioLdap(t, test.PUBLIC_IMAGE_ADDRESS, test.LATEST_RELEASE)
+		container, ctxContainer := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
 		containerIP, err := container.ContainerIP(ctxContainer)
 		t.Logf("LDAP container started at %s", containerIP)
 
@@ -266,7 +266,7 @@ func TestSetup_setup(t *testing.T) {
 
 	t.Run("Should fail when a wrong password is set", func(t *testing.T) {
 		contentToUpload := bytes.Buffer{}
-		writer, err := credentialsEncrypter.NewWriter(&contentToUpload, []byte("password"))
+		writer, err := encrypter.NewWriter(&contentToUpload, []byte("password"))
 		assert.NoError(t, err)
 		assert.NoError(t, writer.Close())
 
@@ -313,7 +313,7 @@ func TestSetup_setup(t *testing.T) {
 
 	t.Run("Should fail to create TLS certificate if CA is not present", func(t *testing.T) {
 		contentToUpload := bytes.Buffer{}
-		writer, err := credentialsEncrypter.NewWriter(&contentToUpload, []byte("password"))
+		writer, err := encrypter.NewWriter(&contentToUpload, []byte("password"))
 		assert.NoError(t, err)
 		assert.NoError(t, writer.Close())
 
@@ -356,7 +356,7 @@ func TestSetup_setup(t *testing.T) {
 		_, err = s.setup(mockDep)
 		expectedCaPath, _ := filepath.Rel("/", path.Join(consulHome, command.ConsulCA))
 		expectedCaKeyPath, _ := filepath.Rel("/", path.Join(consulHome, command.ConsulCAKey))
-		missingFiles := " " + expectedCaPath + " " + expectedCaKeyPath + " " + command.GossipKey + " " + command.ConsulAclBootstrap
+		missingFiles := " " + expectedCaPath + " " + expectedCaKeyPath + " " + command.GossipKey + " " + command.ConsulACLBootstrap
 		assert.EqualError(
 			t,
 			err,
@@ -367,7 +367,7 @@ func TestSetup_setup(t *testing.T) {
 	t.Run("Should fail when systemd enabling service-discover unit returns an error", func(t *testing.T) {
 		testName := "Should fail when systemd enabling service-discover unit returns an error"
 		contentToUpload := bytes.Buffer{}
-		writer, err := credentialsEncrypter.NewWriter(&contentToUpload, []byte("password"))
+		writer, err := encrypter.NewWriter(&contentToUpload, []byte("password"))
 		assert.NoError(t, err)
 
 		errorCause := "this is the error"
@@ -392,8 +392,8 @@ func TestSetup_setup(t *testing.T) {
 		assert.NoError(t, writer.AddFile(dumbCaKeyContent, caKeyStat, command.ConsulCAKey, consulHome+"/"))
 		dumbAclContent, aclStat := test.CreateDumbFile([]byte(`{
   "SecretID": "secret-token"
-}`), command.ConsulAclBootstrap)
-		assert.NoError(t, writer.AddFile(dumbAclContent, aclStat, command.ConsulAclBootstrap, "/"))
+}`), command.ConsulACLBootstrap)
+		assert.NoError(t, writer.AddFile(dumbAclContent, aclStat, command.ConsulACLBootstrap, "/"))
 		assert.NoError(t, writer.Close())
 
 		readContentToUpload, err := io.ReadAll(&contentToUpload)
@@ -444,7 +444,7 @@ func TestSetup_setup(t *testing.T) {
 		aclTemplateData := struct {
 			ZimbraHostname string
 		}{ZimbraHostname: fmt.Sprintf("agent-%s", strings.ReplaceAll(containerIP, ".", "-"))}
-		aclTemplate := template.Must(template.New("acl").Parse(command.AclPolicyTemplateText))
+		aclTemplate := template.Must(template.New("acl").Parse(command.ACLPolicyTemplateText))
 		aclRenderOut := bytes.Buffer{}
 		assert.NoError(t, aclTemplate.Execute(&aclRenderOut, aclTemplateData))
 		aclRenderBs, err := io.ReadAll(&aclRenderOut)
@@ -544,7 +544,7 @@ func TestSetup_setup(t *testing.T) {
 	t.Run("Should properly run without errors", func(t *testing.T) {
 		testName := "Should properly run without errors"
 		contentToUpload := bytes.Buffer{}
-		writer, err := credentialsEncrypter.NewWriter(&contentToUpload, []byte("password"))
+		writer, err := encrypter.NewWriter(&contentToUpload, []byte("password"))
 		assert.NoError(t, err)
 
 		mutableConfiguration := test.GenerateRandomFile(testName)
@@ -565,8 +565,8 @@ func TestSetup_setup(t *testing.T) {
 		assert.NoError(t, writer.AddFile(dumbGossipKeyContent, gossipStat, command.GossipKey, "/"))
 		dumbAclContent, aclStat := test.CreateDumbFile([]byte(`{
   "SecretID": "secret-token"
-}`), command.ConsulAclBootstrap)
-		assert.NoError(t, writer.AddFile(dumbAclContent, aclStat, command.ConsulAclBootstrap, "/"))
+}`), command.ConsulACLBootstrap)
+		assert.NoError(t, writer.AddFile(dumbAclContent, aclStat, command.ConsulACLBootstrap, "/"))
 		dumbCaKeyContent, caKeyStat := test.CreateDumbFile([]byte("Gossip-test"), command.GossipKey)
 		assert.NoError(t, writer.AddFile(dumbCaKeyContent, caKeyStat, command.ConsulCAKey, consulHome+"/"))
 		assert.NoError(t, writer.Close())
@@ -619,7 +619,7 @@ func TestSetup_setup(t *testing.T) {
 		aclTemplateData := struct {
 			ZimbraHostname string
 		}{ZimbraHostname: fmt.Sprintf("agent-%s", strings.ReplaceAll(containerIP, ".", "-"))}
-		aclTemplate := template.Must(template.New("acl").Parse(command.AclPolicyTemplateText))
+		aclTemplate := template.Must(template.New("acl").Parse(command.ACLPolicyTemplateText))
 		aclRenderOut := bytes.Buffer{}
 		assert.NoError(t, aclTemplate.Execute(&aclRenderOut, aclTemplateData))
 		aclRenderBs, err := io.ReadAll(&aclRenderOut)

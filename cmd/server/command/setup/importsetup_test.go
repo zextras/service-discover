@@ -27,7 +27,7 @@ import (
 	"github.com/zextras/service-discover/pkg/carbonio"
 	"github.com/zextras/service-discover/pkg/command"
 	mocks2 "github.com/zextras/service-discover/pkg/command/setup/mocks"
-	"github.com/zextras/service-discover/pkg/credentialsEncrypter"
+	"github.com/zextras/service-discover/pkg/encrypter"
 	mocks3 "github.com/zextras/service-discover/pkg/exec/mocks"
 	mocks4 "github.com/zextras/service-discover/pkg/systemd/mocks"
 	"github.com/zextras/service-discover/test"
@@ -232,7 +232,7 @@ func TestSetup_importSetup(t *testing.T) {
 			clusterCredentialsContent = []byte(fakeCredentialsTar)
 		}
 
-		container, ctxContainer := test.SpinUpCarbonioLdap(t, test.PUBLIC_IMAGE_ADDRESS, test.LATEST_RELEASE)
+		container, ctxContainer := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
 
 		containerIP, err := container.ContainerIP(ctxContainer)
 		if err != nil {
@@ -439,7 +439,7 @@ func TestSetup_importSetup(t *testing.T) {
 		}
 		file, err := os.Create(setupFiles.ClusterCredentialDownload.Name())
 		assert.NoError(t, err)
-		tarWriter, err := credentialsEncrypter.NewWriter(file, []byte("password"))
+		tarWriter, err := encrypter.NewWriter(file, []byte("password"))
 		assert.NoError(t, err)
 		err = os.WriteFile(setupFiles.consulFileConfig, []byte("Test"), os.FileMode(0644))
 		assert.NoError(t, err)
@@ -486,7 +486,7 @@ func TestSetup_importSetup(t *testing.T) {
 		}
 		clusterCredential, err := os.Create(setupFiles.ClusterCredentialDownload.Name())
 		assert.NoError(t, err)
-		tarWriter, err := credentialsEncrypter.NewWriter(clusterCredential, []byte("password"))
+		tarWriter, err := encrypter.NewWriter(clusterCredential, []byte("password"))
 		assert.NoError(t, err)
 
 		assert.NoError(t, tarWriter.AddFile(
@@ -504,7 +504,7 @@ func TestSetup_importSetup(t *testing.T) {
 		assert.NoError(t, tarWriter.AddFile(
 			bytes.NewBuffer([]byte("{\"blabla\": \"123\",\"SecretID\": \"c182a76b-d26f-92fb-de9b-2f828e8730bd\"}")),
 			&FakeFileStat{size: 68},
-			command.ConsulAclBootstrap,
+			command.ConsulACLBootstrap,
 			"/",
 		))
 		assert.NoError(t, tarWriter.AddFile(

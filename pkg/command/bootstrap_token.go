@@ -12,7 +12,7 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
-	"github.com/zextras/service-discover/pkg/credentialsEncrypter"
+	"github.com/zextras/service-discover/pkg/encrypter"
 	"github.com/zextras/service-discover/pkg/formatter"
 	"github.com/zextras/service-discover/pkg/term"
 )
@@ -22,7 +22,7 @@ const (
 )
 
 type BootstrapToken struct {
-	termUiProvider                term.UiProvider
+	termUIProvider                term.UIProvider
 	clusterCredentialFileLocation string `kong:"-"`
 	Command                       `kong:"-"`
 	writer                        io.Writer `kong:"-"`
@@ -39,7 +39,7 @@ func (o *outputBootstrapToken) PlainRender() (string, error) {
 	return o.Token, nil
 }
 
-func (o *outputBootstrapToken) JsonRender() (string, error) {
+func (o *outputBootstrapToken) JSONRender() (string, error) {
 	return formatter.DefaultJSONRender(o)
 }
 
@@ -74,7 +74,7 @@ func (v *BootstrapToken) ReadToken() (string, error) {
 	if v.Password == "" {
 		var err error
 
-		ui, err := v.termUiProvider.Get(wrapper)
+		ui, err := v.termUIProvider.Get(wrapper)
 		if err != nil {
 			return "", err
 		}
@@ -105,18 +105,18 @@ func (v *BootstrapToken) ReadToken() (string, error) {
 		_ = clusterCredentialFile.Close()
 	}(clusterCredentialFile)
 
-	credReader, err := credentialsEncrypter.NewReader(clusterCredentialFile, []byte(password))
+	credReader, err := encrypter.NewReader(clusterCredentialFile, []byte(password))
 	if err != nil {
 		return "", err
 	}
 
-	extractedFiles, err := credentialsEncrypter.ReadFiles(credReader, ConsulAclBootstrap)
+	extractedFiles, err := encrypter.ReadFiles(credReader, ConsulACLBootstrap)
 	if err != nil {
 		return "", err
 	}
 
 	aclBootstrapToken := ACLTokenCreation{}
-	if err := json.Unmarshal(extractedFiles[ConsulAclBootstrap], &aclBootstrapToken); err != nil {
+	if err := json.Unmarshal(extractedFiles[ConsulACLBootstrap], &aclBootstrapToken); err != nil {
 		return "", errors.WithMessagef(err, "unable to decode ACL Bootstrap token")
 	}
 

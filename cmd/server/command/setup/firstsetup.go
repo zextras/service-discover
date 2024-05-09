@@ -16,7 +16,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/zextras/service-discover/pkg/carbonio"
 	"github.com/zextras/service-discover/pkg/command"
-	"github.com/zextras/service-discover/pkg/credentialsEncrypter"
+	"github.com/zextras/service-discover/pkg/encrypter"
 	exec2 "github.com/zextras/service-discover/pkg/exec"
 	"github.com/zextras/service-discover/pkg/formatter"
 	"github.com/zextras/service-discover/pkg/permissions"
@@ -135,13 +135,13 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 		}
 	}
 
-	aclBootstrapJson, err := s.createACLBootstrapToken(d)
+	aclBootstrapJSON, err := s.createACLBootstrapToken(d)
 	if err != nil {
 		return err
 	}
 
 	aclBootstrapUnmarshal := &command.ACLTokenCreation{}
-	err = json.Unmarshal(aclBootstrapJson, aclBootstrapUnmarshal)
+	err = json.Unmarshal(aclBootstrapJSON, aclBootstrapUnmarshal)
 
 	if err != nil {
 		return errors.WithMessage(
@@ -165,14 +165,14 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 		return err
 	}
 
-	aclFile, err := os.CreateTemp("", command.ConsulAclBootstrap)
+	aclFile, err := os.CreateTemp("", command.ConsulACLBootstrap)
 	if err != nil {
 		return err
 	}
 
 	defer os.Remove(aclFile.Name())
 
-	if err = os.WriteFile(aclFile.Name(), aclBootstrapJson, 0600); err != nil {
+	if err = os.WriteFile(aclFile.Name(), aclBootstrapJSON, 0600); err != nil {
 		return err
 	}
 
@@ -189,7 +189,7 @@ func (s *Setup) performSetup(d businessDependencies, inputs *setupConfiguration)
 
 	filesToCompress := map[string]string{
 		command.GossipKey:                        gossipKeyFile.Name(),
-		command.ConsulAclBootstrap:               aclFile.Name(),
+		command.ConsulACLBootstrap:               aclFile.Name(),
 		s.ConsulHome + "/" + command.ConsulCA:    s.ConsulHome + "/" + command.ConsulCA,
 		s.ConsulHome + "/" + command.ConsulCAKey: s.ConsulHome + "/" + command.ConsulCAKey,
 	}
@@ -233,7 +233,7 @@ func (s *Setup) createEncryptedSecret(filesToCompress map[string]string, passwor
 		return errors.Errorf("unable to change permission to %s: %s", s.ClusterCredential, err)
 	}
 
-	encWriter, err := credentialsEncrypter.NewWriter(encryptedSecretFiles, []byte(password))
+	encWriter, err := encrypter.NewWriter(encryptedSecretFiles, []byte(password))
 	if err != nil {
 		return err
 	}
@@ -272,7 +272,7 @@ func (s *Setup) createACLBootstrapToken(d businessDependencies) ([]byte, error) 
 		for {
 			<-ticker.C
 
-			aclBootstrapJson, err := d.CreateCommand(consulBin, "acl", "bootstrap", "-format", "json").Output()
+			aclBootstrapJSON, err := d.CreateCommand(consulBin, "acl", "bootstrap", "-format", "json").Output()
 			if err != nil {
 				if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
 					stderr := strings.TrimSpace(string(ee.Stderr))
@@ -284,7 +284,7 @@ func (s *Setup) createACLBootstrapToken(d businessDependencies) ([]byte, error) 
 					}
 				}
 			} else {
-				res := returnResult{data: aclBootstrapJson}
+				res := returnResult{data: aclBootstrapJSON}
 				result <- res
 
 				return

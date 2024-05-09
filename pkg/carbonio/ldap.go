@@ -122,7 +122,7 @@ func standardLdapConnection() func(url string) (ldapConnInterface, error) {
 	}
 }
 
-// CheckServerAvailability Returns an error if the server is not available
+// CheckServerAvailability Returns an error if the server is not available.
 func (l *ldapContext) CheckServerAvailability(write bool) error {
 	connection, err := connect(l, write)
 	if err != nil {
@@ -175,8 +175,8 @@ func (l *ldapContext) QueryAllServersWithService(service string) ([]string, erro
 
 func readLdapCredentials(localConfig LocalConfig) ldapCredentials {
 	return ldapCredentials{
-		localConfig.Values(LocalConfigLdapMasterUrl),
-		localConfig.Values(LocalConfigLdapUrl),
+		localConfig.Values(LocalConfigLdapMasterURL),
+		localConfig.Values(LocalConfigLdapURL),
 		localConfig.Value(LocalConfigLdapUserDn),
 		localConfig.Value(LocalConfigLdapPassword),
 	}

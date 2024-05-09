@@ -54,7 +54,7 @@ func (o *getConfigOutput) PlainRender() (string, error) {
 	return out, nil
 }
 
-func (o *getConfigOutput) JsonRender() (string, error) {
+func (o *getConfigOutput) JSONRender() (string, error) {
 	return formatter.DefaultJSONRender(o)
 }
 
@@ -146,7 +146,7 @@ func (o *listConfigOutput) PlainRender() (string, error) {
 	return out, nil
 }
 
-func (o *listConfigOutput) JsonRender() (string, error) {
+func (o *listConfigOutput) JSONRender() (string, error) {
 	out, err := json.MarshalIndent(o.configs, "", "  ")
 	return string(out), err
 }

@@ -294,7 +294,7 @@ func TestCredentialsFromAndToLDAP(t *testing.T) {
 		assert.NoError(t, err)
 		err = os.WriteFile(uploadFile.Name(), randomContent, 0777)
 		assert.NoError(t, err)
-		ldapContainer, containerCtx := test.SpinUpCarbonioLdap(t, test.PUBLIC_IMAGE_ADDRESS, test.LATEST_RELEASE)
+		ldapContainer, containerCtx := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
 
 		defer func(ldapContainer testcontainers.Container, ctx context.Context) {
 			if err := ldapContainer.Terminate(ctx); err != nil {
@@ -308,7 +308,7 @@ func TestCredentialsFromAndToLDAP(t *testing.T) {
 		masterUrl := fmt.Sprintf("ldap://%s:%s", ldapIp, "389")
 
 		mockedLocalConfig := new(mocks.LocalConfig)
-		mockedLocalConfig.On("Values", carbonio.LocalConfigLdapMasterUrl).Return([]string{masterUrl}).On("Values", carbonio.LocalConfigLdapUrl).Return([]string{}).On("Value", carbonio.LocalConfigLdapUserDn).Return("uid=zimbra,cn=admins,cn=zimbra").On("Value", carbonio.LocalConfigLdapPassword).Return("password")
+		mockedLocalConfig.On("Values", carbonio.LocalConfigLdapMasterURL).Return([]string{masterUrl}).On("Values", carbonio.LocalConfigLdapURL).Return([]string{}).On("Value", carbonio.LocalConfigLdapUserDn).Return("uid=zimbra,cn=admins,cn=zimbra").On("Value", carbonio.LocalConfigLdapPassword).Return("password")
 
 		ldapHandler := carbonio.CreateNewHandler(mockedLocalConfig)
 
@@ -349,7 +349,7 @@ func TestCredentialsFromAndToLDAP(t *testing.T) {
 		randomContent := make([]byte, 4096000) // 4 MB random byte array to simulate random binary content
 		_, err := rand.Read(randomContent)
 		assert.NoError(t, err)
-		ldapContainer, containerCtx := test.SpinUpCarbonioLdap(t, test.PUBLIC_IMAGE_ADDRESS, test.LATEST_RELEASE)
+		ldapContainer, containerCtx := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
 
 		defer func(ldapContainer testcontainers.Container, ctx context.Context) {
 			if err := ldapContainer.Terminate(ctx); err != nil {
@@ -374,7 +374,7 @@ func TestCredentialsFromAndToLDAP(t *testing.T) {
 		assert.NoError(t, err)
 
 		mockedLocalConfig := new(mocks.LocalConfig)
-		mockedLocalConfig.On("Values", carbonio.LocalConfigLdapMasterUrl).Return([]string{masterUrl}).On("Values", carbonio.LocalConfigLdapUrl).Return([]string{}).On("Value", carbonio.LocalConfigLdapUserDn).Return("uid=zimbra,cn=admins,cn=zimbra").On("Value", carbonio.LocalConfigLdapPassword).Return("password")
+		mockedLocalConfig.On("Values", carbonio.LocalConfigLdapMasterURL).Return([]string{masterUrl}).On("Values", carbonio.LocalConfigLdapURL).Return([]string{}).On("Value", carbonio.LocalConfigLdapUserDn).Return("uid=zimbra,cn=admins,cn=zimbra").On("Value", carbonio.LocalConfigLdapPassword).Return("password")
 
 		ldapHandler := carbonio.CreateNewHandler(mockedLocalConfig)
 

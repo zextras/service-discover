@@ -36,7 +36,7 @@ type businessDependencies interface {
 	GetuidSyscall() int
 	LookupUser(name string) (*user.User, error)
 	LookupGroup(name string) (*user.Group, error)
-	Chown(path string, userUid int, groupUid int) error
+	Chown(path string, userUID int, groupUID int) error
 	Chmod(path string, mode os.FileMode) error
 }
 
@@ -96,8 +96,8 @@ func (r realDependencies) LookupGroup(name string) (*user.Group, error) {
 	return user.LookupGroup(name)
 }
 
-func (r realDependencies) Chown(path string, userUid int, groupUid int) error {
-	return os.Chown(path, userUid, groupUid)
+func (r realDependencies) Chown(path string, userUID int, groupUID int) error {
+	return os.Chown(path, userUID, groupUID)
 }
 
 func (r realDependencies) Chmod(path string, mode os.FileMode) error {

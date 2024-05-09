@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/zextras/service-discover/pkg/credentialsEncrypter"
+	"github.com/zextras/service-discover/pkg/encrypter"
 	"github.com/zextras/service-discover/pkg/formatter"
 	"github.com/zextras/service-discover/pkg/term"
 	"github.com/zextras/service-discover/test"
@@ -68,12 +68,12 @@ func TestBootstrapToken_ReadToken(t *testing.T) {
 	clusterCredentialsFile := test.GenerateRandomFile("test-bootstrap-token-cluster-credentials")
 	defer os.RemoveAll(clusterCredentialsFile.Name())
 
-	writer, _ := credentialsEncrypter.NewWriter(clusterCredentialsFile, []byte(password))
+	writer, _ := encrypter.NewWriter(clusterCredentialsFile, []byte(password))
 
 	dumbAclContent, aclStat := test.CreateDumbFile([]byte(fmt.Sprintf(`{
 		"SecretID":"%s"
-	}`, token)), ConsulAclBootstrap)
-	assert.NoError(t, writer.AddFile(dumbAclContent, aclStat, ConsulAclBootstrap, "/"))
+	}`, token)), ConsulACLBootstrap)
+	assert.NoError(t, writer.AddFile(dumbAclContent, aclStat, ConsulACLBootstrap, "/"))
 	assert.NoError(t, writer.Flush())
 	assert.NoError(t, writer.Close())
 
@@ -102,7 +102,7 @@ func TestBootstrapToken_ReadToken(t *testing.T) {
 				agentName:                     "myAgent",
 				Setup:                         false,
 				clusterCredentialFileLocation: clusterCredentialsFile.Name(),
-				termUiProvider:                &fakeTerminal{Password: password},
+				termUIProvider:                &fakeTerminal{Password: password},
 			},
 			want: token,
 		},
@@ -114,7 +114,7 @@ func TestBootstrapToken_ReadToken(t *testing.T) {
 				agentName:                     "myAgent",
 				Setup:                         false,
 				clusterCredentialFileLocation: clusterCredentialsFile.Name(),
-				termUiProvider:                &fakeTerminal{Password: password},
+				termUIProvider:                &fakeTerminal{Password: password},
 			},
 			want: token,
 		},
@@ -126,7 +126,7 @@ func TestBootstrapToken_ReadToken(t *testing.T) {
 				agentName:                     "myAgent",
 				Setup:                         true,
 				clusterCredentialFileLocation: clusterCredentialsFile.Name(),
-				termUiProvider:                &fakeNotTerminal{fakeTerminal{Password: password}},
+				termUIProvider:                &fakeNotTerminal{fakeTerminal{Password: password}},
 			},
 			want: token,
 		},
@@ -241,12 +241,12 @@ func (t aclSetup) setUpAclTarGpg() string {
 
 	clusterCredentialsFile := test.GenerateRandomFile("test-bootstrap-token-cluster-credentials")
 
-	writer, _ := credentialsEncrypter.NewWriter(clusterCredentialsFile, []byte(password))
+	writer, _ := encrypter.NewWriter(clusterCredentialsFile, []byte(password))
 
 	dumbAclContent, aclStat := test.CreateDumbFile([]byte(fmt.Sprintf(`{
 		"SecretID":"%s"
-	}`, token)), ConsulAclBootstrap)
-	assert.NoError(t.testing, writer.AddFile(dumbAclContent, aclStat, ConsulAclBootstrap, "/"))
+	}`, token)), ConsulACLBootstrap)
+	assert.NoError(t.testing, writer.AddFile(dumbAclContent, aclStat, ConsulACLBootstrap, "/"))
 	assert.NoError(t.testing, writer.Flush())
 	assert.NoError(t.testing, writer.Close())
 	return clusterCredentialsFile.Name()

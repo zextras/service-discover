@@ -14,7 +14,7 @@ import (
 	"github.com/zextras/service-discover/cmd/server/config"
 	"github.com/zextras/service-discover/pkg/carbonio"
 	"github.com/zextras/service-discover/pkg/command"
-	"github.com/zextras/service-discover/pkg/credentialsEncrypter"
+	"github.com/zextras/service-discover/pkg/encrypter"
 	"github.com/zextras/service-discover/pkg/formatter"
 	"github.com/zextras/service-discover/pkg/permissions"
 	"github.com/zextras/service-discover/pkg/systemd"
@@ -60,7 +60,7 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 		return nil, err
 	}
 
-	credReader, err := credentialsEncrypter.NewReader(clusterCredential, []byte(s.Password))
+	credReader, err := encrypter.NewReader(clusterCredential, []byte(s.Password))
 	if err != nil {
 		return nil, errors.Errorf("unable to open %s: %s", clusterCredential.Name(), err)
 	}
@@ -86,11 +86,11 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 		return nil, err
 	}
 
-	extractedFiles, err := credentialsEncrypter.ReadFiles(
+	extractedFiles, err := encrypter.ReadFiles(
 		credReader,
 		tarballCaFullPath,
 		tarballCaKeyFullPath,
-		command.ConsulAclBootstrap,
+		command.ConsulACLBootstrap,
 		command.GossipKey,
 	)
 	if err != nil {
@@ -161,7 +161,7 @@ func (s *Setup) importSetup(d businessDependencies) (formatter.Formatter, error)
 	}
 
 	aclBootstrapToken := command.ACLTokenCreation{}
-	if err := json.Unmarshal(extractedFiles[command.ConsulAclBootstrap], &aclBootstrapToken); err != nil {
+	if err := json.Unmarshal(extractedFiles[command.ConsulACLBootstrap], &aclBootstrapToken); err != nil {
 		return nil, errors.WithMessagef(err, "unable to decode ACL Bootstrap token")
 	}
 

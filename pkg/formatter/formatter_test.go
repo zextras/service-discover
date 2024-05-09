@@ -19,7 +19,7 @@ func (v *validFormatter) PlainRender() (string, error) {
 	return v.Message, nil
 }
 
-func (v *validFormatter) JsonRender() (string, error) {
+func (v *validFormatter) JSONRender() (string, error) {
 	return DefaultJSONRender(v)
 }
 
@@ -31,7 +31,7 @@ func (v *jsonOnlyFormatter) PlainRender() (string, error) {
 	return "", errors.New("Plain render not supported")
 }
 
-func (v *jsonOnlyFormatter) JsonRender() (string, error) {
+func (v *jsonOnlyFormatter) JSONRender() (string, error) {
 	return DefaultJSONRender(v)
 }
 
@@ -43,7 +43,7 @@ func (v *plainOnlyFormatter) PlainRender() (string, error) {
 	return v.Message, nil
 }
 
-func (v *plainOnlyFormatter) JsonRender() (string, error) {
+func (v *plainOnlyFormatter) JSONRender() (string, error) {
 	return "", errors.New("Cannot encode to Json")
 }
 
@@ -74,7 +74,7 @@ func TestRender(t *testing.T) {
 			"Json formatter of a valid struct",
 			args{
 				&validFormatter{Message: "test"},
-				JsonFormatOutput,
+				JSONFormatOutput,
 			},
 			`{"message":"test"}`,
 			false,
@@ -83,7 +83,7 @@ func TestRender(t *testing.T) {
 			"Plain formatter only error on Json formatting",
 			args{
 				&plainOnlyFormatter{Message: "test"},
-				JsonFormatOutput,
+				JSONFormatOutput,
 			},
 			"",
 			true,
@@ -116,14 +116,14 @@ func TestRender(t *testing.T) {
 
 // This example is for documentation purposes https://blog.golang.org/examples
 func ExampleRender() {
-	// My structure, validFormatter, implements PlainRender() and JsonRender()
+	// My structure, validFormatter, implements PlainRender() and JSONRender()
 	dataToOutput := &validFormatter{Message: "hello world"}
 	// Now I want to print the output in plain text
 	plainRes, _ := Render(dataToOutput, PlainFormatOutput)
 	fmt.Println(plainRes)
 
 	// Now I want to print the output encoded in Json
-	jsonRes, _ := Render(dataToOutput, JsonFormatOutput)
+	jsonRes, _ := Render(dataToOutput, JSONFormatOutput)
 	fmt.Println(jsonRes)
 
 	// Output:

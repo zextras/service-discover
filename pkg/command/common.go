@@ -30,11 +30,11 @@ const (
 	ConsulServerCertificateKey = "dc1-server-consul-0-key.pem"
 	ConsulAgentCertificate     = "dc1-client-consul-0.pem"
 	ConsulAgentCertificateKey  = "dc1-client-consul-0-key.pem"
-	ConsulAclBootstrap         = "consul-acl-secret.json"
+	ConsulACLBootstrap         = "consul-acl-secret.json"
 	GossipKey                  = "gossip-key"
-	ConsulHttpToken            = "CONSUL_HTTP_TOKEN" // #nosec
+	ConsulHTTPToken            = "CONSUL_HTTP_TOKEN" // #nosec
 	ConsulBin                  = "/usr/bin/consul"
-	AclPolicyTemplateText      = `{
+	ACLPolicyTemplateText      = `{
    "node":{
       "{{ .ZimbraHostname }}":{
          "policy":"write"
@@ -217,16 +217,16 @@ func CreateACLToken(
 	zimbraHostname string,
 	rootToken string,
 ) (string, error) {
-	if err := os.Setenv(ConsulHttpToken, rootToken); err != nil {
+	if err := os.Setenv(ConsulHTTPToken, rootToken); err != nil {
 		return "", errors.WithMessage(err, "unable to set correct env variable before starting ACL token creation")
 	}
-	defer os.Unsetenv(ConsulHttpToken)
+	defer os.Unsetenv(ConsulHTTPToken)
 
 	agentPolicyName := ConsulNodeName(prefix, zimbraHostname)
 	templateRender := struct {
 		ZimbraHostname string
 	}{ZimbraHostname: agentPolicyName}
-	aclPolicyTemplate := template.Must(template.New("agent-config").Parse(AclPolicyTemplateText))
+	aclPolicyTemplate := template.Must(template.New("agent-config").Parse(ACLPolicyTemplateText))
 
 	aclPolicyRenderBuffer := bytes.Buffer{}
 	if err := aclPolicyTemplate.Execute(&aclPolicyRenderBuffer, templateRender); err != nil {
@@ -285,18 +285,18 @@ func CreateACLToken(
 }
 
 func SetACLToken(commandCreator func(name string, args ...string) exec.Cmd, token string, rootToken string) error {
-	if err := os.Setenv(ConsulHttpToken, rootToken); err != nil {
+	if err := os.Setenv(ConsulHTTPToken, rootToken); err != nil {
 		return errors.WithMessage(err, "unable to set correct env variable before starting ACL token creation")
 	}
-	defer os.Unsetenv(ConsulHttpToken)
+	defer os.Unsetenv(ConsulHTTPToken)
 
-	setupAclCmd := commandCreator(ConsulBin,
+	setupACLCmd := commandCreator(ConsulBin,
 		"acl",
 		"set-agent-token",
 		"default",
 		token,
 	)
-	if _, err := setupAclCmd.Output(); err != nil {
+	if _, err := setupACLCmd.Output(); err != nil {
 		return exec.ErrorFromStderr(err, "unable to set agent token")
 	}
 

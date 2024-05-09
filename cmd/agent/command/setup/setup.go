@@ -19,7 +19,7 @@ import (
 	"github.com/zextras/service-discover/cmd/agent/config"
 	"github.com/zextras/service-discover/pkg/carbonio"
 	"github.com/zextras/service-discover/pkg/command"
-	"github.com/zextras/service-discover/pkg/credentialsEncrypter"
+	"github.com/zextras/service-discover/pkg/encrypter"
 	"github.com/zextras/service-discover/pkg/exec"
 	"github.com/zextras/service-discover/pkg/formatter"
 	"github.com/zextras/service-discover/pkg/permissions"
@@ -30,7 +30,7 @@ import (
 var testingMode bool
 
 const (
-	rootUid               = 0
+	rootUID               = 0
 	certificateExpiration = 365 * 30
 	serviceDiscoverUnit   = "service-discover.service"
 	defaultLogLevel       = "INFO"
@@ -66,7 +66,7 @@ type businessDependencies interface {
 	GetuidSyscall() int
 	LookupUser(name string) (*user.User, error)
 	LookupGroup(name string) (*user.Group, error)
-	Chown(path string, userUid int, groupUid int) error
+	Chown(path string, userUID int, groupUID int) error
 	Chmod(path string, mode os.FileMode) error
 }
 
@@ -118,8 +118,8 @@ func (r realDependencies) LookupGroup(name string) (*user.Group, error) {
 	return user.LookupGroup(name)
 }
 
-func (r realDependencies) Chown(path string, userUid int, groupUid int) error {
-	return os.Chown(path, userUid, groupUid)
+func (r realDependencies) Chown(path string, userUID int, groupUID int) error {
+	return os.Chown(path, userUID, groupUID)
 }
 
 func (r realDependencies) Chmod(path string, mode os.FileMode) error {
@@ -147,7 +147,7 @@ type portsConfig struct {
 }
 
 type setupConfig struct {
-	AclConfig               aclConfig   `json:"acl"`
+	ACLConfig               aclConfig   `json:"acl"`
 	CaFile                  string      `json:"ca_file"`
 	CertFile                string      `json:"cert_file"`
 	DataDir                 string      `json:"data_dir"`
@@ -160,7 +160,7 @@ type setupConfig struct {
 	VerifyIncoming          bool        `json:"verify_incoming"`
 	VerifyOutgoing          bool        `json:"verify_outgoing"`
 	VerifyServerHostname    bool        `json:"verify_server_hostname"`
-	UiConfig                uiConfig    `json:"ui_config"`
+	UIConfig                uiConfig    `json:"ui_config"`
 	Ports                   portsConfig `json:"ports"`
 }
 
@@ -244,7 +244,7 @@ func preRun(clusterCredentialPath string, d businessDependencies) error {
 		return errors.Errorf("unable to execute consul binary: %s", err)
 	}
 
-	if d.GetuidSyscall() != rootUid {
+	if d.GetuidSyscall() != rootUID {
 		return errors.New("this command must be executed as root")
 	}
 
@@ -364,7 +364,7 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 		_ = clusterCredentialFile.Close()
 	}(clusterCredentialFile)
 
-	credReader, err := credentialsEncrypter.NewReader(clusterCredentialFile, []byte(s.Password))
+	credReader, err := encrypter.NewReader(clusterCredentialFile, []byte(s.Password))
 	if err != nil {
 		return nil, errors.WithMessagef(err, "unable to read %s", clusterCredentialFile.Name())
 	}
@@ -380,8 +380,8 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 		return nil, err
 	}
 
-	extractedFiles, err := credentialsEncrypter.ReadFiles(credReader,
-		caPath, caKeyPath, command.GossipKey, command.ConsulAclBootstrap)
+	extractedFiles, err := encrypter.ReadFiles(credReader,
+		caPath, caKeyPath, command.GossipKey, command.ConsulACLBootstrap)
 	if err != nil {
 		return nil, err
 	}
@@ -430,7 +430,7 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 	}
 
 	consulAgentConfig := &setupConfig{
-		AclConfig: aclConfig{
+		ACLConfig: aclConfig{
 			Enabled:                true,
 			DefaultPolicy:          "deny",
 			DownPolicy:             "extend-cache",
@@ -448,7 +448,7 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 		VerifyIncoming:          true,
 		VerifyOutgoing:          true,
 		VerifyServerHostname:    true,
-		UiConfig: uiConfig{
+		UIConfig: uiConfig{
 			Enabled: true,
 		},
 		Ports: portsConfig{
@@ -489,7 +489,7 @@ func (s *Setup) setup(d businessDependencies) (formatter.Formatter, error) {
 	}
 
 	aclBootstrapToken := command.ACLTokenCreation{}
-	if err := json.Unmarshal(extractedFiles[command.ConsulAclBootstrap], &aclBootstrapToken); err != nil {
+	if err := json.Unmarshal(extractedFiles[command.ConsulACLBootstrap], &aclBootstrapToken); err != nil {
 		return nil, errors.WithMessagef(err, "unable to decode ACL Bootstrap token")
 	}
 

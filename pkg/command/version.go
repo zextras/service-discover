@@ -35,7 +35,7 @@ func (o *outputVersion) PlainRender() (string, error) {
 	return out, nil
 }
 
-func (o *outputVersion) JsonRender() (string, error) {
+func (o *outputVersion) JSONRender() (string, error) {
 	return formatter.DefaultJSONRender(o)
 }
 

@@ -109,13 +109,13 @@ func New(reader *os.File, writer io.Writer, prompt string) (Terminal, error) {
 	return res, nil
 }
 
-type UiProvider interface {
+type UIProvider interface {
 	Get(writer io.Writer) (Terminal, error)
 }
 
-type TermUiProvider struct {
+type TermUIProvider struct {
 }
 
-func (c *TermUiProvider) Get(writer io.Writer) (Terminal, error) {
+func (c *TermUIProvider) Get(writer io.Writer) (Terminal, error) {
 	return New(os.Stdin, writer, DefaultTermPrompt)
 }

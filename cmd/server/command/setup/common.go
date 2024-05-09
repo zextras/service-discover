@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	rootUid               = 0
+	rootUID               = 0
 	consulBin             = "/usr/bin/consul"
 	certificateExpiration = 365 * 30
 	defaultLogLevel       = "INFO"
@@ -89,7 +89,7 @@ type connectConfig struct {
 }
 
 type setupConfig struct {
-	AclConfig               aclConfig     `json:"acl"`
+	ACLConfig               aclConfig     `json:"acl"`
 	AutoEncrypt             autoEncrypt   `json:"auto_encrypt,omitempty"`
 	CaFile                  string        `json:"ca_file"`
 	CertFile                string        `json:"cert_file"`
@@ -103,7 +103,7 @@ type setupConfig struct {
 	VerifyIncoming          bool          `json:"verify_incoming"`
 	VerifyOutgoing          bool          `json:"verify_outgoing"`
 	VerifyServerHostname    bool          `json:"verify_server_hostname"`
-	UiConfig                uiConfig      `json:"ui_config"`
+	UIConfig                uiConfig      `json:"ui_config"`
 	Ports                   portsConfig   `json:"ports"`
 	Connect                 connectConfig `json:"connect"`
 }
@@ -118,7 +118,7 @@ func (n *nonInteractiveOutput) PlainRender() (string, error) {
 	return n.Password, nil
 }
 
-func (n *nonInteractiveOutput) JsonRender() (string, error) {
+func (n *nonInteractiveOutput) JSONRender() (string, error) {
 	return formatter.DefaultJSONRender(n)
 }
 
@@ -228,7 +228,7 @@ func preRun(d businessDependencies) error {
 		return errors.Errorf("unable to execute consul binary: %s", err)
 	}
 
-	if d.GetuidSyscall() != rootUid {
+	if d.GetuidSyscall() != rootUID {
 		return errors.New("this command must be executed as root")
 	}
 
@@ -329,7 +329,7 @@ func (s *Setup) generateCertificateAndConfig(d businessDependencies,
 	}
 
 	consulConfigFile := &setupConfig{
-		AclConfig: aclConfig{
+		ACLConfig: aclConfig{
 			Enabled:                true,
 			EnableTokenPersistence: true,
 			DefaultPolicy:          "deny",
@@ -348,7 +348,7 @@ func (s *Setup) generateCertificateAndConfig(d businessDependencies,
 		VerifyIncoming:          true,
 		VerifyOutgoing:          true,
 		VerifyServerHostname:    true,
-		UiConfig:                uiConfig{Enabled: true},
+		UIConfig:                uiConfig{Enabled: true},
 		Ports:                   portsConfig{Grpc: 8502},
 		Connect:                 connectConfig{Enabled: true},
 	}

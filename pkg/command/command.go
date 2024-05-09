@@ -43,7 +43,7 @@ func (c *Command) BootstrapToken(writer io.Writer, agentName string) BootstrapTo
 		Setup:                         false,
 		Password:                      "",
 		clusterCredentialFileLocation: "/etc/zextras/service-discover/cluster-credentials.tar.gpg",
-		termUiProvider:                &term2.TermUiProvider{},
+		termUIProvider:                &term2.TermUIProvider{},
 	}
 }
 

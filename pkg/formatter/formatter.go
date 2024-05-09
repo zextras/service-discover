@@ -18,7 +18,7 @@ type OutputFormat int
 
 const (
 	PlainFormatOutput OutputFormat = iota
-	JsonFormatOutput
+	JSONFormatOutput
 )
 
 // The Formatter interface defines the currently supported encoding mechanisms. Currently, they are subdivided as
@@ -26,7 +26,7 @@ const (
 //
 // - PlainRender() is intended to be used when the final reader will be a human
 //
-// - JsonRender() is intended to be used when the final reader will be another program. Keep in mind that the output of
+// - JSONRender() is intended to be used when the final reader will be another program. Keep in mind that the output of
 // this format could very well be the input of another one.
 //
 // Every struct implementing this interface will have to provide valid implementations. Error are also considered, in
@@ -34,8 +34,8 @@ const (
 type Formatter interface {
 	// PlainRender renders human-readable output
 	PlainRender() (string, error)
-	// JsonRender renders json output, that is more suitable as input of other programs
-	JsonRender() (string, error)
+	// JSONRender renders json output, that is more suitable as input of other programs
+	JSONRender() (string, error)
 }
 
 type EmptyFormatter struct{}
@@ -44,7 +44,7 @@ func (e EmptyFormatter) PlainRender() (string, error) {
 	return "", nil
 }
 
-func (e EmptyFormatter) JsonRender() (string, error) {
+func (e EmptyFormatter) JSONRender() (string, error) {
 	return "{}", nil
 }
 
@@ -60,7 +60,7 @@ func Render(formatter Formatter, outputType OutputFormat) (string, error) {
 	case 0:
 		return formatter.PlainRender()
 	case 1:
-		return formatter.JsonRender()
+		return formatter.JSONRender()
 	default:
 		return "", errors.New("The passed formatting option is not valid")
 	}
