@@ -222,7 +222,7 @@ func startConsul(deps deps, isServer bool, servers []string, localServer string)
 
 	// HACK: consul doesn't notify readiness to systemd if the list of servers is empty
 	if isServer {
-		args = append(args, ("-retry-join=" + localServer))
+		args = append(args, ("-retry-join=%" + localServer))
 	}
 
 	found := false
