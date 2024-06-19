@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	LatestRelease      = "24.3.0"
+	LatestRelease      = "24.5.0"
 	PublicImageAddress = "carbonio/ce-directory-server-u20:%s"
 	CIDockerNetwork    = "ci_agent"
 	CINetworkMode      = "overlay"
