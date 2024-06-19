@@ -34,9 +34,8 @@ func SpinUpCarbonioLdap(t *testing.T, address, version string) (testcontainers.C
 
 	var netMode string
 
-		t.Log("Using " + CIDockerNetwork + " as network for LDAP")
-		nets = append(nets, CIDockerNetwork)
-		netMode = CINetworkMode
+	t.Log("Use standard local network for spinning LDAP")
+
 
 	t.Log("Networks that are going to be attached to the container")
 
