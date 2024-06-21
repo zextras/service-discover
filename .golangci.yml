@@ -68,5 +68,5 @@ linters-settings:
   goimports:
     local-prefixes: github.com/golangci/golangci-lint
 run:
-  tests: false
-  timeout: 5m
+  tests: true
+  timeout: 10m
