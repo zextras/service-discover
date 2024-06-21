@@ -126,18 +126,19 @@ func TestSetup_setup(t *testing.T) {
 	setup := func(t *testing.T, testName string, credentialsContent []byte) (*testDependencies, func()) {
 		t.Log("Starting LDAP container")
 		container, ctxContainer := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
-		containerIP, err := container.ContainerIP(ctxContainer)
-		t.Logf("LDAP container started at %s", containerIP)
-
+		containerIP := "127.0.0.1"
+		containerPort, err := container.MappedPort(ctxContainer, "389")
 		if err != nil {
 			t.Error(err)
 		}
+		var ldapUrl = "ldap://" + containerIP + ":" + containerPort.Port()
+		t.Logf("LDAP container available on host at %s", ldapUrl)
 
 		localConfigByte := test.GenerateLocalConfig(
 			t,
 			containerIP,
-			"ldap://"+containerIP+":389",
-			"ldap://"+containerIP+":389",
+			ldapUrl,
+			ldapUrl,
 			test.DefaultLdapUserDN,
 			"password",
 		)
@@ -151,7 +152,7 @@ func TestSetup_setup(t *testing.T) {
 			t.Error(err)
 		}
 
-		connection, err := ldap.DialURL("ldap://"+containerIP+":389",
+		connection, err := ldap.DialURL(ldapUrl,
 			ldap.DialWithDialer(&net.Dialer{Timeout: 5 * time.Minute}))
 		if err != nil {
 			t.Error(err)
@@ -437,8 +438,7 @@ func TestSetup_setup(t *testing.T) {
 		selectedInterface := net.Interface{
 			Name: "en1",
 		}
-		containerIP, err := testStruct.Container.ContainerIP(testStruct.CtxContainer)
-		assert.NoError(t, err)
+		containerIP := "127.0.0.1"
 
 		aclTemplateData := struct {
 			ZimbraHostname string
