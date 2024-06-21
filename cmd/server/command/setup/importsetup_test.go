@@ -232,9 +232,11 @@ func TestSetup_importSetup(t *testing.T) {
 			clusterCredentialsContent = []byte(fakeCredentialsTar)
 		}
 
-		container, ctxContainer := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
+		ldapContainer, containerCtx := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
 
-		containerIP, err := container.ContainerIP(ctxContainer)
+		var containerIP = ldapContainer.GetHostIp()
+		masterUrl, err := ldapContainer.GetHostLdapUrl(containerCtx)
+		assert.NoError(t, err)
 		if err != nil {
 			t.Error(err)
 		}
@@ -242,8 +244,8 @@ func TestSetup_importSetup(t *testing.T) {
 		localConfigByte := test.GenerateLocalConfig(
 			t,
 			containerIP,
-			"ldap://"+containerIP+":389",
-			"ldap://"+containerIP+":389",
+			masterUrl,
+			masterUrl,
 			test.DefaultLdapUserDN,
 			"password",
 		)
@@ -257,7 +259,7 @@ func TestSetup_importSetup(t *testing.T) {
 			t.Error(err)
 		}
 
-		connection, err := ldap.DialURL("ldap://"+containerIP+":389", ldap.DialWithDialer(&net.Dialer{Timeout: 5 * time.Minute}))
+		connection, err := ldap.DialURL(masterUrl, ldap.DialWithDialer(&net.Dialer{Timeout: 5 * time.Minute}))
 		if err != nil {
 			t.Error(err)
 		}
@@ -297,8 +299,8 @@ func TestSetup_importSetup(t *testing.T) {
 		return &setupOutput{
 				file,
 				clusterCredentialDownloadFile,
-				container,
-				ctxContainer,
+				ldapContainer.Container,
+				containerCtx,
 				consulConfigDir,
 				consulHome,
 				consulData,
@@ -340,7 +342,7 @@ func TestSetup_importSetup(t *testing.T) {
 					t.Error(err)
 				}
 
-				if err := container.Terminate(ctxContainer); err != nil {
+				if err := ldapContainer.Container.Terminate(containerCtx); err != nil {
 					t.Error(err)
 				}
 

@@ -124,21 +124,20 @@ func TestSetup_setup(t *testing.T) {
 	}
 
 	setup := func(t *testing.T, testName string, credentialsContent []byte) (*testDependencies, func()) {
-		t.Log("Starting LDAP container")
-		container, ctxContainer := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
-		containerIP := "127.0.0.1"
-		containerPort, err := container.MappedPort(ctxContainer, "389")
+		t.Log("Starting LDAP ldapContainer")
+		ldapContainer, ctxContainer := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
+		masterUrl, err := ldapContainer.GetHostLdapUrl(ctxContainer)
+		containerIP := ldapContainer.GetHostIp()
 		if err != nil {
 			t.Error(err)
 		}
-		var ldapUrl = "ldap://" + containerIP + ":" + containerPort.Port()
-		t.Logf("LDAP container available on host at %s", ldapUrl)
+		t.Logf("LDAP ldapContainer available on host at %s", masterUrl)
 
 		localConfigByte := test.GenerateLocalConfig(
 			t,
 			containerIP,
-			ldapUrl,
-			ldapUrl,
+			masterUrl,
+			masterUrl,
 			test.DefaultLdapUserDN,
 			"password",
 		)
@@ -152,7 +151,7 @@ func TestSetup_setup(t *testing.T) {
 			t.Error(err)
 		}
 
-		connection, err := ldap.DialURL(ldapUrl,
+		connection, err := ldap.DialURL(masterUrl,
 			ldap.DialWithDialer(&net.Dialer{Timeout: 5 * time.Minute}))
 		if err != nil {
 			t.Error(err)
@@ -173,7 +172,7 @@ func TestSetup_setup(t *testing.T) {
 		return &testDependencies{
 				file,
 				clusterCredentialDownloadFile,
-				container,
+				ldapContainer.Container,
 				ctxContainer,
 			}, func() {
 				defer func(container testcontainers.Container, ctx context.Context) {
@@ -181,7 +180,7 @@ func TestSetup_setup(t *testing.T) {
 					if err != nil {
 						t.Error(err)
 					}
-				}(container, ctxContainer)
+				}(ldapContainer.Container, ctxContainer)
 
 				defer func(name string) {
 					err := os.Remove(name)

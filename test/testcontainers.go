@@ -24,10 +24,10 @@ const (
 )
 
 // SpinUpCarbonioLdap launches a Carbonio LDAP instance with the desired
-// version. It returns the LDAP instance context and the container itself.
-// Note it is necessary to defer the container stop otherwise the instance
+// version. It returns the LDAP instance context and the Container itself.
+// Note it is necessary to defer the Container stop otherwise the instance
 // will be hanging forever `defer ldapContainer.Terminate()`!
-func SpinUpCarbonioLdap(t *testing.T, address, version string) (testcontainers.Container, context.Context) {
+func SpinUpCarbonioLdap(t *testing.T, address, version string) (*LdapContainer, context.Context) {
 	ctx := context.Background()
 
 	var nets []string
@@ -42,7 +42,7 @@ func SpinUpCarbonioLdap(t *testing.T, address, version string) (testcontainers.C
 		t.Log("Use standard local network for spinning LDAP")
 	}
 
-	t.Log("Networks that are going to be attached to the container")
+	t.Log("Networks that are going to be attached to the Container")
 
 	for _, nNet := range nets {
 		t.Log(nNet)
@@ -92,14 +92,28 @@ func SpinUpCarbonioLdap(t *testing.T, address, version string) (testcontainers.C
 			t.Log("Port: " + port.Port() + " host bind: " + binding.HostPort + " ip bind: " + binding.HostIP)
 		}
 	}
+	var ldapContainer = &LdapContainer{Container: ldapC}
 
-	return ldapC, ctx
+	return ldapContainer, ctx
 }
 
 type ContainerTestingLogConsumer struct {
 	t *testing.T
 }
 
+type LdapContainer struct {
+	Container testcontainers.Container
+}
+
 func (consumer *ContainerTestingLogConsumer) Accept(l testcontainers.Log) {
 	consumer.t.Log(string(l.Content))
+}
+
+func (ldapContainer *LdapContainer) GetHostLdapUrl(containerCtx context.Context) (string, error) {
+	port, err := ldapContainer.Container.MappedPort(containerCtx, "389")
+	return fmt.Sprintf("ldap://%s:%s", ldapContainer.GetHostIp(), port), err
+}
+
+func (ldapContainer *LdapContainer) GetHostIp() string {
+	return "127.0.0.1"
 }

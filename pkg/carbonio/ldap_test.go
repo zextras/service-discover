@@ -10,7 +10,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/go-ldap/ldap"
@@ -322,12 +321,10 @@ func TestLDAPDownloadAndUploadCapabilities(t *testing.T) {
 			if err := ldapContainer.Terminate(ctx); err != nil {
 				t.Error(err)
 			}
-		}(ldapContainer, containerCtx)
+		}(ldapContainer.Container, containerCtx)
 
-		ldapIp, err := ldapContainer.ContainerIP(containerCtx)
+		masterUrl, err := ldapContainer.GetHostLdapUrl(containerCtx)
 		assert.NoError(t, err)
-
-		masterUrl := fmt.Sprintf("ldap://%s:%s", ldapIp, "389")
 
 		ldapHandler := ldapContext{
 			Credentials: ldapCredentials{
@@ -364,12 +361,10 @@ func TestLDAPDownloadAndUploadCapabilities(t *testing.T) {
 			if err := ldapContainer.Terminate(ctx); err != nil {
 				t.Error(err)
 			}
-		}(ldapContainer, containerCtx)
+		}(ldapContainer.Container, containerCtx)
 
-		ldapIp, err := ldapContainer.ContainerIP(containerCtx)
+		masterUrl, err := ldapContainer.GetHostLdapUrl(containerCtx)
 		assert.NoError(t, err)
-
-		masterUrl := fmt.Sprintf("ldap://%s:%s", ldapIp, "389")
 
 		ldapHandler := ldapContext{
 			Credentials: ldapCredentials{

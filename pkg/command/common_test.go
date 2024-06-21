@@ -297,12 +297,10 @@ func TestCredentialsFromAndToLDAP(t *testing.T) {
 			if err := ldapContainer.Terminate(ctx); err != nil {
 				t.Error(err)
 			}
-		}(ldapContainer, containerCtx)
+		}(ldapContainer.Container, containerCtx)
 
-		ldapIp, err := ldapContainer.ContainerIP(containerCtx)
+		masterUrl, err := ldapContainer.GetHostLdapUrl(containerCtx)
 		assert.NoError(t, err)
-
-		masterUrl := fmt.Sprintf("ldap://%s:%s", ldapIp, "389")
 
 		mockedLocalConfig := new(mocks.LocalConfig)
 		mockedLocalConfig.On("Values", carbonio.LocalConfigLdapMasterURL).Return([]string{masterUrl}).On("Values", carbonio.LocalConfigLdapURL).Return([]string{}).On("Value", carbonio.LocalConfigLdapUserDn).Return("uid=zimbra,cn=admins,cn=zimbra").On("Value", carbonio.LocalConfigLdapPassword).Return("password")
@@ -352,12 +350,10 @@ func TestCredentialsFromAndToLDAP(t *testing.T) {
 			if err := ldapContainer.Terminate(ctx); err != nil {
 				t.Error(err)
 			}
-		}(ldapContainer, containerCtx)
+		}(ldapContainer.Container, containerCtx)
 
-		ldapIp, err := ldapContainer.ContainerIP(containerCtx)
+		masterUrl, err := ldapContainer.GetHostLdapUrl(containerCtx)
 		assert.NoError(t, err)
-
-		masterUrl := fmt.Sprintf("ldap://%s:%s", ldapIp, "389")
 		// Try to download the content and check that it is the same
 		ldapConnection, err := ldap.DialURL(masterUrl)
 		assert.NoError(t, err)
