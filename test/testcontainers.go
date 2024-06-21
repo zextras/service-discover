@@ -7,12 +7,11 @@ package test
 import (
 	"context"
 	"fmt"
-	"testing"
-
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-units"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
+	"testing"
 )
 
 const (
@@ -55,8 +54,11 @@ func SpinUpCarbonioLdap(t *testing.T, address, version string) (testcontainers.C
 		},
 		Networks: nets,
 		ShmSize:  8 * 1024 * 1024 * 1024,
+		LogConsumerCfg: &testcontainers.LogConsumerConfig{
+			Opts:      []testcontainers.LogProductionOption{},
+			Consumers: []testcontainers.LogConsumer{&ContainerTestingLogConsumer{t: t}},
+		},
 	}
-
 	ldapC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
 		Started:          true,
@@ -84,4 +86,12 @@ func SpinUpCarbonioLdap(t *testing.T, address, version string) (testcontainers.C
 	}
 
 	return ldapC, ctx
+}
+
+type ContainerTestingLogConsumer struct {
+	t *testing.T
+}
+
+func (consumer *ContainerTestingLogConsumer) Accept(l testcontainers.Log) {
+	consumer.t.Log(string(l.Content))
 }
