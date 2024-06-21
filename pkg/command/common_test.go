@@ -5,9 +5,11 @@
 package command
 
 import (
+	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/testcontainers/testcontainers-go"
 	"math/rand"
 	"net"
 	"os"
@@ -276,6 +278,15 @@ func TestSaveBindAddressConfiguration(t *testing.T) {
 }
 
 func TestCredentialsFromAndToLDAP(t *testing.T) {
+	ldapContainer, ctxContainer := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
+	defer func(container testcontainers.Container, ctx context.Context) {
+		err := container.Terminate(ctx)
+		if err != nil {
+			t.Error(err)
+		}
+	}(ldapContainer.Container, ctxContainer)
+	masterUrl, err := ldapContainer.GetHostLdapUrl(ctxContainer)
+	assert.NoError(t, err)
 	t.Run("should upload the value to LDAP", func(t *testing.T) {
 		uploadFile := test.GenerateRandomFile("fakeCredentials*.tar")
 		defer func(name string) {
@@ -289,15 +300,7 @@ func TestCredentialsFromAndToLDAP(t *testing.T) {
 		assert.NoError(t, err)
 		err = os.WriteFile(uploadFile.Name(), randomContent, 0777)
 		assert.NoError(t, err)
-		ldapContainer, containerCtx := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
 
-		//defer func(ldapContainer testcontainers.Container, ctx context.Context) {
-		//	if err := ldapContainer.Terminate(ctx); err != nil {
-		//		t.Error(err)
-		//	}
-		//}(ldapContainer.Container, containerCtx)
-
-		masterUrl, err := ldapContainer.GetHostLdapUrl(containerCtx)
 		assert.NoError(t, err)
 
 		mockedLocalConfig := new(mocks.LocalConfig)
@@ -341,16 +344,6 @@ func TestCredentialsFromAndToLDAP(t *testing.T) {
 	t.Run("should download the value from LDAP", func(t *testing.T) {
 		randomContent := make([]byte, 4096000) // 4 MB random byte array to simulate random binary content
 		_, err := rand.Read(randomContent)
-		assert.NoError(t, err)
-		ldapContainer, containerCtx := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
-
-		//defer func(ldapContainer testcontainers.Container, ctx context.Context) {
-		//	if err := ldapContainer.Terminate(ctx); err != nil {
-		//		t.Error(err)
-		//	}
-		//}(ldapContainer.Container, containerCtx)
-
-		masterUrl, err := ldapContainer.GetHostLdapUrl(containerCtx)
 		assert.NoError(t, err)
 		// Try to download the content and check that it is the same
 		ldapConnection, err := ldap.DialURL(masterUrl)

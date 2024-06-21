@@ -6,9 +6,11 @@ package carbonio
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"github.com/testcontainers/testcontainers-go"
 	"testing"
 
 	"github.com/go-ldap/ldap"
@@ -309,19 +311,22 @@ func TestLDAPDownloadAndUploadCapabilities(t *testing.T) {
 	testDn := "cn=config,cn=zimbra"
 	testAttribute := "carbonioMeshCredentials"
 
+	ldapContainer, ctxContainer := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
+	defer func(container testcontainers.Container, ctx context.Context) {
+		err := container.Terminate(ctx)
+		if err != nil {
+			t.Error(err)
+		}
+	}(ldapContainer.Container, ctxContainer)
+	masterUrl, err := ldapContainer.GetHostLdapUrl(ctxContainer)
+	assert.NoError(t, err)
+
 	t.Run("should download content from LDAP", func(t *testing.T) {
 		expectedContent := make([]byte, 2048000) // 2 MB random byte array to simulate random binary content
 		_, err := rand.Read(expectedContent)
 		assert.NoError(t, err)
-		ldapContainer, containerCtx := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
 
-		//defer func(ldapContainer testcontainers.Container, ctx context.Context) {
-		//	if err := ldapContainer.Terminate(ctx); err != nil {
-		//		t.Error(err)
-		//	}
-		//}(ldapContainer.Container, containerCtx)
-
-		masterUrl, err := ldapContainer.GetHostLdapUrl(containerCtx)
+		masterUrl, err := ldapContainer.GetHostLdapUrl(ctxContainer)
 		assert.NoError(t, err)
 
 		ldapHandler := ldapContext{
@@ -353,15 +358,6 @@ func TestLDAPDownloadAndUploadCapabilities(t *testing.T) {
 		expectedContent := make([]byte, 2048000) // 2 MB random byte array to simulate random binary content
 		_, err := rand.Read(expectedContent)
 		assert.NoError(t, err)
-		ldapContainer, containerCtx := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
-
-		//defer func(ldapContainer testcontainers.Container, ctx context.Context) {
-		//	if err := ldapContainer.Terminate(ctx); err != nil {
-		//		t.Error(err)
-		//	}
-		//}(ldapContainer.Container, containerCtx)
-
-		masterUrl, err := ldapContainer.GetHostLdapUrl(containerCtx)
 		assert.NoError(t, err)
 
 		ldapHandler := ldapContext{

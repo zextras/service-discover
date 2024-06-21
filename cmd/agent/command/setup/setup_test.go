@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"github.com/testcontainers/testcontainers-go"
 	"html/template"
 	"io"
 	"net"
@@ -122,10 +123,18 @@ func TestSetup_setup(t *testing.T) {
 		CtxContainer              context.Context
 	}
 
+	ldapContainer, ctxContainer := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
+	masterUrl, err := ldapContainer.GetHostLdapUrl(ctxContainer)
+
+	defer func(container testcontainers.Container, ctx context.Context) {
+		err := container.Terminate(ctx)
+		if err != nil {
+			t.Error(err)
+		}
+	}(ldapContainer.Container, ctxContainer)
+
 	setup := func(t *testing.T, testName string, credentialsContent []byte) (*testDependencies, func()) {
 		t.Log("Starting LDAP ldapContainer")
-		ldapContainer, ctxContainer := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
-		masterUrl, err := ldapContainer.GetHostLdapUrl(ctxContainer)
 		containerIP := ldapContainer.GetHostIp()
 		if err != nil {
 			t.Error(err)
@@ -174,12 +183,6 @@ func TestSetup_setup(t *testing.T) {
 				ldapContainer,
 				ctxContainer,
 			}, func() {
-				//defer func(container testcontainers.Container, ctx context.Context) {
-				//	err := container.Terminate(ctx)
-				//	if err != nil {
-				//		t.Error(err)
-				//	}
-				//}(ldapContainer.Container, ctxContainer)
 
 				defer func(name string) {
 					err := os.Remove(name)

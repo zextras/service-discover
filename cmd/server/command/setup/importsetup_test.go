@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"github.com/testcontainers/testcontainers-go"
 	"io/fs"
 	"net"
 	"os"
@@ -210,8 +211,6 @@ func TestSetup_importSetup(t *testing.T) {
 	type setupOutput struct {
 		FakeLocalConfig           *os.File
 		ClusterCredentialDownload *os.File
-		Container                 *test.LdapContainer
-		CtxContainer              context.Context
 		consulConfigDir           string
 		consulHome                string
 		consulData                string
@@ -225,16 +224,23 @@ func TestSetup_importSetup(t *testing.T) {
 	defaultClusterCredentialsPassword := "assext"
 	testingMode = true
 
+	ldapContainer, ctxContainer := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
+	defer func(container testcontainers.Container, ctx context.Context) {
+		err := container.Terminate(ctx)
+		if err != nil {
+			t.Error(err)
+		}
+	}(ldapContainer.Container, ctxContainer)
+	masterUrl, err := ldapContainer.GetHostLdapUrl(ctxContainer)
+	containerIP := ldapContainer.GetHostIp()
+
 	setup := func(t *testing.T, testName string, includeTar bool) (*setupOutput, func()) {
 		var clusterCredentialsContent []byte
 		if includeTar {
 			clusterCredentialsContent = []byte(fakeCredentialsTar)
 		}
 
-		ldapContainer, containerCtx := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
-
 		var containerIP = ldapContainer.GetHostIp()
-		masterUrl, err := ldapContainer.GetHostLdapUrl(containerCtx)
 		assert.NoError(t, err)
 		if err != nil {
 			t.Error(err)
@@ -298,8 +304,6 @@ func TestSetup_importSetup(t *testing.T) {
 		return &setupOutput{
 				file,
 				clusterCredentialDownloadFile,
-				ldapContainer,
-				containerCtx,
 				consulConfigDir,
 				consulHome,
 				consulData,
@@ -341,10 +345,6 @@ func TestSetup_importSetup(t *testing.T) {
 					t.Error(err)
 				}
 
-				//if err := ldapContainer.Container.Terminate(containerCtx); err != nil {
-				//	t.Error(err)
-				//}
-
 				if err := os.Remove(file.Name()); err != nil {
 					t.Error(err)
 				}
@@ -360,8 +360,6 @@ func TestSetup_importSetup(t *testing.T) {
 	t.Run("Cluster credentials is required", func(t *testing.T) {
 		setupFiles, cleanup := setup(t, "Test cluster credentials is required", false)
 		defer cleanup()
-
-		containerIP := setupFiles.Container.GetHostIp()
 
 		businessDep := new(mocks2.BusinessDependencies)
 		setupNetwork(businessDep, containerIP)
@@ -391,8 +389,6 @@ func TestSetup_importSetup(t *testing.T) {
 		setupFiles, cleanup := setup(t, "Wrong binding address", true)
 		defer cleanup()
 
-		containerIP := setupFiles.Container.GetHostIp()
-
 		businessDep := new(mocks2.BusinessDependencies)
 		setupNetwork(businessDep, containerIP)
 
@@ -418,8 +414,6 @@ func TestSetup_importSetup(t *testing.T) {
 	t.Run("Wrong cluster credentials password", func(t *testing.T) {
 		setupFiles, cleanup := setup(t, "Wrong cluster credentials password", true)
 		defer cleanup()
-
-		containerIP := setupFiles.Container.GetHostIp()
 
 		businessDep := new(mocks2.BusinessDependencies)
 		setupNetwork(businessDep, containerIP)
@@ -463,8 +457,6 @@ func TestSetup_importSetup(t *testing.T) {
 	t.Run("Run with correct configuration and flags", func(t *testing.T) {
 		setupFiles, cleanup := setup(t, "Run with correct configuration and flags", true)
 		defer cleanup()
-
-		containerIP := setupFiles.Container.GetHostIp()
 
 		businessDep := new(mocks2.BusinessDependencies)
 		setupNetwork(businessDep, containerIP)
