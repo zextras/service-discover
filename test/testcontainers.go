@@ -7,11 +7,13 @@ package test
 import (
 	"context"
 	"fmt"
+	"os"
+	"testing"
+
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-units"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
-	"testing"
 )
 
 const (
@@ -32,7 +34,13 @@ func SpinUpCarbonioLdap(t *testing.T, address, version string) (testcontainers.C
 
 	var netMode string
 
-	t.Log("Use standard local network for spinning LDAP")
+	if os.Getenv("CI") == "true" {
+		t.Log("Using " + CIDockerNetwork + " as network for LDAP")
+		nets = append(nets, CIDockerNetwork)
+		netMode = CINetworkMode
+	} else {
+		t.Log("Use standard local network for spinning LDAP")
+	}
 
 	t.Log("Networks that are going to be attached to the container")
 
