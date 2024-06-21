@@ -103,7 +103,7 @@ func (consumer *ContainerTestingLogConsumer) Accept(l testcontainers.Log) {
 
 func (ldapContainer *LdapContainer) GetHostLdapUrl(containerCtx context.Context) (string, error) {
 	port, err := ldapContainer.Container.MappedPort(containerCtx, "389")
-	return fmt.Sprintf("ldap://%s:%s", ldapContainer.GetHostIp(), port), err
+	return fmt.Sprintf("ldap://%s:%s", ldapContainer.GetHostIp(), port.Port()), err
 }
 
 func (ldapContainer *LdapContainer) GetHostIp() string {
