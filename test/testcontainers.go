@@ -7,7 +7,6 @@ package test
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/docker/docker/api/types/container"
@@ -35,7 +34,6 @@ func SpinUpCarbonioLdap(t *testing.T, address, version string) (testcontainers.C
 	var netMode string
 
 	t.Log("Use standard local network for spinning LDAP")
-
 
 	t.Log("Networks that are going to be attached to the container")
 
