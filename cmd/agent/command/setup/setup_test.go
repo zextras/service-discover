@@ -25,7 +25,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/testcontainers/testcontainers-go"
 	"github.com/zextras/service-discover/pkg/carbonio"
 	mocks5 "github.com/zextras/service-discover/pkg/carbonio/mocks"
 	"github.com/zextras/service-discover/pkg/command"
@@ -175,12 +174,12 @@ func TestSetup_setup(t *testing.T) {
 				ldapContainer,
 				ctxContainer,
 			}, func() {
-				defer func(container testcontainers.Container, ctx context.Context) {
-					err := container.Terminate(ctx)
-					if err != nil {
-						t.Error(err)
-					}
-				}(ldapContainer.Container, ctxContainer)
+				//defer func(container testcontainers.Container, ctx context.Context) {
+				//	err := container.Terminate(ctx)
+				//	if err != nil {
+				//		t.Error(err)
+				//	}
+				//}(ldapContainer.Container, ctxContainer)
 
 				defer func(name string) {
 					err := os.Remove(name)

@@ -341,9 +341,9 @@ func TestSetup_importSetup(t *testing.T) {
 					t.Error(err)
 				}
 
-				if err := ldapContainer.Container.Terminate(containerCtx); err != nil {
-					t.Error(err)
-				}
+				//if err := ldapContainer.Container.Terminate(containerCtx); err != nil {
+				//	t.Error(err)
+				//}
 
 				if err := os.Remove(file.Name()); err != nil {
 					t.Error(err)
