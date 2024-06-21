@@ -41,15 +41,19 @@ func SpinUpCarbonioLdap(t *testing.T, address, version string) (*LdapContainer, 
 		Image:        fmt.Sprintf(address, version),
 		ExposedPorts: []string{"389/tcp"},
 		Entrypoint:   []string{"entrypoint"},
-		WaitingFor:   wait.ForListeningPort("389/tcp"),
-		Hostname:     "carbonio-ce-directory-server.carbonio-system.svc.cluster.local",
+		WaitingFor: wait.ForAll(
+			wait.ForListeningPort("389/tcp"),
+			wait.ForLog("Starting directory server...Done."),
+			wait.ForLog("Starting config service...Done."),
+			wait.ForLog("Starting stats...Done."),
+		),
+		Hostname: "carbonio-ce-directory-server.carbonio-system.svc.cluster.local",
 		HostConfigModifier: func(config *container.HostConfig) {
 			config.AutoRemove = true
 			config.NetworkMode = container.NetworkMode(netMode)
 			config.Ulimits = ulimits
 		},
-		Networks: nets,
-		ShmSize:  8 * 1024 * 1024 * 1024,
+		ShmSize: 8 * 1024 * 1024 * 1024,
 		LogConsumerCfg: &testcontainers.LogConsumerConfig{
 			Opts:      []testcontainers.LogProductionOption{},
 			Consumers: []testcontainers.LogConsumer{&ContainerTestingLogConsumer{t: t}},
