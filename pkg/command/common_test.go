@@ -70,7 +70,6 @@ func (m *mockedNetworkInterfaces) LookupIP(s string) ([]net.IP, error) {
 }
 
 func TestCheckValidBindingAddress(t *testing.T) {
-	t.Parallel()
 
 	t.Run("Valid interface selected", func(t *testing.T) {
 		mockDependencies := new(mockedNetworkInterfaces)
@@ -228,7 +227,6 @@ func TestCheckValidBindingAddress(t *testing.T) {
 }
 
 func TestSetup_openClusterCredential(t *testing.T) {
-	t.Parallel()
 
 	t.Run("File doesn't exists", func(t *testing.T) {
 		nonExistingFile := test.GenerateRandomFile("File doesn't exists")
@@ -253,7 +251,6 @@ func TestSetup_openClusterCredential(t *testing.T) {
 }
 
 func TestSaveBindAddressConfiguration(t *testing.T) {
-	t.Parallel()
 
 	t.Run("Should check that the file is correctly written", func(t *testing.T) {
 		actualResult := test.GenerateRandomFile("Should check that the file is correctly written")

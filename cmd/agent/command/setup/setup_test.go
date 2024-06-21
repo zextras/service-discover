@@ -49,7 +49,6 @@ func (a *addrStub) String() string {
 }
 
 func TestSetup_preRun(t *testing.T) {
-	t.Parallel()
 
 	t.Run("Should fail if consul is not present", func(t *testing.T) {
 		expectedErrorOutput := "awesome-error"
