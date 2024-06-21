@@ -119,7 +119,7 @@ func TestSetup_setup(t *testing.T) {
 	type testDependencies struct {
 		FakeLocalConfig           *os.File
 		ClusterCredentialDownload *os.File
-		Container                 testcontainers.Container
+		Container                 *test.LdapContainer
 		CtxContainer              context.Context
 	}
 
@@ -172,7 +172,7 @@ func TestSetup_setup(t *testing.T) {
 		return &testDependencies{
 				file,
 				clusterCredentialDownloadFile,
-				ldapContainer.Container,
+				ldapContainer,
 				ctxContainer,
 			}, func() {
 				defer func(container testcontainers.Container, ctx context.Context) {
@@ -611,8 +611,7 @@ func TestSetup_setup(t *testing.T) {
 		selectedInterface := net.Interface{
 			Name: "en1",
 		}
-		containerIP, err := testStruct.Container.ContainerIP(testStruct.CtxContainer)
-		assert.NoError(t, err)
+		containerIP := testStruct.Container.GetHostIp()
 
 		aclTemplateData := struct {
 			ZimbraHostname string
