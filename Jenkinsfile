@@ -4,6 +4,9 @@ pipeline {
             label 'golang-agent-v2'
         }
     }
+    parameters {
+        booleanParam defaultValue: false, description: 'Set to true to skip the test stage', name: 'SKIP_TEST'
+    }
     options {
         skipDefaultCheckout()
         buildDiscarder(logRotator(numToKeepStr: '25'))
@@ -28,6 +31,7 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
             }
         }
         stage('Tests') {
+            when { expression { params.SKIP_TEST != true } }
             steps {
                 script {
                     sh 'rm -rfv /home/agent/.gnupg'
@@ -86,7 +90,6 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                         sh 'yap build ubuntu build -sd'
                     }
                 }
-                sh 'yap build ubuntu build -sd'
                 stash includes: 'artifacts/*.deb', name: 'artifacts-ubuntu'
             }
             post {
@@ -113,7 +116,6 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                         sh 'yap build rocky build -sd'
                     }
                 }
-                sh 'yap build rocky build -sd'
                 stash includes: 'artifacts/x86_64/*.rpm', name: 'artifacts-rocky'
             }
             post {
