@@ -78,6 +78,14 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                 unstash 'project'
                 sh 'mkdir -p /tmp/service-discover'
                 sh 'cp -r * /tmp/service-discover'
+                script {
+                    if (BRANCH_NAME == 'devel') {
+                        def timestamp = new Date().format('yyyyMMddHHmmss')
+                        sh "yap build ubuntu build -r ${timestamp} -sd"
+                    } else {
+                        sh 'yap build ubuntu build -sd'
+                    }
+                }
                 sh 'yap build ubuntu build -sd'
                 stash includes: 'artifacts/*.deb', name: 'artifacts-ubuntu'
             }
@@ -97,6 +105,14 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                 unstash 'project'
                 sh 'mkdir -p /tmp/service-discover'
                 sh 'cp -r * /tmp/service-discover'
+                script {
+                    if (BRANCH_NAME == 'devel') {
+                        def timestamp = new Date().format('yyyyMMddHHmmss')
+                        sh "yap build rocky build -r ${timestamp} -sd"
+                    } else {
+                        sh 'yap build rocky build -sd'
+                    }
+                }
                 sh 'yap build rocky build -sd'
                 stash includes: 'artifacts/x86_64/*.rpm', name: 'artifacts-rocky'
             }
