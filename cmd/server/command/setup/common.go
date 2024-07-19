@@ -80,7 +80,7 @@ type uiConfig struct {
 }
 
 type portsConfig struct {
-	Grpc int `json:"grpc"`
+	Grpc int `json:"grpc_tls"`
 }
 
 type connectConfig struct {
