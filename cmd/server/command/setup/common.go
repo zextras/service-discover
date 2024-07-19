@@ -80,7 +80,8 @@ type uiConfig struct {
 }
 
 type portsConfig struct {
-	Grpc int `json:"grpc"`
+	Grpc    int `json:"grpc"`
+	GrpcTLS int `json:"grpc_tls"`
 }
 
 type connectConfig struct {
@@ -349,7 +350,7 @@ func (s *Setup) generateCertificateAndConfig(deps businessDependencies,
 		VerifyOutgoing:          true,
 		VerifyServerHostname:    true,
 		UIConfig:                uiConfig{Enabled: true},
-		Ports:                   portsConfig{Grpc: 8502},
+		Ports:                   portsConfig{Grpc: 8502, GrpcTLS: 8503},
 		Connect:                 connectConfig{Enabled: true},
 	}
 

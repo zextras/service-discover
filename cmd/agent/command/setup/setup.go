@@ -143,7 +143,8 @@ type uiConfig struct {
 }
 
 type portsConfig struct {
-	Grpc int `json:"grpc"`
+	Grpc    int `json:"grpc"`
+	GrpcTLS int `json:"grpc_tls"`
 }
 
 type setupConfig struct {
@@ -452,7 +453,8 @@ func (s *Setup) setup(deps businessDependencies) (formatter.Formatter, error) {
 			Enabled: true,
 		},
 		Ports: portsConfig{
-			Grpc: 8502,
+			Grpc:    8502,
+			GrpcTLS: 8503,
 		},
 	}
 
