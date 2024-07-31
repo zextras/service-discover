@@ -132,7 +132,7 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 		setupMock(mockDependencies, true)
 		runServiceDiscoverDaemon(
 			mockDependencies,
-			[]string{discoverdBinPath, "server"},
+			[]string{discoverdBinPath, "server", "test.json"},
 		)
 		mockDependencies.AssertNumberOfCalls(t, "Exec", 1)
 		mockDependencies.AssertCalled(t, "Exit", ExitCodeExecError)
@@ -143,7 +143,7 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 		setupMock(mockDependencies, false)
 		runServiceDiscoverDaemon(
 			mockDependencies,
-			[]string{discoverdBinPath, "agent"},
+			[]string{discoverdBinPath, "agent", "test.json"},
 		)
 		mockDependencies.AssertNumberOfCalls(t, "Exec", 1)
 		mockDependencies.AssertCalled(t, "Exit", ExitCodeExecError)
@@ -165,7 +165,7 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 		setupMock(mockDependencies, true)
 		runServiceDiscoverDaemon(
 			mockDependencies,
-			[]string{discoverdBinPath, "invalid"},
+			[]string{discoverdBinPath, "invalid", "test.json"},
 		)
 		mockDependencies.AssertCalled(t, "Log", []any{"one parameter: server or agent"})
 		mockDependencies.AssertCalled(t, "Exit", ExitCodeWrongArgs)
@@ -178,7 +178,7 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 
 		runServiceDiscoverDaemon(
 			mockDependencies,
-			[]string{discoverdBinPath, "server"},
+			[]string{discoverdBinPath, "server", "test.json"},
 		)
 		mockDependencies.AssertCalled(t, "Log", []any{"run as root"})
 		mockDependencies.AssertCalled(t, "Exit", ExitCodeUserStuff)
@@ -191,7 +191,7 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 
 		runServiceDiscoverDaemon(
 			mockDependencies,
-			[]string{discoverdBinPath, "server"},
+			[]string{discoverdBinPath, "server", "test.json"},
 		)
 		mockDependencies.AssertCalled(t, "Log", []any{"unable to read ldap configuration: fake error"})
 		mockDependencies.AssertCalled(t, "Exit", ExitCodeLocalCfg)
@@ -206,7 +206,7 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 
 		runServiceDiscoverDaemon(
 			mockDependencies,
-			[]string{discoverdBinPath, "server"},
+			[]string{discoverdBinPath, "server", "test.json"},
 		)
 		mockDependencies.AssertCalled(t, "Log", []any{"cannot find user 'service-discover': fake error"})
 		mockDependencies.AssertCalled(t, "Exit", ExitCodeUserStuff)
@@ -219,7 +219,7 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 
 		runServiceDiscoverDaemon(
 			mockDependencies,
-			[]string{discoverdBinPath, "server"},
+			[]string{discoverdBinPath, "server", "test.json"},
 		)
 		mockDependencies.AssertCalled(t, "Log", []any{"cannot change uid: fake error"})
 		mockDependencies.AssertCalled(t, "Exit", ExitCodeUserStuff)
@@ -235,7 +235,7 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 
 		runServiceDiscoverDaemon(
 			mockDependencies,
-			[]string{discoverdBinPath, "server"},
+			[]string{discoverdBinPath, "server", "test.json"},
 		)
 		mockDependencies.AssertCalled(t, "Log", []any{"unable to query ldap: fake error"})
 		mockDependencies.AssertCalled(t, "Exit", ExitCodeLdapError)
@@ -251,7 +251,7 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 
 		runServiceDiscoverDaemon(
 			mockDependencies,
-			[]string{discoverdBinPath, "server"},
+			[]string{discoverdBinPath, "server", "test.json"},
 		)
 		mockDependencies.AssertCalled(t, "Log",
 			[]any{"local service-discover server NOT present in ldap/zimbraServiceEnabled attribute local-hostname"})
@@ -268,7 +268,7 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 
 		runServiceDiscoverDaemon(
 			mockDependencies,
-			[]string{discoverdBinPath, "agent"},
+			[]string{discoverdBinPath, "agent", "test.json"},
 		)
 		mockDependencies.AssertCalled(t, "Log",
 			[]any{"local service-discover agent must NOT be present in ldap/zimbraServiceEnabled attribute local-hostname"})
@@ -299,7 +299,7 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 
 		runServiceDiscoverDaemon(
 			mockDependencies,
-			[]string{discoverdBinPath, "server"},
+			[]string{discoverdBinPath, "server", "test.json"},
 		)
 		mockDependencies.AssertCalled(t, "Log", []any{"consul execute failed: fake error"})
 		mockDependencies.AssertCalled(t, "Exit", ExitCodeExecError)
