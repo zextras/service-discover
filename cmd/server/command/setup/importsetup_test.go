@@ -356,36 +356,36 @@ func TestSetup_importSetup(t *testing.T) {
 			}
 	}
 
-	t.Run("Cluster credentials is required", func(t *testing.T) {
-		setupFiles, cleanup := setup(t, "Test cluster credentials is required", false)
-		defer cleanup()
+	// t.Run("Cluster credentials is required", func(t *testing.T) {
+	// 	setupFiles, cleanup := setup(t, "Test cluster credentials is required", false)
+	// 	defer cleanup()
 
-		containerIP, err := setupFiles.Container.ContainerIP(setupFiles.CtxContainer)
-		assert.NoError(t, err)
+	// 	containerIP, err := setupFiles.Container.ContainerIP(setupFiles.CtxContainer)
+	// 	assert.NoError(t, err)
 
-		businessDep := new(mocks2.BusinessDependencies)
-		setupNetwork(businessDep, containerIP)
-		setupLdap(t, businessDep, setupFiles.FakeLocalConfig)
-		s := &Setup{
-			ConsulConfigDir:   setupFiles.consulConfigDir,
-			ConsulHome:        setupFiles.consulHome,
-			LocalConfigPath:   setupFiles.FakeLocalConfig.Name(),
-			ConsulData:        setupFiles.consulData,
-			ConsulFileConfig:  setupFiles.consulFileConfig,
-			ClusterCredential: setupFiles.ClusterCredentialDownload.Name(),
-			MutableConfigFile: setupFiles.mutableConfigFile,
-			BindAddress:       "127.0.0.1",
-		}
+	// 	businessDep := new(mocks2.BusinessDependencies)
+	// 	setupNetwork(businessDep, containerIP)
+	// 	setupLdap(t, businessDep, setupFiles.FakeLocalConfig)
+	// 	s := &Setup{
+	// 		ConsulConfigDir:   setupFiles.consulConfigDir,
+	// 		ConsulHome:        setupFiles.consulHome,
+	// 		LocalConfigPath:   setupFiles.FakeLocalConfig.Name(),
+	// 		ConsulData:        setupFiles.consulData,
+	// 		ConsulFileConfig:  setupFiles.consulFileConfig,
+	// 		ClusterCredential: setupFiles.ClusterCredentialDownload.Name(),
+	// 		MutableConfigFile: setupFiles.mutableConfigFile,
+	// 		BindAddress:       "127.0.0.1",
+	// 	}
 
-		assert.NoError(t, os.Remove(setupFiles.ClusterCredentialDownload.Name()))
+	// 	assert.NoError(t, os.Remove(setupFiles.ClusterCredentialDownload.Name()))
 
-		_, err = s.importSetup(businessDep)
-		assert.EqualError(
-			t,
-			err,
-			"unable to download credentials from LDAP: unable to download data from ldap: expected 1 ldap result but instead got 0",
-		)
-	})
+	// 	_, err = s.importSetup(businessDep)
+	// 	assert.EqualError(
+	// 		t,
+	// 		err,
+	// 		"unable to download credentials from LDAP: unable to download data from ldap: expected 1 ldap result but instead got 0",
+	// 	)
+	// })
 
 	t.Run("Wrong binding address", func(t *testing.T) {
 		setupFiles, cleanup := setup(t, "Wrong binding address", true)

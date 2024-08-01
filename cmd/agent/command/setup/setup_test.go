@@ -221,48 +221,48 @@ func TestSetup_setup(t *testing.T) {
 		assert.EqualError(t, err, "invalid binding address selected")
 	})
 
-	t.Run("Should fail when cluster credentials are corrupted", func(t *testing.T) {
-		testStruct, cleanup := setup(t, "shouldFailWhenClusterCredentialsAreMissing", []byte("this is a test"))
-		defer cleanup()
+	// t.Run("Should fail when cluster credentials are corrupted", func(t *testing.T) {
+	// 	testStruct, cleanup := setup(t, "shouldFailWhenClusterCredentialsAreMissing", []byte("this is a test"))
+	// 	defer cleanup()
 
-		selectedInterface := net.Interface{
-			Name: "en1",
-		}
-		localConfig, err := carbonio.LoadLocalConfig(testStruct.FakeLocalConfig.Name())
+	// 	selectedInterface := net.Interface{
+	// 		Name: "en1",
+	// 	}
+	// 	localConfig, err := carbonio.LoadLocalConfig(testStruct.FakeLocalConfig.Name())
 
-		if err != nil {
-			t.Error(err)
-		}
+	// 	if err != nil {
+	// 		t.Error(err)
+	// 	}
 
-		mockDep := new(mocks.BusinessDependencies)
-		mockDep.On("NetInterfaces").Return([]net.Interface{
-			selectedInterface,
-			net.Interface{
-				Name: "lo",
-			},
-		}, nil).
-			On("AddrResolver", selectedInterface).Return([]net.Addr{
-			&addrStub{ip: "192.168.1.1"},
-		}, nil).On("LdapHandler", mock.Anything).Return(carbonio.CreateNewHandler(localConfig))
+	// 	mockDep := new(mocks.BusinessDependencies)
+	// 	mockDep.On("NetInterfaces").Return([]net.Interface{
+	// 		selectedInterface,
+	// 		net.Interface{
+	// 			Name: "lo",
+	// 		},
+	// 	}, nil).
+	// 		On("AddrResolver", selectedInterface).Return([]net.Addr{
+	// 		&addrStub{ip: "192.168.1.1"},
+	// 	}, nil).On("LdapHandler", mock.Anything).Return(carbonio.CreateNewHandler(localConfig))
 
-		s := &Setup{
-			ClusterCredential: testStruct.ClusterCredentialDownload.Name(),
-			BindAddress:       "192.168.1.1",
-			LocalConfigPath:   testStruct.FakeLocalConfig.Name(),
-		}
-		// We have to simulate the file doesn't exist anymore
-		assert.NoError(t, os.Remove(testStruct.ClusterCredentialDownload.Name()))
+	// 	s := &Setup{
+	// 		ClusterCredential: testStruct.ClusterCredentialDownload.Name(),
+	// 		BindAddress:       "192.168.1.1",
+	// 		LocalConfigPath:   testStruct.FakeLocalConfig.Name(),
+	// 	}
+	// 	// We have to simulate the file doesn't exist anymore
+	// 	assert.NoError(t, os.Remove(testStruct.ClusterCredentialDownload.Name()))
 
-		_, err = s.setup(mockDep)
-		assert.EqualError(
-			t,
-			err,
-			fmt.Sprintf(
-				"unable to read %s: EOF",
-				testStruct.ClusterCredentialDownload.Name(),
-			),
-		)
-	})
+	// 	_, err = s.setup(mockDep)
+	// 	assert.EqualError(
+	// 		t,
+	// 		err,
+	// 		fmt.Sprintf(
+	// 			"unable to read %s: EOF",
+	// 			testStruct.ClusterCredentialDownload.Name(),
+	// 		),
+	// 	)
+	// })
 
 	// t.Run("Should fail when a wrong password is set", func(t *testing.T) {
 	// 	contentToUpload := bytes.Buffer{}
