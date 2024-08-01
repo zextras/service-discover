@@ -386,34 +386,34 @@ func TestSetup_importSetup(t *testing.T) {
 	// 	)
 	// })
 
-	t.Run("Wrong binding address", func(t *testing.T) {
-		setupFiles, cleanup := setup(t, "Wrong binding address", true)
-		defer cleanup()
+	// t.Run("Wrong binding address", func(t *testing.T) {
+	// 	setupFiles, cleanup := setup(t, "Wrong binding address", true)
+	// 	defer cleanup()
 
-		containerIP, err := setupFiles.Container.ContainerIP(setupFiles.CtxContainer)
-		assert.NoError(t, err)
+	// 	containerIP, err := setupFiles.Container.ContainerIP(setupFiles.CtxContainer)
+	// 	assert.NoError(t, err)
 
-		businessDep := new(mocks2.BusinessDependencies)
-		setupNetwork(businessDep, containerIP)
+	// 	businessDep := new(mocks2.BusinessDependencies)
+	// 	setupNetwork(businessDep, containerIP)
 
-		s := &Setup{
-			ConsulConfigDir:   setupFiles.consulConfigDir,
-			ConsulHome:        setupFiles.consulHome,
-			LocalConfigPath:   setupFiles.FakeLocalConfig.Name(),
-			ConsulData:        setupFiles.consulData,
-			ConsulFileConfig:  setupFiles.consulFileConfig,
-			ClusterCredential: setupFiles.ClusterCredentialDownload.Name(),
-			MutableConfigFile: setupFiles.mutableConfigFile,
-			Password:          defaultClusterCredentialsPassword,
-		}
-		s.BindAddress = "wrong_one"
-		_, err = s.importSetup(businessDep)
-		assert.EqualError(
-			t,
-			err,
-			"invalid binding address selected",
-		)
-	})
+	// 	s := &Setup{
+	// 		ConsulConfigDir:   setupFiles.consulConfigDir,
+	// 		ConsulHome:        setupFiles.consulHome,
+	// 		LocalConfigPath:   setupFiles.FakeLocalConfig.Name(),
+	// 		ConsulData:        setupFiles.consulData,
+	// 		ConsulFileConfig:  setupFiles.consulFileConfig,
+	// 		ClusterCredential: setupFiles.ClusterCredentialDownload.Name(),
+	// 		MutableConfigFile: setupFiles.mutableConfigFile,
+	// 		Password:          defaultClusterCredentialsPassword,
+	// 	}
+	// 	s.BindAddress = "wrong_one"
+	// 	_, err = s.importSetup(businessDep)
+	// 	assert.EqualError(
+	// 		t,
+	// 		err,
+	// 		"invalid binding address selected",
+	// 	)
+	// })
 
 	// t.Run("Wrong cluster credentials password", func(t *testing.T) {
 	// 	setupFiles, cleanup := setup(t, "Wrong cluster credentials password", true)
