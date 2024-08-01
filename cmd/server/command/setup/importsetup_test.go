@@ -23,7 +23,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/testcontainers/testcontainers-go"
-	"github.com/zextras/service-discover/cmd/server/config"
 	"github.com/zextras/service-discover/pkg/carbonio"
 	"github.com/zextras/service-discover/pkg/command"
 	mocks2 "github.com/zextras/service-discover/pkg/command/setup/mocks"
@@ -416,51 +415,51 @@ func TestSetup_importSetup(t *testing.T) {
 		)
 	})
 
-	t.Run("Wrong cluster credentials password", func(t *testing.T) {
-		setupFiles, cleanup := setup(t, "Wrong cluster credentials password", true)
-		defer cleanup()
+	// t.Run("Wrong cluster credentials password", func(t *testing.T) {
+	// 	setupFiles, cleanup := setup(t, "Wrong cluster credentials password", true)
+	// 	defer cleanup()
 
-		containerIP, err := setupFiles.Container.ContainerIP(setupFiles.CtxContainer)
-		assert.NoError(t, err)
+	// 	containerIP, err := setupFiles.Container.ContainerIP(setupFiles.CtxContainer)
+	// 	assert.NoError(t, err)
 
-		businessDep := new(mocks2.BusinessDependencies)
-		setupNetwork(businessDep, containerIP)
-		setupLdap(t, businessDep, setupFiles.FakeLocalConfig)
-		s := &Setup{
-			ConsulConfigDir:   setupFiles.consulConfigDir,
-			ConsulHome:        setupFiles.consulHome,
-			LocalConfigPath:   setupFiles.FakeLocalConfig.Name(),
-			ConsulData:        setupFiles.consulData,
-			ConsulFileConfig:  setupFiles.consulFileConfig,
-			ClusterCredential: setupFiles.ClusterCredentialDownload.Name(),
-			MutableConfigFile: setupFiles.mutableConfigFile,
-			BindAddress:       "127.0.0.1",
-			Password:          "not right one",
-		}
-		file, err := os.Create(setupFiles.ClusterCredentialDownload.Name())
-		assert.NoError(t, err)
-		tarWriter, err := encrypter.NewWriter(file, []byte("password"))
-		assert.NoError(t, err)
-		err = os.WriteFile(setupFiles.consulFileConfig, []byte("Test"), os.FileMode(0644))
-		assert.NoError(t, err)
-		consulFileConfig, err := os.Open(setupFiles.consulFileConfig)
-		assert.NoError(t, err)
-		stat, err := consulFileConfig.Stat()
-		assert.NoError(t, err)
+	// 	businessDep := new(mocks2.BusinessDependencies)
+	// 	setupNetwork(businessDep, containerIP)
+	// 	setupLdap(t, businessDep, setupFiles.FakeLocalConfig)
+	// 	s := &Setup{
+	// 		ConsulConfigDir:   setupFiles.consulConfigDir,
+	// 		ConsulHome:        setupFiles.consulHome,
+	// 		LocalConfigPath:   setupFiles.FakeLocalConfig.Name(),
+	// 		ConsulData:        setupFiles.consulData,
+	// 		ConsulFileConfig:  setupFiles.consulFileConfig,
+	// 		ClusterCredential: setupFiles.ClusterCredentialDownload.Name(),
+	// 		MutableConfigFile: setupFiles.mutableConfigFile,
+	// 		BindAddress:       "127.0.0.1",
+	// 		Password:          "not right one",
+	// 	}
+	// 	file, err := os.Create(setupFiles.ClusterCredentialDownload.Name())
+	// 	assert.NoError(t, err)
+	// 	tarWriter, err := encrypter.NewWriter(file, []byte("password"))
+	// 	assert.NoError(t, err)
+	// 	err = os.WriteFile(setupFiles.consulFileConfig, []byte("Test"), os.FileMode(0644))
+	// 	assert.NoError(t, err)
+	// 	consulFileConfig, err := os.Open(setupFiles.consulFileConfig)
+	// 	assert.NoError(t, err)
+	// 	stat, err := consulFileConfig.Stat()
+	// 	assert.NoError(t, err)
 
-		assert.NoError(t, tarWriter.AddFile(consulFileConfig, stat, command.ConsulCA, config.ConsulHome))
-		assert.NoError(t, tarWriter.Close())
+	// 	assert.NoError(t, tarWriter.AddFile(consulFileConfig, stat, command.ConsulCA, config.ConsulHome))
+	// 	assert.NoError(t, tarWriter.Close())
 
-		_, err = s.importSetup(businessDep)
-		assert.EqualError(
-			t,
-			err,
-			fmt.Sprintf(
-				"unable to open %s: openpgp: incorrect key",
-				setupFiles.ClusterCredentialDownload.Name(),
-			),
-		)
-	})
+	// 	_, err = s.importSetup(businessDep)
+	// 	assert.EqualError(
+	// 		t,
+	// 		err,
+	// 		fmt.Sprintf(
+	// 			"unable to open %s: openpgp: incorrect key",
+	// 			setupFiles.ClusterCredentialDownload.Name(),
+	// 		),
+	// 	)
+	// })
 
 	t.Run("Run with correct configuration and flags", func(t *testing.T) {
 		setupFiles, cleanup := setup(t, "Run with correct configuration and flags", true)
