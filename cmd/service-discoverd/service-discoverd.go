@@ -19,11 +19,11 @@ const (
 	ExitCodeLocalCfg   = 1003
 	ExitCodeLdapError  = 1004
 	ExitCodeExecError  = 1005
-	ReadMainJson       = 1006
-	ParseMainJson      = 1007
-	ParsePortsMainJson = 1008
-	MarshallMainJson   = 1009
-	WriteMainJson      = 1010
+	ReadMainJSON       = 1006
+	ParseMainJSON      = 1007
+	ParsePortsMainJSON = 1008
+	MarshallMainJSON   = 1009
+	WriteMainJSON      = 1010
 )
 
 type realDependencies struct{}
@@ -136,14 +136,17 @@ func runServiceDiscoverDaemon(deps deps, args []string) {
 
 		return
 	}
-	mainJsonPath := "/etc/zextras/service-discover/main.json"
+
+	mainJSONPath := "/etc/zextras/service-discover/main.json"
 	if len(args) > 2 {
-		mainJsonPath = args[2]
+		mainJSONPath = args[2]
 	}
-	errTls := grpcTls(mainJsonPath)
-	if errTls != nil {
-		deps.Log(errTls.Log)
-		deps.Exit(errTls.ExitCode)
+
+	errTLS := addGrpcTLS(mainJSONPath)
+	if errTLS != nil {
+		deps.Log(errTLS.Log)
+		deps.Exit(errTLS.ExitCode)
+
 		return
 	}
 
@@ -323,23 +326,24 @@ func queryAllServiceDiscoverServers(ldapHandler carbonio.LdapHandler) ([]string,
 	return servers, nil
 }
 
-func grpcTls(inputFile string) *ErrorWithExitCode {
+func addGrpcTLS(inputFile string) *ErrorWithExitCode {
 	// Read the input JSON file
 	inputData, err := os.ReadFile(inputFile)
 	if err != nil {
 		return &ErrorWithExitCode{
 			Log:      "Failed to read input file:" + err.Error(),
-			ExitCode: ReadMainJson,
+			ExitCode: ReadMainJSON,
 		}
 	}
 
 	// Parse the JSON data
 	var jsonData map[string]interface{}
+
 	err = json.Unmarshal(inputData, &jsonData)
 	if err != nil {
 		return &ErrorWithExitCode{
 			Log:      "Failed to parse JSON data:" + err.Error(),
-			ExitCode: ParseMainJson,
+			ExitCode: ParseMainJSON,
 		}
 	}
 
@@ -348,7 +352,7 @@ func grpcTls(inputFile string) *ErrorWithExitCode {
 	if !ok {
 		return &ErrorWithExitCode{
 			Log:      "Invalid JSON structure: 'ports' field is missing or not an object",
-			ExitCode: ParsePortsMainJson,
+			ExitCode: ParsePortsMainJSON,
 		}
 	}
 
@@ -359,7 +363,7 @@ func grpcTls(inputFile string) *ErrorWithExitCode {
 		if err != nil {
 			return &ErrorWithExitCode{
 				Log:      "Failed to marshal modified JSON data:" + err.Error(),
-				ExitCode: MarshallMainJson,
+				ExitCode: MarshallMainJSON,
 			}
 		}
 
@@ -369,11 +373,12 @@ func grpcTls(inputFile string) *ErrorWithExitCode {
 		if err != nil {
 			return &ErrorWithExitCode{
 				Log:      "Failed to write output file:" + err.Error(),
-				ExitCode: WriteMainJson,
+				ExitCode: WriteMainJSON,
 			}
 		}
 	} else {
 		fmt.Println("'grpc_tls' port already exists")
 	}
+
 	return nil
 }
