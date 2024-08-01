@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/user"
@@ -13,11 +14,16 @@ import (
 const (
 	consulBinPath = "/usr/bin/consul"
 	// Starting from 1000 to avoid conflicts with consul exit codes.
-	ExitCodeWrongArgs = 1001
-	ExitCodeUserStuff = 1002
-	ExitCodeLocalCfg  = 1003
-	ExitCodeLdapError = 1004
-	ExitCodeExecError = 1005
+	ExitCodeWrongArgs  = 1001
+	ExitCodeUserStuff  = 1002
+	ExitCodeLocalCfg   = 1003
+	ExitCodeLdapError  = 1004
+	ExitCodeExecError  = 1005
+	ReadMainJSON       = 1006
+	ParseMainJSON      = 1007
+	ParsePortsMainJSON = 1008
+	MarshallMainJSON   = 1009
+	WriteMainJSON      = 1010
 )
 
 type realDependencies struct{}
@@ -127,6 +133,19 @@ func runServiceDiscoverDaemon(deps deps, args []string) {
 	if err != nil {
 		deps.Log(err.Log)
 		deps.Exit(err.ExitCode)
+
+		return
+	}
+
+	mainJSONPath := "/etc/zextras/service-discover/main.json"
+	if len(args) > 2 {
+		mainJSONPath = args[2]
+	}
+
+	errTLS := addGrpcTLS(mainJSONPath)
+	if errTLS != nil {
+		deps.Log(errTLS.Log)
+		deps.Exit(errTLS.ExitCode)
 
 		return
 	}
@@ -305,4 +324,61 @@ func queryAllServiceDiscoverServers(ldapHandler carbonio.LdapHandler) ([]string,
 	}
 
 	return servers, nil
+}
+
+func addGrpcTLS(inputFile string) *ErrorWithExitCode {
+	// Read the input JSON file
+	inputData, err := os.ReadFile(inputFile)
+	if err != nil {
+		return &ErrorWithExitCode{
+			Log:      "Failed to read input file:" + err.Error(),
+			ExitCode: ReadMainJSON,
+		}
+	}
+
+	// Parse the JSON data
+	var jsonData map[string]interface{}
+
+	err = json.Unmarshal(inputData, &jsonData)
+	if err != nil {
+		return &ErrorWithExitCode{
+			Log:      "Failed to parse JSON data:" + err.Error(),
+			ExitCode: ParseMainJSON,
+		}
+	}
+
+	// Check if the 'ports' field exists and is a map
+	ports, ok := jsonData["ports"].(map[string]interface{})
+	if !ok {
+		return &ErrorWithExitCode{
+			Log:      "Invalid JSON structure: 'ports' field is missing or not an object",
+			ExitCode: ParsePortsMainJSON,
+		}
+	}
+
+	// Check if 'grpc_tls' port does not exist and add it
+	if _, exists := ports["grpc_tls"]; !exists {
+		ports["grpc_tls"] = 8503
+		modifiedData, err := json.MarshalIndent(jsonData, "", "  ")
+		if err != nil {
+			return &ErrorWithExitCode{
+				Log:      "Failed to marshal modified JSON data:" + err.Error(),
+				ExitCode: MarshallMainJSON,
+			}
+		}
+
+		// Write the modified JSON data to the output file
+		outputFile := inputFile
+		err = os.WriteFile(outputFile, modifiedData, 0644)
+		if err != nil {
+			return &ErrorWithExitCode{
+				Log:      "Failed to write output file:" + err.Error(),
+				ExitCode: WriteMainJSON,
+			}
+		}
+	} else {
+		fmt.Println("'grpc_tls' port already exists")
+	}
+
+	return nil
 }
