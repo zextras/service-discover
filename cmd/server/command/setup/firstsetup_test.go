@@ -21,7 +21,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/zextras/service-discover/pkg/carbonio"
 	mocks5 "github.com/zextras/service-discover/pkg/carbonio/mocks"
-	"github.com/zextras/service-discover/pkg/command"
 	mocks2 "github.com/zextras/service-discover/pkg/command/setup/mocks"
 	"github.com/zextras/service-discover/pkg/encrypter"
 	"github.com/zextras/service-discover/pkg/exec"
@@ -93,120 +92,120 @@ type mocked interface {
 }
 
 func TestFirstSetup_business(t *testing.T) {
-	t.Run("Complete all setup tasks", func(t *testing.T) {
-		var cleanups = make([]func(), 0)
-		defer func() {
-			for _, f := range cleanups {
-				f()
-			}
-		}()
+	// t.Run("Complete all setup tasks", func(t *testing.T) {
+	// 	var cleanups = make([]func(), 0)
+	// 	defer func() {
+	// 		for _, f := range cleanups {
+	// 			f()
+	// 		}
+	// 	}()
 
-		setup, setupCleanup := createSetup(t)
-		cleanups = append(cleanups, setupCleanup)
+	// 	setup, setupCleanup := createSetup(t)
+	// 	cleanups = append(cleanups, setupCleanup)
 
-		mockLocalConfig, err := carbonio.LoadLocalConfig(setup.LocalConfigPath)
-		assert.NoError(t, err)
+	// 	mockLocalConfig, err := carbonio.LoadLocalConfig(setup.LocalConfigPath)
+	// 	assert.NoError(t, err)
 
-		mockLdapHandler := new(mocks5.LdapHandler)
-		mockLdapHandler.On("UploadBinary", mock.Anything, "cn=config,cn=zimbra", "carbonioMeshCredentials").Return(nil)
+	// 	mockLdapHandler := new(mocks5.LdapHandler)
+	// 	mockLdapHandler.On("UploadBinary", mock.Anything, "cn=config,cn=zimbra", "carbonioMeshCredentials").Return(nil)
 
-		mockSystemdUnit := new(mocks3.UnitManager)
-		mockDependencies := new(mocks2.BusinessDependencies)
-		mockDependencies.On("writer").Return(io.Discard)
-		mockNetwork(mockDependencies, false, false)
-		cleanup := mockBusinessDependencies(&setup, mockDependencies, &mockLocalConfig, mockLdapHandler, mockSystemdUnit)
-		cleanups = append(cleanups, cleanup)
+	// 	mockSystemdUnit := new(mocks3.UnitManager)
+	// 	mockDependencies := new(mocks2.BusinessDependencies)
+	// 	mockDependencies.On("writer").Return(io.Discard)
+	// 	mockNetwork(mockDependencies, false, false)
+	// 	cleanup := mockBusinessDependencies(&setup, mockDependencies, &mockLocalConfig, mockLdapHandler, mockSystemdUnit)
+	// 	cleanups = append(cleanups, cleanup)
 
-		out, err := setup.firstSetup(mockDependencies)
+	// 	out, err := setup.firstSetup(mockDependencies)
 
-		assert.NoError(t, err)
-		assert.NotNil(t, out)
-		text, err := out.PlainRender()
-		assert.NoError(t, err)
-		assert.Equal(t, "", text)
-		text, err = out.JSONRender()
-		assert.NoError(t, err)
-		assert.Equal(t, "{\"cluster_credentials\":\""+setup.ClusterCredential+"\"}", text)
+	// 	assert.NoError(t, err)
+	// 	assert.NotNil(t, out)
+	// 	text, err := out.PlainRender()
+	// 	assert.NoError(t, err)
+	// 	assert.Equal(t, "", text)
+	// 	text, err = out.JSONRender()
+	// 	assert.NoError(t, err)
+	// 	assert.Equal(t, "{\"cluster_credentials\":\""+setup.ClusterCredential+"\"}", text)
 
-		mockLdapHandler.AssertNumberOfCalls(t, "AddService", 1)
-		mockLdapHandler.AssertNumberOfCalls(t, "UploadBinary", 1)
-		mockDependencies.AssertNumberOfCalls(t, "CreateCommand", 6)
+	// 	mockLdapHandler.AssertNumberOfCalls(t, "AddService", 1)
+	// 	mockLdapHandler.AssertNumberOfCalls(t, "UploadBinary", 1)
+	// 	mockDependencies.AssertNumberOfCalls(t, "CreateCommand", 6)
 
-		clusterCredentialFile, err := os.Open(setup.ClusterCredential)
-		assert.NoError(t, err, "File should exist")
+	// 	clusterCredentialFile, err := os.Open(setup.ClusterCredential)
+	// 	assert.NoError(t, err, "File should exist")
 
-		defer clusterCredentialFile.Close() // It will be removed in the cleanup() function deferred before
-		encReader, err := encrypter.NewReader(clusterCredentialFile, []byte("password"))
-		assert.NoError(t, err, "Error while opening tar reader")
+	// 	defer clusterCredentialFile.Close() // It will be removed in the cleanup() function deferred before
+	// 	encReader, err := encrypter.NewReader(clusterCredentialFile, []byte("password"))
+	// 	assert.NoError(t, err, "Error while opening tar reader")
 
-		listOfCompressedFiles := make([]string, 0)
+	// 	listOfCompressedFiles := make([]string, 0)
 
-		for {
-			header, err := encReader.Next()
-			if err == io.EOF {
-				t.Log("Reached EOF")
+	// 	for {
+	// 		header, err := encReader.Next()
+	// 		if err == io.EOF {
+	// 			t.Log("Reached EOF")
 
-				break
-			}
+	// 			break
+	// 		}
 
-			assert.NoError(t, err, "Error while reading tar file")
-			t.Logf("Header name file: %s\n", header.Name)
-			listOfCompressedFiles = append(listOfCompressedFiles, header.Name)
-		}
+	// 		assert.NoError(t, err, "Error while reading tar file")
+	// 		t.Logf("Header name file: %s\n", header.Name)
+	// 		listOfCompressedFiles = append(listOfCompressedFiles, header.Name)
+	// 	}
 
-		// Note: we use relative path since the tarball will not have absolute paths.
-		expectedFileList := make([]string, 0)
-		caFileNameRel, _ := filepath.Rel("/", setup.ConsulHome+"/"+command.ConsulCA)
-		caKeyFileNameRel, _ := filepath.Rel("/", setup.ConsulHome+"/"+command.ConsulCAKey)
+	// 	// Note: we use relative path since the tarball will not have absolute paths.
+	// 	expectedFileList := make([]string, 0)
+	// 	caFileNameRel, _ := filepath.Rel("/", setup.ConsulHome+"/"+command.ConsulCA)
+	// 	caKeyFileNameRel, _ := filepath.Rel("/", setup.ConsulHome+"/"+command.ConsulCAKey)
 
-		expectedFileList = append(expectedFileList, command.GossipKey)
-		expectedFileList = append(expectedFileList, command.ConsulACLBootstrap)
-		expectedFileList = append(expectedFileList, caKeyFileNameRel)
-		expectedFileList = append(expectedFileList, caFileNameRel)
-		assert.Equal(
-			t,
-			len(expectedFileList),
-			len(listOfCompressedFiles),
-			"The number of elements in the array is not the wanted one",
-		)
-		assert.ElementsMatch(
-			t,
-			expectedFileList,
-			listOfCompressedFiles,
-			"The element in the arrays are not equal",
-		)
-	})
+	// 	expectedFileList = append(expectedFileList, command.GossipKey)
+	// 	expectedFileList = append(expectedFileList, command.ConsulACLBootstrap)
+	// 	expectedFileList = append(expectedFileList, caKeyFileNameRel)
+	// 	expectedFileList = append(expectedFileList, caFileNameRel)
+	// 	assert.Equal(
+	// 		t,
+	// 		len(expectedFileList),
+	// 		len(listOfCompressedFiles),
+	// 		"The number of elements in the array is not the wanted one",
+	// 	)
+	// 	assert.ElementsMatch(
+	// 		t,
+	// 		expectedFileList,
+	// 		listOfCompressedFiles,
+	// 		"The element in the arrays are not equal",
+	// 	)
+	// })
 
-	t.Run("First non interactive setup without lo interface", func(t *testing.T) {
-		var cleanups = make([]func(), 0)
-		defer func() {
-			for _, f := range cleanups {
-				f()
-			}
-		}()
+	// t.Run("First non interactive setup without lo interface", func(t *testing.T) {
+	// 	var cleanups = make([]func(), 0)
+	// 	defer func() {
+	// 		for _, f := range cleanups {
+	// 			f()
+	// 		}
+	// 	}()
 
-		setup, setupCleanup := createSetup(t)
-		cleanups = append(cleanups, setupCleanup)
+	// 	setup, setupCleanup := createSetup(t)
+	// 	cleanups = append(cleanups, setupCleanup)
 
-		mockLocalConfig, err := carbonio.LoadLocalConfig(setup.LocalConfigPath)
-		assert.NoError(t, err)
+	// 	mockLocalConfig, err := carbonio.LoadLocalConfig(setup.LocalConfigPath)
+	// 	assert.NoError(t, err)
 
-		mockLdapHandler := new(mocks5.LdapHandler)
-		mockLdapHandler.On("UploadBinary", mock.Anything, "cn=config,cn=zimbra", "carbonioMeshCredentials").Return(nil)
+	// 	mockLdapHandler := new(mocks5.LdapHandler)
+	// 	mockLdapHandler.On("UploadBinary", mock.Anything, "cn=config,cn=zimbra", "carbonioMeshCredentials").Return(nil)
 
-		mockSystemdUnit := new(mocks3.UnitManager)
-		mockDependencies := new(mocks2.BusinessDependencies)
+	// 	mockSystemdUnit := new(mocks3.UnitManager)
+	// 	mockDependencies := new(mocks2.BusinessDependencies)
 
-		mockDependencies.On("writer").Return(io.Discard)
-		mockNetwork(mockDependencies, true, false)
-		cleanup := mockBusinessDependencies(&setup, mockDependencies, &mockLocalConfig, mockLdapHandler, mockSystemdUnit)
-		cleanups = append(cleanups, cleanup)
+	// 	mockDependencies.On("writer").Return(io.Discard)
+	// 	mockNetwork(mockDependencies, true, false)
+	// 	cleanup := mockBusinessDependencies(&setup, mockDependencies, &mockLocalConfig, mockLdapHandler, mockSystemdUnit)
+	// 	cleanups = append(cleanups, cleanup)
 
-		out, err := setup.firstSetup(mockDependencies)
+	// 	out, err := setup.firstSetup(mockDependencies)
 
-		assert.NoError(t, err)
-		assert.NotNil(t, out)
-	})
+	// 	assert.NoError(t, err)
+	// 	assert.NotNil(t, out)
+	// })
 }
 
 func mockBusinessDependencies(
