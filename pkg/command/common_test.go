@@ -14,7 +14,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/go-ldap/ldap"
+	"github.com/go-ldap/ldap/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/testcontainers/testcontainers-go"
