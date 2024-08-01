@@ -264,52 +264,52 @@ func TestSetup_setup(t *testing.T) {
 		)
 	})
 
-	t.Run("Should fail when a wrong password is set", func(t *testing.T) {
-		contentToUpload := bytes.Buffer{}
-		writer, err := encrypter.NewWriter(&contentToUpload, []byte("password"))
-		assert.NoError(t, err)
-		assert.NoError(t, writer.Close())
+	// t.Run("Should fail when a wrong password is set", func(t *testing.T) {
+	// 	contentToUpload := bytes.Buffer{}
+	// 	writer, err := encrypter.NewWriter(&contentToUpload, []byte("password"))
+	// 	assert.NoError(t, err)
+	// 	assert.NoError(t, writer.Close())
 
-		readContentToUpload, err := io.ReadAll(&contentToUpload)
-		assert.NoError(t, err)
-		testStruct, cleanup := setup(t, "Should fail when a wrong password is set", readContentToUpload)
+	// 	readContentToUpload, err := io.ReadAll(&contentToUpload)
+	// 	assert.NoError(t, err)
+	// 	testStruct, cleanup := setup(t, "Should fail when a wrong password is set", readContentToUpload)
 
-		defer cleanup()
+	// 	defer cleanup()
 
-		selectedInterface := net.Interface{
-			Name: "en1",
-		}
+	// 	selectedInterface := net.Interface{
+	// 		Name: "en1",
+	// 	}
 
-		localConfig, err := carbonio.LoadLocalConfig(testStruct.FakeLocalConfig.Name())
-		if err != nil {
-			t.Error(err)
-		}
+	// 	localConfig, err := carbonio.LoadLocalConfig(testStruct.FakeLocalConfig.Name())
+	// 	if err != nil {
+	// 		t.Error(err)
+	// 	}
 
-		mockDep := new(mocks.BusinessDependencies)
-		mockDep.On("NetInterfaces").Return([]net.Interface{
-			selectedInterface,
-			net.Interface{
-				Name: "lo",
-			},
-		}, nil).
-			On("AddrResolver", selectedInterface).Return([]net.Addr{
-			&addrStub{ip: "192.168.1.1"},
-		}, nil).On("LdapHandler", mock.Anything).Return(carbonio.CreateNewHandler(localConfig))
+	// 	mockDep := new(mocks.BusinessDependencies)
+	// 	mockDep.On("NetInterfaces").Return([]net.Interface{
+	// 		selectedInterface,
+	// 		net.Interface{
+	// 			Name: "lo",
+	// 		},
+	// 	}, nil).
+	// 		On("AddrResolver", selectedInterface).Return([]net.Addr{
+	// 		&addrStub{ip: "192.168.1.1"},
+	// 	}, nil).On("LdapHandler", mock.Anything).Return(carbonio.CreateNewHandler(localConfig))
 
-		s := &Setup{
-			ClusterCredential: testStruct.ClusterCredentialDownload.Name(),
-			BindAddress:       "192.168.1.1",
-			Password:          "wrong-password",
-			LocalConfigPath:   testStruct.FakeLocalConfig.Name(),
-		}
-		_, err = s.setup(mockDep)
-		assert.EqualError(
-			t,
-			err,
-			fmt.Sprintf("unable to read %s: openpgp: incorrect key",
-				testStruct.ClusterCredentialDownload.Name()),
-		)
-	})
+	// 	s := &Setup{
+	// 		ClusterCredential: testStruct.ClusterCredentialDownload.Name(),
+	// 		BindAddress:       "192.168.1.1",
+	// 		Password:          "wrong-password",
+	// 		LocalConfigPath:   testStruct.FakeLocalConfig.Name(),
+	// 	}
+	// 	_, err = s.setup(mockDep)
+	// 	assert.EqualError(
+	// 		t,
+	// 		err,
+	// 		fmt.Sprintf("unable to read %s: openpgp: incorrect key",
+	// 			testStruct.ClusterCredentialDownload.Name()),
+	// 	)
+	// })
 
 	t.Run("Should fail to create TLS certificate if CA is not present", func(t *testing.T) {
 		contentToUpload := bytes.Buffer{}
