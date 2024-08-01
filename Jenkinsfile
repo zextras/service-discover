@@ -38,6 +38,8 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                     sh 'mkdir -p /home/agent/.gnupg'
                     def modules = [:]
                     def builds = [:]
+                    modules["agent"] = "cmd/agent"
+                    modules["server"] = "cmd/server"
                     modules["command"] = "pkg/command"
                     modules["encrypter"] = "pkg/encrypter"
                     modules["exec"] = "pkg/exec"
