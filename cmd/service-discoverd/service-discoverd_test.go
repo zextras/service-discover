@@ -1,11 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
+	"os"
 	"os/user"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/zextras/service-discover/pkg/carbonio"
 )
@@ -304,6 +307,46 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 		mockDependencies.AssertCalled(t, "Log", []any{"consul execute failed: fake error"})
 		mockDependencies.AssertCalled(t, "Exit", ExitCodeExecError)
 	})
+}
+
+func Test_runAddGrpcTLS(t *testing.T) {
+	t.Run("addGprcTLS file not found", func(t *testing.T) {
+		errTLS := addGrpcTLS("abc")
+		assert.NotNil(t, errTLS)
+		assert.Equal(t, errTLS.ExitCode, 1006, "file not found")
+	})
+
+	t.Run("addGprcTLS file has non valid json", func(t *testing.T) {
+		errTLS := addGrpcTLS("test_invalid.json")
+		assert.NotNil(t, errTLS)
+		assert.Equal(t, errTLS.ExitCode, 1007, "not valid json")
+	})
+
+	t.Run("addGprcTLS file has no ports", func(t *testing.T) {
+		errTLS := addGrpcTLS("test_no_ports.json")
+		assert.NotNil(t, errTLS)
+		assert.Equal(t, errTLS.ExitCode, 1008, "no ports")
+	})
+	t.Run("addGprcTLS port_tls is not exits", func(t *testing.T) {
+		os.WriteFile("test_without_tls.json", []byte("{\"ports\": {\"abc\":5}}"), 0644)
+		errTLS := addGrpcTLS("test_without_tls.json")
+		assert.Nil(t, errTLS)
+
+		inputData, err := os.ReadFile("test_without_tls.json")
+		assert.Nil(t, err)
+		var jsonData map[string]interface{}
+		err = json.Unmarshal(inputData, &jsonData)
+		assert.Nil(t, err)
+		ports, ok := jsonData["ports"].(map[string]interface{})
+		assert.Equal(t, true, ok)
+		var x float64 = 8503
+		assert.Equal(t, x, ports["grpc_tls"])
+	})
+	t.Run("addGprcTLS works fine when file exists", func(t *testing.T) {
+		errTLS := addGrpcTLS("test.json")
+		assert.Nil(t, errTLS)
+	})
+
 }
 
 func setupMock(mockDependencies *mockDependencies, isServer bool) {
