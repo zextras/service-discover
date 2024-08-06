@@ -38,9 +38,6 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                     sh 'mkdir -p /home/agent/.gnupg'
                     def modules = [:]
                     def builds = [:]
-                    modules["agent"] = "cmd/agent"
-                    modules["server"] = "cmd/server"
-                    modules["command"] = "pkg/command"
                     modules["encrypter"] = "pkg/encrypter"
                     modules["exec"] = "pkg/exec"
                     modules["formatter"] = "pkg/formatter"
@@ -54,7 +51,20 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                             }
                         }
                     }
+
                     parallel builds
+                    dir('pkg/command') {
+                        sh 'gotestsum --format testname --junitfile tests.xml'
+                        junit allowEmptyResults: false, checksName: "Test for command", testResults: 'tests.xml'
+                    }
+                    dir('cmd/agent') {
+                        sh 'gotestsum --format testname --junitfile tests.xml'
+                        junit allowEmptyResults: false, checksName: "Test for agent", testResults: 'tests.xml'
+                    }
+                    dir('cmd/server') {
+                        sh 'gotestsum --format testname --junitfile tests.xml'
+                        junit allowEmptyResults: false, checksName: "Test for server", testResults: 'tests.xml'
+                    }
                 }
             }
         }
