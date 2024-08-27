@@ -324,10 +324,14 @@ func TestLDAPDownloadAndUploadCapabilities(t *testing.T) {
 			}
 		}(ldapContainer, containerCtx)
 
-		ldapIp, err := ldapContainer.ContainerIP(containerCtx)
+		//æ-ldapIp, err := ldapContainer.ContainerIP(containerCtx)
+
+		port, err := ldapContainer.MappedPort(containerCtx, "389/tcp")
+
+		ldapContainer.Ports(containerCtx)
 		assert.NoError(t, err)
 
-		masterUrl := fmt.Sprintf("ldap://%s:%s", ldapIp, "389")
+		masterUrl := fmt.Sprintf("ldap://%s:%s", "localhost", port.Port())
 
 		ldapHandler := ldapContext{
 			Credentials: ldapCredentials{
