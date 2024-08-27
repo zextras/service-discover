@@ -4,6 +4,9 @@ pipeline {
             label 'golang-agent-v2'
         }
     }
+    parameters {
+        booleanParam defaultValue: false, description: 'Set to true to skip the test stage', name: 'SKIP_TEST'
+    }
     options {
         skipDefaultCheckout()
         buildDiscarder(logRotator(numToKeepStr: '25'))
@@ -28,20 +31,18 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
             }
         }
         stage('Tests') {
+            when { expression { params.SKIP_TEST != true } }
             steps {
                 script {
                     sh 'rm -rfv /home/agent/.gnupg'
                     sh 'mkdir -p /home/agent/.gnupg'
                     def modules = [:]
                     def builds = [:]
-                    modules["agent"] = "cli/agent"
-                    modules["server"] = "cli/server"
-                    modules["command"] = "cli/lib/command"
-                    modules["credentialsEncrypter"] = "cli/lib/credentialsEncrypter"
-                    modules["exec"] = "cli/lib/exec"
-                    modules["formatter"] = "cli/lib/formatter"
-                    modules["parser"] = "cli/lib/parser"
-                    modules["carbonio"] = "cli/lib/carbonio"
+                    modules["encrypter"] = "pkg/encrypter"
+                    modules["exec"] = "pkg/exec"
+                    modules["formatter"] = "pkg/formatter"
+                    modules["parser"] = "pkg/parser"
+                    modules["carbonio"] = "pkg/carbonio"
                     modules.each{key, value ->
                         builds[key] = {
                             dir(value) {
@@ -50,7 +51,20 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                             }
                         }
                     }
+
                     parallel builds
+                    dir('pkg/command') {
+                        sh 'gotestsum --format testname --junitfile tests.xml'
+                        junit allowEmptyResults: false, checksName: "Test for command", testResults: 'tests.xml'
+                    }
+                    dir('cmd/agent') {
+                        sh 'gotestsum --format testname --junitfile tests.xml'
+                        junit allowEmptyResults: false, checksName: "Test for agent", testResults: 'tests.xml'
+                    }
+                    dir('cmd/server') {
+                        sh 'gotestsum --format testname --junitfile tests.xml'
+                        junit allowEmptyResults: false, checksName: "Test for server", testResults: 'tests.xml'
+                    }
                 }
             }
         }
@@ -60,9 +74,7 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                 script {
                     scannerHome = tool 'SonarScanner';
                 }
-                sh 'cd cli/agent; golangci-lint run --issues-exit-code 0 --out-format checkstyle > cli-agent.out'
-                sh 'cd cli/server; golangci-lint run --issues-exit-code 0 --out-format checkstyle > cli-server.out'
-                sh 'cd service-discoverd; golangci-lint run --issues-exit-code 0 --out-format checkstyle > discoverd.out'
+                sh 'golangci-lint run ./... --issues-exit-code 0 --out-format checkstyle > linter.out'
 
                 withSonarQubeEnv(credentialsId: 'sonarqube-user-token',
                     installationName: 'SonarQube instance') {
@@ -71,84 +83,54 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
             }
         }
         stage('Build Ubuntu') {
-            parallel {
-                stage('Ubuntu 20.04') {
-                    agent {
-                        node {
-                            label 'yap-agent-ubuntu-20.04-v2'
-                        }
-                    }
-                    steps {
-                        unstash 'project'
-                        sh 'sudo cp -r * /tmp'
-                        sh 'sudo yap build ubuntu-focal .'
-                        stash includes: 'artifacts/*focal*.deb', name: 'artifacts-ubuntu-focal'
-                    }
-                    post {
-                        always {
-                            archiveArtifacts artifacts: "artifacts/*focal*.deb", fingerprint: true
-                        }
+            agent {
+                node {
+                    label 'yap-agent-ubuntu-20.04-v2'
+                }
+            }
+            steps {
+                unstash 'project'
+                sh 'mkdir -p /tmp/service-discover'
+                sh 'cp -r * /tmp/service-discover'
+                script {
+                    if (BRANCH_NAME == 'devel') {
+                        def timestamp = new Date().format('yyyyMMddHHmmss')
+                        sh "yap build ubuntu build -r ${timestamp} -sd"
+                    } else {
+                        sh 'yap build ubuntu build -sd'
                     }
                 }
-
-                stage('Ubuntu 22.04') {
-                    agent {
-                        node {
-                            label 'yap-agent-ubuntu-22.04-v2'
-                        }
-                    }
-                    steps {
-                        unstash 'project'
-                        sh 'sudo cp -r * /tmp'
-                        sh 'sudo yap build ubuntu-jammy .'
-                        stash includes: 'artifacts/*jammy*.deb', name: 'artifacts-ubuntu-jammy'
-                    }
-                    post {
-                        always {
-                            archiveArtifacts artifacts: "artifacts/*jammy*.deb", fingerprint: true
-                        }
-                    }
+                stash includes: 'artifacts/*.deb', name: 'artifacts-ubuntu'
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: "artifacts/*.deb", fingerprint: true
                 }
             }
         }
         stage('Build RHEL') {
-            parallel {
-                stage('RHEL 8') {
-                    agent {
-                        node {
-                            label 'yap-agent-rocky-8-v2'
-                        }
-                    }
-                    steps {
-                        unstash 'project'
-                        sh 'sudo cp -r * /tmp'
-                        sh 'sudo yap build rocky-8 .'
-                        stash includes: 'artifacts/x86_64/*el8*.rpm', name: 'artifacts-rocky-8'
-                    }
-                    post {
-                        always {
-                            archiveArtifacts artifacts: "artifacts/x86_64/*el8*.rpm", fingerprint: true
-                        }
+            agent {
+                node {
+                    label 'yap-agent-rocky-8-v2'
+                }
+            }
+            steps {
+                unstash 'project'
+                sh 'mkdir -p /tmp/service-discover'
+                sh 'cp -r * /tmp/service-discover'
+                script {
+                    if (BRANCH_NAME == 'devel') {
+                        def timestamp = new Date().format('yyyyMMddHHmmss')
+                        sh "yap build rocky build -r ${timestamp} -sd"
+                    } else {
+                        sh 'yap build rocky build -sd'
                     }
                 }
-
-                stage('RHEL 9') {
-                    agent {
-                        node {
-                            label 'yap-agent-rocky-9-v2'
-                        }
-                    }
-                    steps {
-                        unstash 'project'
-                        sh 'sudo cp -r * /tmp'
-                        sh 'sudo yap build rocky-9 .'
-                        stash includes: 'artifacts/x86_64/*el9*.rpm', name: 'artifacts-rocky-9'
-                    }
-                    post {
-                        always {
-                            archiveArtifacts artifacts: "artifacts/x86_64/*el9*.rpm", fingerprint: true
-                        }
-                    }
+                stash includes: 'artifacts/x86_64/*.rpm', name: 'artifacts-rocky'
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: "artifacts/x86_64/*.rpm", fingerprint: true
                 }
             }
         }
@@ -157,10 +139,8 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                 branch 'devel'
             }
             steps {
-                unstash 'artifacts-ubuntu-focal'
-                unstash 'artifacts-ubuntu-jammy'
-                unstash 'artifacts-rocky-8'
-                unstash 'artifacts-rocky-9'
+                unstash 'artifacts-ubuntu'
+                unstash 'artifacts-rocky'
 
                 script {
                     def server = Artifactory.server 'zextras-artifactory'
@@ -171,73 +151,68 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                     uploadSpec = """{
                         "files": [
                             {
-                                "pattern": "artifacts/*focal*.deb",
+                                "pattern": "artifacts/*.deb",
                                 "target": "ubuntu-devel/pool/",
-                                "props": "deb.distribution=focal;deb.component=main;deb.architecture=amd64"
+                                "props": "deb.distribution=focal;deb.distribution=jammy;deb.distribution=noble;deb.component=main;deb.architecture=amd64"
                             },
                             {
-                                "pattern": "artifacts/*jammy*.deb",
-                                "target": "ubuntu-devel/pool/",
-                                "props": "deb.distribution=jammy;deb.component=main;deb.architecture=amd64"
-                            },
-                            {
-                                "pattern": "artifacts/x86_64/(service-discover-server)-(*).el8.x86_64.rpm",
-                                "target": "centos8-devel/zextras/{1}/{1}-{2}.el8.x86_64.rpm",
+                                "pattern": "artifacts/x86_64/(service-discover-server)-(*).x86_64.rpm",
+                                "target": "centos8-devel/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-agent)-(*).el8.x86_64.rpm",
-                                "target": "centos8-devel/zextras/{1}/{1}-{2}.el8.x86_64.rpm",
+                                "pattern": "artifacts/x86_64/(service-discover-agent)-(*).x86_64.rpm",
+                                "target": "centos8-devel/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-daemon)-(*).el8.x86_64.rpm",
-                                "target": "centos8-devel/zextras/{1}/{1}-{2}.el8.x86_64.rpm",
+                                "pattern": "artifacts/x86_64/(service-discover-daemon)-(*).x86_64.rpm",
+                                "target": "centos8-devel/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-server)-(*).el8.x86_64.rpm",
-                                "target": "centos8-devel/zextras/{1}/{1}-{2}.el8.x86_64.rpm",
+                                "pattern": "artifacts/x86_64/(service-discover-server)-(*).x86_64.rpm",
+                                "target": "centos8-devel/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-agent)-(*).el8.x86_64.rpm",
-                                "target": "centos8-devel/zextras/{1}/{1}-{2}.el8.x86_64.rpm",
+                                "pattern": "artifacts/x86_64/(service-discover-agent)-(*).x86_64.rpm",
+                                "target": "centos8-devel/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-daemon)-(*).el8.x86_64.rpm",
-                                "target": "centos8-devel/zextras/{1}/{1}-{2}.el8.x86_64.rpm",
+                                "pattern": "artifacts/x86_64/(service-discover-daemon)-(*).x86_64.rpm",
+                                "target": "centos8-devel/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-server)-(*).el9.x86_64.rpm",
-                                "target": "rhel9-devel/zextras/{1}/{1}-{2}.el9.x86_64.rpm",
+                                "pattern": "artifacts/x86_64/(service-discover-server)-(*).x86_64.rpm",
+                                "target": "rhel9-devel/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-agent)-(*).el9.x86_64.rpm",
-                                "target": "rhel9-devel/zextras/{1}/{1}-{2}.el9.x86_64.rpm",
+                                "pattern": "artifacts/x86_64/(service-discover-agent)-(*).x86_64.rpm",
+                                "target": "rhel9-devel/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-daemon)-(*).el9.x86_64.rpm",
-                                "target": "rhel9-devel/zextras/{1}/{1}-{2}.el9.x86_64.rpm",
+                                "pattern": "artifacts/x86_64/(service-discover-daemon)-(*).x86_64.rpm",
+                                "target": "rhel9-devel/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-server)-(*).el9.x86_64.rpm",
-                                "target": "rhel9-devel/zextras/{1}/{1}-{2}.el9.x86_64.rpm",
+                                "pattern": "artifacts/x86_64/(service-discover-server)-(*).x86_64.rpm",
+                                "target": "rhel9-devel/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-agent)-(*).el9.x86_64.rpm",
-                                "target": "rhel9-devel/zextras/{1}/{1}-{2}.el9.x86_64.rpm",
+                                "pattern": "artifacts/x86_64/(service-discover-agent)-(*).x86_64.rpm",
+                                "target": "rhel9-devel/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-daemon)-(*).el9.x86_64.rpm",
-                                "target": "rhel9-devel/zextras/{1}/{1}-{2}.el9.x86_64.rpm",
+                                "pattern": "artifacts/x86_64/(service-discover-daemon)-(*).x86_64.rpm",
+                                "target": "rhel9-devel/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             }
                         ]
@@ -251,10 +226,8 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                 buildingTag()
             }
             steps {
-                unstash 'artifacts-ubuntu-focal'
-                unstash 'artifacts-ubuntu-jammy'
-                unstash 'artifacts-rocky-8'
-                unstash 'artifacts-rocky-9'
+                unstash 'artifacts-ubuntu'
+                unstash 'artifacts-rocky'
 
                 script {
                     def server = Artifactory.server 'zextras-artifactory'
@@ -268,14 +241,9 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                     uploadSpec= """{
                         "files": [
                             {
-                                "pattern": "artifacts/*focal*.deb",
+                                "pattern": "artifacts/*.deb",
                                 "target": "ubuntu-rc/pool/",
-                                "props": "deb.distribution=focal;deb.component=main;deb.architecture=amd64"
-                            },
-                            {
-                                "pattern": "artifacts/*jammy*.deb",
-                                "target": "ubuntu-rc/pool/",
-                                "props": "deb.distribution=jammy;deb.component=main;deb.architecture=amd64"
+                                "props": "deb.distribution=focal;deb.distribution=jammy;deb.distribution=noble;deb.component=main;deb.architecture=amd64"
                             }
                         ]
                     }"""
@@ -300,18 +268,18 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                     uploadSpec= """{
                         "files": [
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-server)-(*).el8.x86_64.rpm",
-                                "target": "centos8-rc/zextras/{1}/{1}-{2}.el8.x86_64.rpm",
+                                "pattern": "artifacts/x86_64/(service-discover-server)-(*).x86_64.rpm",
+                                "target": "centos8-rc/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-agent)-(*).el8.x86_64.rpm",
-                                "target": "centos8-rc/zextras/{1}/{1}-{2}.el8.x86_64.rpm",
+                                "pattern": "artifacts/x86_64/(service-discover-agent)-(*).x86_64.rpm",
+                                "target": "centos8-rc/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-daemon)-(*).el8.x86_64.rpm",
-                                "target": "centos8-rc/zextras/{1}/{1}-{2}.el8.x86_64.rpm",
+                                "pattern": "artifacts/x86_64/(service-discover-daemon)-(*).x86_64.rpm",
+                                "target": "centos8-rc/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             }
                         ]
@@ -337,18 +305,18 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                     uploadSpec= """{
                         "files": [
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-server)-(*).el9.x86_64.rpm",
-                                "target": "rhel9-rc/zextras/{1}/{1}-{2}.el9.x86_64.rpm",
+                                "pattern": "artifacts/x86_64/(service-discover-server)-(*).x86_64.rpm",
+                                "target": "rhel9-rc/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-agent)-(*).el9.x86_64.rpm",
-                                "target": "rhel9-rc/zextras/{1}/{1}-{2}.el9.x86_64.rpm",
+                                "pattern": "artifacts/x86_64/(service-discover-agent)-(*).x86_64.rpm",
+                                "target": "rhel9-rc/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-daemon)-(*).el9.x86_64.rpm",
-                                "target": "rhel9-rc/zextras/{1}/{1}-{2}.el9.x86_64.rpm",
+                                "pattern": "artifacts/x86_64/(service-discover-daemon)-(*).x86_64.rpm",
+                                "target": "rhel9-rc/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras"
                             }
                         ]

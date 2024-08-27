@@ -1,0 +1,22 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: service-discover-term-lib
+  title: Service Discover Terminal Library
+  description: |
+    A Terminal library represents a terminal where information gets printed to the final user.
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+  tags:
+    - service-discover
+    - cli
+    - lib
+    - library
+    - terminal
+    - consul
+    - go
+    - backend
+spec:
+  type: library
+  lifecycle: production
+  owner: keyboard-crackers

@@ -1,0 +1,17 @@
+# Agent CLI
+
+This CLI is specifically designed for interacting with an Agent node.
+
+## Compilation & Run
+
+From the root of the package (where this file is located) run:
+
+```bash
+CGO_ENABLED=0 go build .
+```
+
+For directly running the CLI just type:
+
+```bash
+go run . # You can append additional CLI arguments here
+```

@@ -1,0 +1,17 @@
+{
+    "name": "service-discover",
+    "description": "Amazing project description",
+    "buildDir": "/tmp/",
+    "output": "artifacts",
+    "projects": [
+        {
+            "name": "agent"
+        },
+        {
+            "name": "service-discoverd"
+        },
+        {
+            "name": "server"
+        }
+    ]
+}
