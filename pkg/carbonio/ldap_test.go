@@ -311,6 +311,7 @@ func TestQueryAllServiceDiscoverServers(t *testing.T) {
 func TestLDAPDownloadAndUploadCapabilities(t *testing.T) {
 	testDn := "cn=config,cn=zimbra"
 	testAttribute := "carbonioMeshCredentials"
+	ipAddress := "0.0.0.0"
 
 	t.Run("should download content from LDAP", func(t *testing.T) {
 		expectedContent := make([]byte, 2048000) // 2 MB random byte array to simulate random binary content
@@ -331,7 +332,7 @@ func TestLDAPDownloadAndUploadCapabilities(t *testing.T) {
 		ldapContainer.Ports(containerCtx)
 		assert.NoError(t, err)
 
-		masterUrl := fmt.Sprintf("ldap://%s:%s", "localhost", port.Port())
+		masterUrl := fmt.Sprintf("ldap://%s:%s", ipAddress, port.Port())
 
 		ldapHandler := ldapContext{
 			Credentials: ldapCredentials{
@@ -375,7 +376,7 @@ func TestLDAPDownloadAndUploadCapabilities(t *testing.T) {
 		ldapContainer.Ports(containerCtx)
 		assert.NoError(t, err)
 
-		masterUrl := fmt.Sprintf("ldap://%s:%s", "localhost", port.Port())
+		masterUrl := fmt.Sprintf("ldap://%s:%s", ipAddress, port.Port())
 
 		ldapHandler := ldapContext{
 			Credentials: ldapCredentials{
