@@ -77,7 +77,7 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                 script {
                     scannerHome = tool 'SonarScanner';
                 }
-                sh 'golangci-lint run ./... --issues-exit-code 0 --out-format checkstyle > linter.out'
+                sh 'golangci-lint run ./... --issues-exit-code 0 --output.checkstyle.path linter.out'
 
                 withSonarQubeEnv(credentialsId: 'sonarqube-user-token',
                     installationName: 'SonarQube instance') {
