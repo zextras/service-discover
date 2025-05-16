@@ -1,7 +1,7 @@
 pipeline {
     agent {
         node {
-            label 'golang-agent-v2'
+            label 'golang-v1'
         }
     }
     parameters {
@@ -16,14 +16,6 @@ pipeline {
         GOPRIVATE="gitlab.com/zextras,bitbucket.org/zextras,github.com/zextras"
     }
     stages {
-        stage('Setup') {
-            steps {
-                sh '''
-sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal main" > /etc/apt/sources.list.d/zextras.list'
-'''
-                sh 'sudo apt-get update && sudo apt-get install -y service-discover-base'
-            }
-        }
         stage('Stash') {
             steps {
                 checkout scm
@@ -36,49 +28,50 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
         stage('Tests') {
             when { expression { params.SKIP_TEST != true } }
             steps {
-                script {
-                    sh 'rm -rfv /home/agent/.gnupg'
-                    sh 'mkdir -p /home/agent/.gnupg'
-                    def modules = [:]
-                    def builds = [:]
-                    modules["encrypter"] = "pkg/encrypter"
-                    modules["exec"] = "pkg/exec"
-                    modules["formatter"] = "pkg/formatter"
-                    modules["parser"] = "pkg/parser"
-                    modules["carbonio"] = "pkg/carbonio"
-                    modules.each{key, value ->
-                        builds[key] = {
-                            dir(value) {
-                                sh 'gotestsum --format testname --junitfile tests.xml'
-                                junit allowEmptyResults: false, checksName: "Test for " + key, testResults: 'tests.xml'
+                container('golang') {
+                    script {
+                        def modules = [:]
+                        def builds = [:]
+                        modules["encrypter"] = "pkg/encrypter"
+                        modules["exec"] = "pkg/exec"
+                        modules["formatter"] = "pkg/formatter"
+                        modules["parser"] = "pkg/parser"
+                        modules["carbonio"] = "pkg/carbonio"
+                        modules.each{key, value ->
+                            builds[key] = {
+                                dir(value) {
+                                    sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml'
+                                    junit allowEmptyResults: false, checksName: "Test for " + key, testResults: 'tests.xml'
+                                }
                             }
                         }
-                    }
 
-                    parallel builds
-                    dir('pkg/command') {
-                        sh 'gotestsum --format testname --junitfile tests.xml'
-                        junit allowEmptyResults: false, checksName: "Test for command", testResults: 'tests.xml'
-                    }
-                    dir('cmd/agent') {
-                        sh 'gotestsum --format testname --junitfile tests.xml'
-                        junit allowEmptyResults: false, checksName: "Test for agent", testResults: 'tests.xml'
-                    }
-                    dir('cmd/server') {
-                        sh 'gotestsum --format testname --junitfile tests.xml'
-                        junit allowEmptyResults: false, checksName: "Test for server", testResults: 'tests.xml'
+                        parallel builds
+                        dir('pkg/command') {
+                            sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml'
+                            junit allowEmptyResults: false, checksName: "Test for command", testResults: 'tests.xml'
+                        }
+                        dir('cmd/agent') {
+                            sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml'
+                            junit allowEmptyResults: false, checksName: "Test for agent", testResults: 'tests.xml'
+                        }
+                        dir('cmd/server') {
+                            sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml'
+                            junit allowEmptyResults: false, checksName: "Test for server", testResults: 'tests.xml'
+                        }
                     }
                 }
             }
         }
         stage('SonarQube analysis') {
             steps {
-                unstash 'project'
-                script {
-                    scannerHome = tool 'SonarScanner';
+                container('golangci-lint') {
+                    unstash 'project'
+                    script {
+                        def scannerHome = tool 'SonarScanner';
+                    }
+                    sh 'golangci-lint run ./... --issues-exit-code 0 --output.checkstyle.path linter.out'
                 }
-                sh 'golangci-lint run ./... --issues-exit-code 0 --output.checkstyle.path linter.out'
-
                 withSonarQubeEnv(credentialsId: 'sonarqube-user-token',
                     installationName: 'SonarQube instance') {
                     sh "${scannerHome}/bin/sonar-scanner"
@@ -88,22 +81,25 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
         stage('Build Ubuntu') {
             agent {
                 node {
-                    label 'yap-agent-ubuntu-20.04-v2'
+                    label 'yap-ubuntu-20-v1'
                 }
             }
             steps {
-                unstash 'project'
-                sh 'mkdir -p /tmp/service-discover'
-                sh 'cp -r * /tmp/service-discover'
-                script {
-                    if (BRANCH_NAME == 'devel') {
-                        def timestamp = new Date().format('yyyyMMddHHmmss')
-                        sh "yap build ubuntu build -r ${timestamp} -sd"
-                    } else {
-                        sh 'yap build ubuntu build -sd'
+                container('yap') {
+                    unstash 'project'
+                    sh 'mkdir -p /tmp/service-discover'
+                    sh 'cp -r * /tmp/service-discover'
+                    script {
+                        sh "yap prepare ubuntu -g"
+                        if (BRANCH_NAME == 'devel') {
+                            def timestamp = new Date().format('yyyyMMddHHmmss')
+                            sh "yap build ubuntu build -r ${timestamp} -sd"
+                        } else {
+                            sh 'yap build ubuntu build -sd'
+                        }
                     }
+                    stash includes: 'artifacts/*.deb', name: 'artifacts-ubuntu'
                 }
-                stash includes: 'artifacts/*.deb', name: 'artifacts-ubuntu'
             }
             post {
                 always {
@@ -114,26 +110,29 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
         stage('Build RHEL') {
             agent {
                 node {
-                    label 'yap-agent-rocky-8-v2'
+                    label 'yap-rocky-8-v1'
                 }
             }
             steps {
-                unstash 'project'
-                sh 'mkdir -p /tmp/service-discover'
-                sh 'cp -r * /tmp/service-discover'
-                script {
-                    if (BRANCH_NAME == 'devel') {
-                        def timestamp = new Date().format('yyyyMMddHHmmss')
-                        sh "yap build rocky build -r ${timestamp} -sd"
-                    } else {
-                        sh 'yap build rocky build -sd'
+                container('yap') {
+                    unstash 'project'
+                    sh 'mkdir -p /tmp/service-discover'
+                    sh 'cp -r * /tmp/service-discover'
+                    script {
+                        sh "sudo yap prepare rocky -g"
+                        if (BRANCH_NAME == 'devel') {
+                            def timestamp = new Date().format('yyyyMMddHHmmss')
+                            sh "yap build rocky build -r ${timestamp} -sd"
+                        } else {
+                            sh 'yap build rocky build -sd'
+                        }
                     }
+                    stash includes: 'artifacts/*.rpm', name: 'artifacts-rocky'
                 }
-                stash includes: 'artifacts/x86_64/*.rpm', name: 'artifacts-rocky'
             }
             post {
                 always {
-                    archiveArtifacts artifacts: "artifacts/x86_64/*.rpm", fingerprint: true
+                    archiveArtifacts artifacts: "artifacts/*.rpm", fingerprint: true
                 }
             }
         }
@@ -159,62 +158,62 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                                 "props": "deb.distribution=focal;deb.distribution=jammy;deb.distribution=noble;deb.component=main;deb.architecture=amd64;vcs.revision=${env.GIT_COMMIT}"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-server)-(*).x86_64.rpm",
+                                "pattern": "artifacts/(service-discover-server)-(*).x86_64.rpm",
                                 "target": "centos8-devel/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras;vcs.revision=${env.GIT_COMMIT}"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-agent)-(*).x86_64.rpm",
+                                "pattern": "artifacts/(service-discover-agent)-(*).x86_64.rpm",
                                 "target": "centos8-devel/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras;vcs.revision=${env.GIT_COMMIT}"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-daemon)-(*).x86_64.rpm",
+                                "pattern": "artifacts/(service-discover-daemon)-(*).x86_64.rpm",
                                 "target": "centos8-devel/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras;vcs.revision=${env.GIT_COMMIT}"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-server)-(*).x86_64.rpm",
+                                "pattern": "artifacts/(service-discover-server)-(*).x86_64.rpm",
                                 "target": "centos8-devel/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras;vcs.revision=${env.GIT_COMMIT}"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-agent)-(*).x86_64.rpm",
+                                "pattern": "artifacts/(service-discover-agent)-(*).x86_64.rpm",
                                 "target": "centos8-devel/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras;vcs.revision=${env.GIT_COMMIT}"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-daemon)-(*).x86_64.rpm",
+                                "pattern": "artifacts/(service-discover-daemon)-(*).x86_64.rpm",
                                 "target": "centos8-devel/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras;vcs.revision=${env.GIT_COMMIT}"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-server)-(*).x86_64.rpm",
+                                "pattern": "artifacts/(service-discover-server)-(*).x86_64.rpm",
                                 "target": "rhel9-devel/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras;vcs.revision=${env.GIT_COMMIT}"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-agent)-(*).x86_64.rpm",
+                                "pattern": "artifacts/(service-discover-agent)-(*).x86_64.rpm",
                                 "target": "rhel9-devel/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras;vcs.revision=${env.GIT_COMMIT}"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-daemon)-(*).x86_64.rpm",
+                                "pattern": "artifacts/(service-discover-daemon)-(*).x86_64.rpm",
                                 "target": "rhel9-devel/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras;vcs.revision=${env.GIT_COMMIT}"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-server)-(*).x86_64.rpm",
+                                "pattern": "artifacts/(service-discover-server)-(*).x86_64.rpm",
                                 "target": "rhel9-devel/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras;vcs.revision=${env.GIT_COMMIT}"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-agent)-(*).x86_64.rpm",
+                                "pattern": "artifacts/(service-discover-agent)-(*).x86_64.rpm",
                                 "target": "rhel9-devel/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras;vcs.revision=${env.GIT_COMMIT}"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-daemon)-(*).x86_64.rpm",
+                                "pattern": "artifacts/(service-discover-daemon)-(*).x86_64.rpm",
                                 "target": "rhel9-devel/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras;vcs.revision=${env.GIT_COMMIT}"
                             }
@@ -271,17 +270,17 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                     uploadSpec= """{
                         "files": [
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-server)-(*).x86_64.rpm",
+                                "pattern": "artifacts/(service-discover-server)-(*).x86_64.rpm",
                                 "target": "centos8-rc/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras;vcs.revision=${env.GIT_COMMIT}"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-agent)-(*).x86_64.rpm",
+                                "pattern": "artifacts/(service-discover-agent)-(*).x86_64.rpm",
                                 "target": "centos8-rc/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras;vcs.revision=${env.GIT_COMMIT}"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-daemon)-(*).x86_64.rpm",
+                                "pattern": "artifacts/(service-discover-daemon)-(*).x86_64.rpm",
                                 "target": "centos8-rc/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras;vcs.revision=${env.GIT_COMMIT}"
                             }
@@ -308,17 +307,17 @@ sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal ma
                     uploadSpec= """{
                         "files": [
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-server)-(*).x86_64.rpm",
+                                "pattern": "artifacts/(service-discover-server)-(*).x86_64.rpm",
                                 "target": "rhel9-rc/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras;vcs.revision=${env.GIT_COMMIT}"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-agent)-(*).x86_64.rpm",
+                                "pattern": "artifacts/(service-discover-agent)-(*).x86_64.rpm",
                                 "target": "rhel9-rc/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras;vcs.revision=${env.GIT_COMMIT}"
                             },
                             {
-                                "pattern": "artifacts/x86_64/(service-discover-daemon)-(*).x86_64.rpm",
+                                "pattern": "artifacts/(service-discover-daemon)-(*).x86_64.rpm",
                                 "target": "rhel9-rc/zextras/{1}/{1}-{2}.x86_64.rpm",
                                 "props": "rpm.metadata.arch=x86_64;rpm.metadata.vendor=zextras;vcs.revision=${env.GIT_COMMIT}"
                             }
