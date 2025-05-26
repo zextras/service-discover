@@ -17,6 +17,7 @@ const (
 	LdapConfigBaseDn           = "cn=config,cn=zimbra"
 	ServiceDiscoverServiceName = "service-discover"
 	AttrServiceEnabled         = "zimbraServiceEnabled"
+	AttrServiceInstalled       = "zimbraServiceInstalled"
 	AttrServiceHostname        = "zimbraServiceHostname"
 	AttrCarbonioCredentials    = "carbonioMeshCredentials" // #nosec
 )
@@ -280,8 +281,10 @@ func modifyEnabledServices(context *ldapContext, server, service string, change 
 	switch change {
 	case changeAdd:
 		request.Add(AttrServiceEnabled, []string{service})
+		request.Add(AttrServiceInstalled, []string{service})
 	case changeRemove:
 		request.Delete(AttrServiceEnabled, []string{service})
+		request.Delete(AttrServiceInstalled, []string{service})
 	default:
 		panic("Invalid LDAP change")
 	}
