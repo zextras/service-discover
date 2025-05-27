@@ -138,6 +138,7 @@ func TestEnableDisableService(t *testing.T) {
 			DN: "server-dn",
 		}
 		expectedModifyRequest.Add("zimbraServiceEnabled", []string{"service"})
+		expectedModifyRequest.Add("zimbraServiceInstalled", []string{"service"})
 		mockLdapConnection.On("Modify", &expectedModifyRequest).Return(nil)
 
 		handler := ldapContext{
@@ -196,6 +197,7 @@ func TestEnableDisableService(t *testing.T) {
 			DN: "server-dn",
 		}
 		expectedModifyRequest.Delete("zimbraServiceEnabled", []string{"service"})
+		expectedModifyRequest.Delete("zimbraServiceInstalled", []string{"service"})
 		mockLdapConnection.On("Modify", &expectedModifyRequest).Return(nil)
 
 		handler := ldapContext{
