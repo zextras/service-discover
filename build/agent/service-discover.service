@@ -3,6 +3,7 @@ Description=Service discover agent for Zextras
 Documentation=https://docs.zextras.com/
 Requires=network-online.target
 After=network-online.target
+PartOf=carbonio.target
 
 [Service]
 Type=notify
@@ -16,4 +17,4 @@ TimeoutSec=120
 TimeoutStopSec=120
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=carbonio.target
