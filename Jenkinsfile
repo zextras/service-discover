@@ -35,6 +35,8 @@ pipeline {
                 }
                 container('golang') {
                     script {
+                        // WARNING: these tests need an integration environment
+                        // They expect service-discover-base to be in the system
                         sh 'apt update && apt clean'
                         sh 'apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 52FD40243E584A21'
                         sh 'echo deb https://repo.zextras.io/release/ubuntu jammy main > /etc/apt/sources.list.d/zextras.list'
