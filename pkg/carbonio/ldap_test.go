@@ -325,9 +325,10 @@ func TestLDAPDownloadAndUploadCapabilities(t *testing.T) {
 		}(ldapContainer, containerCtx)
 
 		ldapIp, err := ldapContainer.ContainerIP(containerCtx)
+		ldapPort, err := ldapContainer.MappedPort(containerCtx, "1389")
 		assert.NoError(t, err)
 
-		masterUrl := fmt.Sprintf("ldap://%s:%s", ldapIp, "389")
+		masterUrl := fmt.Sprintf("ldap://%s:%s", ldapIp, ldapPort.Port())
 
 		ldapHandler := ldapContext{
 			Credentials: ldapCredentials{
@@ -367,9 +368,10 @@ func TestLDAPDownloadAndUploadCapabilities(t *testing.T) {
 		}(ldapContainer, containerCtx)
 
 		ldapIp, err := ldapContainer.ContainerIP(containerCtx)
+		ldapPort, err := ldapContainer.MappedPort(containerCtx, "1389")
 		assert.NoError(t, err)
 
-		masterUrl := fmt.Sprintf("ldap://%s:%s", ldapIp, "389")
+		masterUrl := fmt.Sprintf("ldap://%s:%s", ldapIp, ldapPort.Port())
 
 		ldapHandler := ldapContext{
 			Credentials: ldapCredentials{
