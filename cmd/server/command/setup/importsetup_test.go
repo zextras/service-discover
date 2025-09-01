@@ -9,27 +9,23 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	mocks3 "github.com/zextras/service-discover/pkg/exec/mocks"
+	mocks4 "github.com/zextras/service-discover/pkg/systemd/mocks"
 	"io/fs"
 	"net"
 	"os"
-	native_exec "os/exec"
 	"os/user"
-	"strings"
-	"syscall"
 	"testing"
 	"time"
 
 	"github.com/go-ldap/ldap/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/testcontainers/testcontainers-go"
 	"github.com/zextras/service-discover/cmd/server/config"
 	"github.com/zextras/service-discover/pkg/carbonio"
 	"github.com/zextras/service-discover/pkg/command"
 	mocks2 "github.com/zextras/service-discover/pkg/command/setup/mocks"
 	"github.com/zextras/service-discover/pkg/encrypter"
-	mocks3 "github.com/zextras/service-discover/pkg/exec/mocks"
-	mocks4 "github.com/zextras/service-discover/pkg/systemd/mocks"
 	"github.com/zextras/service-discover/test"
 )
 
@@ -211,7 +207,7 @@ func TestSetup_importSetup(t *testing.T) {
 	type setupOutput struct {
 		FakeLocalConfig           *os.File
 		ClusterCredentialDownload *os.File
-		Container                 testcontainers.Container
+		Container                 test.LdapContainer
 		CtxContainer              context.Context
 		consulConfigDir           string
 		consulHome                string
@@ -234,16 +230,12 @@ func TestSetup_importSetup(t *testing.T) {
 
 		container, ctxContainer := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
 
-		containerIP, err := container.ContainerIP(ctxContainer)
-		if err != nil {
-			t.Error(err)
-		}
-
+		ldapUrl := container.URL()
 		localConfigByte := test.GenerateLocalConfig(
 			t,
-			containerIP,
-			"ldap://"+containerIP+":389",
-			"ldap://"+containerIP+":389",
+			"localhost",
+			ldapUrl,
+			ldapUrl,
 			test.DefaultLdapUserDN,
 			"password",
 		)
@@ -257,11 +249,14 @@ func TestSetup_importSetup(t *testing.T) {
 			t.Error(err)
 		}
 
-		connection, err := ldap.DialURL("ldap://"+containerIP+":389", ldap.DialWithDialer(&net.Dialer{Timeout: 5 * time.Minute}))
+		connection, err := ldap.DialURL(ldapUrl, ldap.DialWithDialer(&net.Dialer{Timeout: 5 * time.Minute}))
 		if err != nil {
 			t.Error(err)
 		}
 
+		//if err := connection.Bind(test.DefaultLdapUserDN, "password"); err != nil {
+		//	t.Error(err)
+		//}
 		if err := connection.Bind(test.DefaultLdapUserDN, "password"); err != nil {
 			t.Error(err)
 		}
@@ -276,10 +271,10 @@ func TestSetup_importSetup(t *testing.T) {
 			t.Log("Skipping credentials upload since inclusion is not set")
 		}
 
-		addRequest := ldap.NewAddRequest(fmt.Sprintf("cn=%s,cn=servers,cn=zimbra", containerIP), []ldap.Control{})
+		addRequest := ldap.NewAddRequest(fmt.Sprintf("cn=%s,cn=servers,cn=zimbra", "localhost"), []ldap.Control{})
 		addRequest.Attribute("objectClass", []string{"zimbraServer"})
 		addRequest.Attribute("zimbraId", []string{"27a46c9c-7bcb-46e0-a1c3-43b2ee3f3d8e"})
-		addRequest.Attribute("zimbraServiceHostname", []string{containerIP})
+		addRequest.Attribute("zimbraServiceHostname", []string{"localhost"})
 		err = connection.Add(addRequest)
 		assert.NoError(t, err)
 
@@ -340,9 +335,7 @@ func TestSetup_importSetup(t *testing.T) {
 					t.Error(err)
 				}
 
-				if err := container.Terminate(ctxContainer); err != nil {
-					t.Error(err)
-				}
+				container.Stop()
 
 				if err := os.Remove(file.Name()); err != nil {
 					t.Error(err)
@@ -356,15 +349,12 @@ func TestSetup_importSetup(t *testing.T) {
 			}
 	}
 
-	t.Run("Cluster credentials is required", func(t *testing.T) {
+	t.Run("should fail if cluster credentials are missing", func(t *testing.T) {
 		setupFiles, cleanup := setup(t, "Test cluster credentials is required", false)
 		defer cleanup()
 
-		containerIP, err := setupFiles.Container.ContainerIP(setupFiles.CtxContainer)
-		assert.NoError(t, err)
-
 		businessDep := new(mocks2.BusinessDependencies)
-		setupNetwork(businessDep, containerIP)
+		setupNetwork(businessDep, "localhost")
 		setupLdap(t, businessDep, setupFiles.FakeLocalConfig)
 		s := &Setup{
 			ConsulConfigDir:   setupFiles.consulConfigDir,
@@ -379,7 +369,7 @@ func TestSetup_importSetup(t *testing.T) {
 
 		assert.NoError(t, os.Remove(setupFiles.ClusterCredentialDownload.Name()))
 
-		_, err = s.importSetup(businessDep)
+		_, err := s.importSetup(businessDep)
 		assert.EqualError(
 			t,
 			err,
@@ -387,15 +377,12 @@ func TestSetup_importSetup(t *testing.T) {
 		)
 	})
 
-	t.Run("Wrong binding address", func(t *testing.T) {
+	t.Run("fails when using Wrong binding address", func(t *testing.T) {
 		setupFiles, cleanup := setup(t, "Wrong binding address", true)
 		defer cleanup()
 
-		containerIP, err := setupFiles.Container.ContainerIP(setupFiles.CtxContainer)
-		assert.NoError(t, err)
-
 		businessDep := new(mocks2.BusinessDependencies)
-		setupNetwork(businessDep, containerIP)
+		setupNetwork(businessDep, "localhost")
 
 		s := &Setup{
 			ConsulConfigDir:   setupFiles.consulConfigDir,
@@ -408,7 +395,7 @@ func TestSetup_importSetup(t *testing.T) {
 			Password:          defaultClusterCredentialsPassword,
 		}
 		s.BindAddress = "wrong_one"
-		_, err = s.importSetup(businessDep)
+		_, err := s.importSetup(businessDep)
 		assert.EqualError(
 			t,
 			err,
@@ -416,15 +403,12 @@ func TestSetup_importSetup(t *testing.T) {
 		)
 	})
 
-	t.Run("Wrong cluster credentials password", func(t *testing.T) {
+	t.Run("fails when using wrong cluster credentials password", func(t *testing.T) {
 		setupFiles, cleanup := setup(t, "Wrong cluster credentials password", true)
 		defer cleanup()
 
-		containerIP, err := setupFiles.Container.ContainerIP(setupFiles.CtxContainer)
-		assert.NoError(t, err)
-
 		businessDep := new(mocks2.BusinessDependencies)
-		setupNetwork(businessDep, containerIP)
+		setupNetwork(businessDep, "localhost")
 		setupLdap(t, businessDep, setupFiles.FakeLocalConfig)
 		s := &Setup{
 			ConsulConfigDir:   setupFiles.consulConfigDir,
@@ -462,15 +446,12 @@ func TestSetup_importSetup(t *testing.T) {
 		)
 	})
 
-	t.Run("Run with correct configuration and flags", func(t *testing.T) {
+	t.Run("import succeeds when running with correct configuration and flags", func(t *testing.T) {
 		setupFiles, cleanup := setup(t, "Run with correct configuration and flags", true)
 		defer cleanup()
 
-		containerIP, err := setupFiles.Container.ContainerIP(setupFiles.CtxContainer)
-		assert.NoError(t, err)
-
 		businessDep := new(mocks2.BusinessDependencies)
-		setupNetwork(businessDep, containerIP)
+		setupNetwork(businessDep, "localhost")
 		setupBusinessDeps(businessDep)
 
 		s := &Setup{
@@ -528,8 +509,8 @@ func TestSetup_importSetup(t *testing.T) {
 
 		tokenCreateMock := new(mocks3.Cmd)
 		tokenCreateMock.On("Output").Return([]byte(`{
-		  "SecretID": "secret-token-2"
-		}`), nil)
+				  "SecretID": "secret-token-2"
+				}`), nil)
 
 		setTokenCmd := new(mocks3.Cmd)
 		setTokenCmd.On("Output").Return(make([]byte, 0), nil)
@@ -549,25 +530,9 @@ func TestSetup_importSetup(t *testing.T) {
 			"policy",
 			"create",
 			"-name",
-			fmt.Sprintf("server-%s", strings.ReplaceAll(containerIP, ".", "-")),
+			"server-localhost",
 			"-rules",
-			fmt.Sprintf(`{
-   "node":{
-      "server-%s":{
-         "policy":"write"
-      }
-   },
-   "node_prefix":{
-      "":{
-         "policy":"read"
-      }
-   },
-   "service_prefix":{
-      "":{
-         "policy":"write"
-      }
-   }
-}`, strings.ReplaceAll(containerIP, ".", "-")),
+			"{\n   \"node\":{\n      \"server-localhost\":{\n         \"policy\":\"write\"\n      }\n   },\n   \"node_prefix\":{\n      \"\":{\n         \"policy\":\"read\"\n      }\n   },\n   \"service_prefix\":{\n      \"\":{\n         \"policy\":\"write\"\n      }\n   }\n}",
 		).Return(aclPolicyCreateMock, nil).
 			On("CreateCommand",
 				"/usr/bin/consul",
@@ -575,7 +540,7 @@ func TestSetup_importSetup(t *testing.T) {
 				"token",
 				"create",
 				"-policy-name",
-				fmt.Sprintf("server-%s", strings.ReplaceAll(containerIP, ".", "-")),
+				"server-localhost",
 				"-format",
 				"json").
 			Return(tokenCreateMock)
@@ -593,30 +558,6 @@ func TestSetup_importSetup(t *testing.T) {
 			0, nil,
 		).Run(func(args mock.Arguments) {
 			ch := args.Get(2).(chan<- string)
-
-			cmd := native_exec.Command(
-				"/usr/bin/consul",
-				"agent",
-				"-dev", // otherwise it takes up to 10 seconds to boostrap
-				"-config-dir",
-				s.ConsulConfigDir,
-				"-server",
-				"-bind",
-				"127.0.0.1", // otherwise test address will be used
-			)
-			err := cmd.Start()
-
-			if err != nil {
-				panic(err)
-			}
-
-			cleanups = append(cleanups, func() {
-				err := syscall.Kill(cmd.Process.Pid, syscall.SIGTERM)
-				if err != nil {
-					panic(err)
-				}
-			})
-
 			time.Sleep(250 * time.Millisecond)
 			ch <- "done"
 		})

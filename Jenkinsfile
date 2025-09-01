@@ -28,6 +28,11 @@ pipeline {
         stage('Tests') {
             when { expression { params.SKIP_TEST != true } }
             steps {
+                container('dind') {
+                    withDockerRegistry(credentialsId: 'private-registry', url: 'https://registry.dev.zextras.com') {
+                        sh 'docker pull registry.dev.zextras.com/dev/carbonio-openldap:latest'
+                    }
+                }
                 container('golang') {
                     script {
                         def modules = [:]
@@ -37,7 +42,7 @@ pipeline {
                         modules["formatter"] = "pkg/formatter"
                         modules["parser"] = "pkg/parser"
                         modules["carbonio"] = "pkg/carbonio"
-                        modules.each{key, value ->
+                        modules.each { key, value ->
                             builds[key] = {
                                 dir(value) {
                                     sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml'

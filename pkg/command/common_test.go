@@ -17,7 +17,6 @@ import (
 	"github.com/go-ldap/ldap/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/testcontainers/testcontainers-go"
 	"github.com/zextras/service-discover/pkg/carbonio"
 	"github.com/zextras/service-discover/pkg/carbonio/mocks"
 	"github.com/zextras/service-discover/test"
@@ -296,16 +295,13 @@ func TestCredentialsFromAndToLDAP(t *testing.T) {
 		assert.NoError(t, err)
 		ldapContainer, containerCtx := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
 
-		defer func(ldapContainer testcontainers.Container, ctx context.Context) {
-			if err := ldapContainer.Terminate(ctx); err != nil {
-				t.Error(err)
-			}
+		defer func(ldapContainer test.LdapContainer, ctx context.Context) {
+			ldapContainer.Stop()
 		}(ldapContainer, containerCtx)
 
-		ldapIp, err := ldapContainer.ContainerIP(containerCtx)
 		assert.NoError(t, err)
 
-		masterUrl := fmt.Sprintf("ldap://%s:%s", ldapIp, "389")
+		masterUrl := ldapContainer.URL()
 
 		mockedLocalConfig := new(mocks.LocalConfig)
 		mockedLocalConfig.On("Values", carbonio.LocalConfigLdapMasterURL).Return([]string{masterUrl}).On("Values", carbonio.LocalConfigLdapURL).Return([]string{}).On("Value", carbonio.LocalConfigLdapUserDn).Return("uid=zimbra,cn=admins,cn=zimbra").On("Value", carbonio.LocalConfigLdapPassword).Return("password")
@@ -351,16 +347,12 @@ func TestCredentialsFromAndToLDAP(t *testing.T) {
 		assert.NoError(t, err)
 		ldapContainer, containerCtx := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
 
-		defer func(ldapContainer testcontainers.Container, ctx context.Context) {
-			if err := ldapContainer.Terminate(ctx); err != nil {
-				t.Error(err)
-			}
+		defer func(ldapContainer test.LdapContainer, ctx context.Context) {
+			ldapContainer.Stop()
 		}(ldapContainer, containerCtx)
-
-		ldapIp, err := ldapContainer.ContainerIP(containerCtx)
 		assert.NoError(t, err)
 
-		masterUrl := fmt.Sprintf("ldap://%s:%s", ldapIp, "389")
+		masterUrl := ldapContainer.URL()
 		// Try to download the content and check that it is the same
 		ldapConnection, err := ldap.DialURL(masterUrl)
 		assert.NoError(t, err)
