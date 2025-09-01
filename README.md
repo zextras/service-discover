@@ -9,7 +9,6 @@ Zextras services.
 - [Prerequisites](#prerequisites)
 - [Build Instructions](#build-instructions)
 - [Testing](#testing)
-- [Linting & Static Analysis](#linting--static-analysis)
 - [Deployment & Release](#deployment--release)
 - [License](#license)
 
@@ -73,13 +72,6 @@ go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml
 
 ### Integration Environment
 Some tests require `service-discover-base` to be installed on the system. See Jenkinsfile for setup steps.
-
-## Linting & Static Analysis
-
-Use [golangci-lint](https://golangci-lint.run/) for linting:
-```sh
-golangci-lint run ./...
-```
 
 ## Deployment & Release
 
