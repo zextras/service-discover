@@ -71,13 +71,13 @@ Artifacts are uploaded to Artifactory and promoted via Jenkins pipeline. See Jen
 Please ensure all tests pass and code is linted before submitting.
 
 ## RC
-Release is managed with [release-it](https://github.
-com/release-it/release-it).
-Install the dependencies with `npm i`.  
-Run `release-it --ci`. This will bump the versions, commit, tag and push the 
+Release is managed with [release-it](https://github.com/release-it/release-it).
+
+1. Install the dependencies with `npm i`.  
+2. Run `release-it --ci`. This will bump the versions, commit, tag and push the 
 code.  
-The make sure the tag was built. This will deliver the RC.  
-Finalize the work by merging the RC in the main branch. 
+3. The make sure the tag was built. This will deliver the RC.  
+4. Finalize the work by merging the RC in the main branch. 
 
 
 ## License
