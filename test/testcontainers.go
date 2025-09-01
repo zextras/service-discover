@@ -7,7 +7,6 @@ package test
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/docker/docker/api/types/container"
@@ -19,8 +18,6 @@ import (
 const (
 	LatestRelease      = "latest"
 	PublicImageAddress = "registry.dev.zextras.com/dev/carbonio-openldap:%s"
-	CIDockerNetwork    = "ci_agent"
-	CINetworkMode      = "overlay"
 )
 
 // SpinUpCarbonioLdap launches a Carbonio LDAP instance with the desired
@@ -30,23 +27,7 @@ const (
 func SpinUpCarbonioLdap(t *testing.T, address, version string) (testcontainers.Container, context.Context) {
 	ctx := context.Background()
 
-	var nets []string
-
-	var netMode string
-
-	if os.Getenv("CI") == "true" {
-		t.Log("Using " + CIDockerNetwork + " as network for LDAP")
-		nets = append(nets, CIDockerNetwork)
-		netMode = CINetworkMode
-	} else {
-		t.Log("Use standard local network for spinning LDAP")
-	}
-
 	t.Log("Networks that are going to be attached to the container")
-
-	for _, nNet := range nets {
-		t.Log(nNet)
-	}
 
 	ulimits := []*units.Ulimit{{Name: "nofile", Soft: 32678, Hard: 32678}}
 	req := testcontainers.ContainerRequest{
@@ -55,11 +36,9 @@ func SpinUpCarbonioLdap(t *testing.T, address, version string) (testcontainers.C
 		WaitingFor:   wait.ForLog("modifying entry \"uid=zimbra,cn=admins,cn=zimbra\""),
 		HostConfigModifier: func(config *container.HostConfig) {
 			config.AutoRemove = true
-			config.NetworkMode = container.NetworkMode(netMode)
 			config.Ulimits = ulimits
 		},
-		Networks: nets,
-		ShmSize:  8 * 1024 * 1024 * 1024,
+		ShmSize: 8 * 1024 * 1024 * 1024,
 	}
 
 	ldapC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
