@@ -52,7 +52,7 @@ func SpinUpCarbonioLdap(t *testing.T, address, version string) (testcontainers.C
 	req := testcontainers.ContainerRequest{
 		Image:        fmt.Sprintf(address, version),
 		ExposedPorts: []string{"1389/tcp"},
-		WaitingFor:   wait.ForListeningPort("1389/tcp"),
+		WaitingFor:   wait.ForLog("modifying entry \"uid=zimbra,cn=admins,cn=zimbra\""),
 		HostConfigModifier: func(config *container.HostConfig) {
 			config.AutoRemove = true
 			config.NetworkMode = container.NetworkMode(netMode)

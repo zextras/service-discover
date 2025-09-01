@@ -235,15 +235,17 @@ func TestSetup_importSetup(t *testing.T) {
 		container, ctxContainer := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
 
 		containerIP, err := container.ContainerIP(ctxContainer)
+		containerPort, err := container.MappedPort(ctxContainer, "1389")
 		if err != nil {
 			t.Error(err)
 		}
 
+		ldapUrl := "ldap://localhost:" + containerPort.Port()
 		localConfigByte := test.GenerateLocalConfig(
 			t,
 			containerIP,
-			"ldap://"+containerIP+":1389",
-			"ldap://"+containerIP+":1389",
+			ldapUrl,
+			ldapUrl,
 			test.DefaultLdapUserDN,
 			"password",
 		)
@@ -257,11 +259,14 @@ func TestSetup_importSetup(t *testing.T) {
 			t.Error(err)
 		}
 
-		connection, err := ldap.DialURL("ldap://"+containerIP+":1389", ldap.DialWithDialer(&net.Dialer{Timeout: 5 * time.Minute}))
+		connection, err := ldap.DialURL(ldapUrl, ldap.DialWithDialer(&net.Dialer{Timeout: 5 * time.Minute}))
 		if err != nil {
 			t.Error(err)
 		}
 
+		//if err := connection.Bind(test.DefaultLdapUserDN, "password"); err != nil {
+		//	t.Error(err)
+		//}
 		if err := connection.Bind(test.DefaultLdapUserDN, "password"); err != nil {
 			t.Error(err)
 		}
@@ -387,7 +392,7 @@ func TestSetup_importSetup(t *testing.T) {
 		)
 	})
 
-	t.Run("Wrong binding address", func(t *testing.T) {
+	t.Run("Returns error when using Wrong binding address", func(t *testing.T) {
 		setupFiles, cleanup := setup(t, "Wrong binding address", true)
 		defer cleanup()
 
@@ -416,7 +421,7 @@ func TestSetup_importSetup(t *testing.T) {
 		)
 	})
 
-	t.Run("Wrong cluster credentials password", func(t *testing.T) {
+	t.Run("Returns error when using wrong cluster credentials password", func(t *testing.T) {
 		setupFiles, cleanup := setup(t, "Wrong cluster credentials password", true)
 		defer cleanup()
 
