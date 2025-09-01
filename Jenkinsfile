@@ -16,14 +16,6 @@ pipeline {
         GOPRIVATE="gitlab.com/zextras,bitbucket.org/zextras,github.com/zextras"
     }
     stages {
-        stage('Setup') {
-            steps {
-                sh 'sudo apt update && apt clean'
-                sh 'sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 52FD40243E584A21'
-                sh 'echo deb https://repo.zextras.io/release/ubuntu jammy main > /etc/apt/sources.list.d/zextras.list'
-                sh 'sudo apt-get update && sudo apt-get install -y service-discover-base'
-            }
-        }
         stage('Stash') {
             steps {
                 checkout scm
@@ -43,6 +35,10 @@ pipeline {
                 }
                 container('golang') {
                     script {
+                        sh 'apt update && apt clean'
+                        sh 'apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 52FD40243E584A21'
+                        sh 'echo deb https://repo.zextras.io/release/ubuntu jammy main > /etc/apt/sources.list.d/zextras.list'
+                        sh 'apt-get update && sudo apt-get install -y service-discover-base'
                         def modules = [:]
                         def builds = [:]
                         modules["encrypter"] = "pkg/encrypter"
