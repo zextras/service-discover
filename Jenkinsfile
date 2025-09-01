@@ -28,38 +28,41 @@ pipeline {
         stage('Tests') {
             when { expression { params.SKIP_TEST != true } }
             steps {
-                container('golang') {
+                container('dind') {
                     withDockerRegistry(credentialsId: 'private-registry', url: 'https://registry.dev.zextras.com') {
-                        script {
-                            def modules = [:]
-                            def builds = [:]
-                            modules["encrypter"] = "pkg/encrypter"
-                            modules["exec"] = "pkg/exec"
-                            modules["formatter"] = "pkg/formatter"
-                            modules["parser"] = "pkg/parser"
-                            modules["carbonio"] = "pkg/carbonio"
-                            modules.each { key, value ->
-                                builds[key] = {
-                                    dir(value) {
-                                        sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml'
-                                        junit allowEmptyResults: false, checksName: "Test for " + key, testResults: 'tests.xml'
-                                    }
+                        sh 'docker pull registry.dev.zextras.com/dev/carbonio-openldap:latest'
+                    }
+                }
+                container('golang') {
+                    script {
+                        def modules = [:]
+                        def builds = [:]
+                        modules["encrypter"] = "pkg/encrypter"
+                        modules["exec"] = "pkg/exec"
+                        modules["formatter"] = "pkg/formatter"
+                        modules["parser"] = "pkg/parser"
+                        modules["carbonio"] = "pkg/carbonio"
+                        modules.each { key, value ->
+                            builds[key] = {
+                                dir(value) {
+                                    sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml'
+                                    junit allowEmptyResults: false, checksName: "Test for " + key, testResults: 'tests.xml'
                                 }
                             }
+                        }
 
-                            parallel builds
-                            dir('pkg/command') {
-                                sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml'
-                                junit allowEmptyResults: false, checksName: "Test for command", testResults: 'tests.xml'
-                            }
-                            dir('cmd/agent') {
-                                sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml'
-                                junit allowEmptyResults: false, checksName: "Test for agent", testResults: 'tests.xml'
-                            }
-                            dir('cmd/server') {
-                                sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml'
-                                junit allowEmptyResults: false, checksName: "Test for server", testResults: 'tests.xml'
-                            }
+                        parallel builds
+                        dir('pkg/command') {
+                            sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml'
+                            junit allowEmptyResults: false, checksName: "Test for command", testResults: 'tests.xml'
+                        }
+                        dir('cmd/agent') {
+                            sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml'
+                            junit allowEmptyResults: false, checksName: "Test for agent", testResults: 'tests.xml'
+                        }
+                        dir('cmd/server') {
+                            sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml'
+                            junit allowEmptyResults: false, checksName: "Test for server", testResults: 'tests.xml'
                         }
                     }
                 }
