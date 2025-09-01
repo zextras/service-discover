@@ -1,5 +1,5 @@
 pkgname="service-discover-agent"
-pkgver="0.2.1"
+pkgver="0.2.2"
 pkgrel="1"
 pkgdesc="Service discover agent cli"
 maintainer="Zextras <packages@zextras.com>"
