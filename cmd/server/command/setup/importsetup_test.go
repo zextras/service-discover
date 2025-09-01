@@ -5,9 +5,12 @@
 package setup
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"fmt"
+	mocks3 "github.com/zextras/service-discover/pkg/exec/mocks"
+	mocks4 "github.com/zextras/service-discover/pkg/systemd/mocks"
 	"io/fs"
 	"net"
 	"os"
@@ -228,7 +231,6 @@ func TestSetup_importSetup(t *testing.T) {
 
 		container, ctxContainer := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
 
-		containerIP, err := container.ContainerIP(ctxContainer)
 		containerPort, err := container.MappedPort(ctxContainer, "1389")
 		if err != nil {
 			t.Error(err)
@@ -237,7 +239,7 @@ func TestSetup_importSetup(t *testing.T) {
 		ldapUrl := "ldap://localhost:" + containerPort.Port()
 		localConfigByte := test.GenerateLocalConfig(
 			t,
-			containerIP,
+			"localhost",
 			ldapUrl,
 			ldapUrl,
 			test.DefaultLdapUserDN,
@@ -275,10 +277,10 @@ func TestSetup_importSetup(t *testing.T) {
 			t.Log("Skipping credentials upload since inclusion is not set")
 		}
 
-		addRequest := ldap.NewAddRequest(fmt.Sprintf("cn=%s,cn=servers,cn=zimbra", containerIP), []ldap.Control{})
+		addRequest := ldap.NewAddRequest(fmt.Sprintf("cn=%s,cn=servers,cn=zimbra", "localhost"), []ldap.Control{})
 		addRequest.Attribute("objectClass", []string{"zimbraServer"})
 		addRequest.Attribute("zimbraId", []string{"27a46c9c-7bcb-46e0-a1c3-43b2ee3f3d8e"})
-		addRequest.Attribute("zimbraServiceHostname", []string{containerIP})
+		addRequest.Attribute("zimbraServiceHostname", []string{"localhost"})
 		err = connection.Add(addRequest)
 		assert.NoError(t, err)
 
@@ -359,11 +361,8 @@ func TestSetup_importSetup(t *testing.T) {
 		setupFiles, cleanup := setup(t, "Test cluster credentials is required", false)
 		defer cleanup()
 
-		containerIP, err := setupFiles.Container.ContainerIP(setupFiles.CtxContainer)
-		assert.NoError(t, err)
-
 		businessDep := new(mocks2.BusinessDependencies)
-		setupNetwork(businessDep, containerIP)
+		setupNetwork(businessDep, "localhost")
 		setupLdap(t, businessDep, setupFiles.FakeLocalConfig)
 		s := &Setup{
 			ConsulConfigDir:   setupFiles.consulConfigDir,
@@ -378,7 +377,7 @@ func TestSetup_importSetup(t *testing.T) {
 
 		assert.NoError(t, os.Remove(setupFiles.ClusterCredentialDownload.Name()))
 
-		_, err = s.importSetup(businessDep)
+		_, err := s.importSetup(businessDep)
 		assert.EqualError(
 			t,
 			err,
@@ -390,11 +389,8 @@ func TestSetup_importSetup(t *testing.T) {
 		setupFiles, cleanup := setup(t, "Wrong binding address", true)
 		defer cleanup()
 
-		containerIP, err := setupFiles.Container.ContainerIP(setupFiles.CtxContainer)
-		assert.NoError(t, err)
-
 		businessDep := new(mocks2.BusinessDependencies)
-		setupNetwork(businessDep, containerIP)
+		setupNetwork(businessDep, "localhost")
 
 		s := &Setup{
 			ConsulConfigDir:   setupFiles.consulConfigDir,
@@ -407,7 +403,7 @@ func TestSetup_importSetup(t *testing.T) {
 			Password:          defaultClusterCredentialsPassword,
 		}
 		s.BindAddress = "wrong_one"
-		_, err = s.importSetup(businessDep)
+		_, err := s.importSetup(businessDep)
 		assert.EqualError(
 			t,
 			err,
@@ -419,11 +415,8 @@ func TestSetup_importSetup(t *testing.T) {
 		setupFiles, cleanup := setup(t, "Wrong cluster credentials password", true)
 		defer cleanup()
 
-		containerIP, err := setupFiles.Container.ContainerIP(setupFiles.CtxContainer)
-		assert.NoError(t, err)
-
 		businessDep := new(mocks2.BusinessDependencies)
-		setupNetwork(businessDep, containerIP)
+		setupNetwork(businessDep, "localhost")
 		setupLdap(t, businessDep, setupFiles.FakeLocalConfig)
 		s := &Setup{
 			ConsulConfigDir:   setupFiles.consulConfigDir,
@@ -461,172 +454,128 @@ func TestSetup_importSetup(t *testing.T) {
 		)
 	})
 
-	//		t.Skip("import succeeds when running with correct configuration and flags", func(t *testing.T) {
-	//			setupFiles, cleanup := setup(t, "Run with correct configuration and flags", true)
-	//			defer cleanup()
-	//
-	//			containerIP, err := setupFiles.Container.ContainerIP(setupFiles.CtxContainer)
-	//			assert.NoError(t, err)
-	//
-	//			businessDep := new(mocks2.BusinessDependencies)
-	//			setupNetwork(businessDep, containerIP)
-	//			setupBusinessDeps(businessDep)
-	//
-	//			s := &Setup{
-	//				ConsulConfigDir:   setupFiles.consulConfigDir,
-	//				ConsulHome:        setupFiles.consulHome,
-	//				LocalConfigPath:   setupFiles.FakeLocalConfig.Name(),
-	//				ConsulData:        setupFiles.consulData,
-	//				ConsulFileConfig:  setupFiles.consulFileConfig,
-	//				ClusterCredential: setupFiles.ClusterCredentialDownload.Name(),
-	//				MutableConfigFile: setupFiles.mutableConfigFile,
-	//				Password:          defaultClusterCredentialsPassword,
-	//				BindAddress:       "127.0.0.1",
-	//			}
-	//			clusterCredential, err := os.Create(setupFiles.ClusterCredentialDownload.Name())
-	//			assert.NoError(t, err)
-	//			tarWriter, err := encrypter.NewWriter(clusterCredential, []byte("password"))
-	//			assert.NoError(t, err)
-	//
-	//			assert.NoError(t, tarWriter.AddFile(
-	//				bytes.NewBuffer([]byte("Test")),
-	//				&FakeFileStat{size: 4},
-	//				command.ConsulCA,
-	//				setupFiles.consulHome+"/",
-	//			))
-	//			assert.NoError(t, tarWriter.AddFile(
-	//				bytes.NewBuffer([]byte("Test")),
-	//				&FakeFileStat{size: 4},
-	//				command.ConsulCAKey,
-	//				setupFiles.consulHome+"/",
-	//			))
-	//			assert.NoError(t, tarWriter.AddFile(
-	//				bytes.NewBuffer([]byte("{\"blabla\": \"123\",\"SecretID\": \"c182a76b-d26f-92fb-de9b-2f828e8730bd\"}")),
-	//				&FakeFileStat{size: 68},
-	//				command.ConsulACLBootstrap,
-	//				"/",
-	//			))
-	//			assert.NoError(t, tarWriter.AddFile(
-	//				bytes.NewBuffer([]byte("random")),
-	//				&FakeFileStat{size: 6},
-	//				command.GossipKey,
-	//				"/",
-	//			))
-	//			assert.NoError(t, tarWriter.Close())
-	//
-	//			tlsCertCreateMock := new(mocks3.Cmd)
-	//			tlsCertCreateMock.On("Output").Return([]byte("random"), nil)
-	//			businessDep.On("CreateCommand",
-	//				"/usr/bin/consul",
-	//				"tls",
-	//				"cert",
-	//				"create",
-	//				fmt.Sprintf("-days=%d", certificateExpiration),
-	//				"-server",
-	//			).Return(tlsCertCreateMock)
-	//
-	//			tokenCreateMock := new(mocks3.Cmd)
-	//			tokenCreateMock.On("Output").Return([]byte(`{
-	//			  "SecretID": "secret-token-2"
-	//			}`), nil)
-	//
-	//			setTokenCmd := new(mocks3.Cmd)
-	//			setTokenCmd.On("Output").Return(make([]byte, 0), nil)
-	//			businessDep.On("CreateCommand",
-	//				"/usr/bin/consul",
-	//				"acl",
-	//				"set-agent-token",
-	//				"default",
-	//				"secret-token-2",
-	//			).Return(setTokenCmd)
-	//
-	//			aclPolicyCreateMock := new(mocks3.Cmd)
-	//			aclPolicyCreateMock.On("Output").Return([]byte("something"), nil)
-	//			businessDep.On("CreateCommand",
-	//				"/usr/bin/consul",
-	//				"acl",
-	//				"policy",
-	//				"create",
-	//				"-name",
-	//				fmt.Sprintf("server-%s", strings.ReplaceAll(containerIP, ".", "-")),
-	//				"-rules",
-	//				fmt.Sprintf(`{
-	//	  "node":{
-	//	     "server-%s":{
-	//	        "policy":"write"
-	//	     }
-	//	  },
-	//	  "node_prefix":{
-	//	     "":{
-	//	        "policy":"read"
-	//	     }
-	//	  },
-	//	  "service_prefix":{
-	//	     "":{
-	//	        "policy":"write"
-	//	     }
-	//	  }
-	//	}`, strings.ReplaceAll(containerIP, ".", "-")),
-	//
-	//		).Return(aclPolicyCreateMock, nil).
-	//			On("CreateCommand",
-	//				"/usr/bin/consul",
-	//				"acl",
-	//				"token",
-	//				"create",
-	//				"-policy-name",
-	//				fmt.Sprintf("server-%s", strings.ReplaceAll(containerIP, ".", "-")),
-	//				"-format",
-	//				"json").
-	//			Return(tokenCreateMock)
-	//
-	//		var cleanups = make([]func(), 0)
-	//		defer func() {
-	//			for _, f := range cleanups {
-	//				f()
-	//			}
-	//		}()
-	//		setupLdap(t, businessDep, setupFiles.FakeLocalConfig)
-	//
-	//		systemdUnitMock := new(mocks4.UnitManager)
-	//		systemdUnitMock.On("StartUnit", "service-discover.service", "replace", mock.Anything).Return(
-	//			0, nil,
-	//		).Run(func(args mock.Arguments) {
-	//			ch := args.Get(2).(chan<- string)
-	//
-	//			cmd := native_exec.Command(
-	//				"/usr/bin/consul",
-	//				"agent",
-	//				"-dev", // otherwise it takes up to 10 seconds to boostrap
-	//				"-config-dir",
-	//				s.ConsulConfigDir,
-	//				"-server",
-	//				"-bind",
-	//				"127.0.0.1", // otherwise test address will be used
-	//			)
-	//			err := cmd.Start()
-	//
-	//			if err != nil {
-	//				panic(err)
-	//			}
-	//
-	//			cleanups = append(cleanups, func() {
-	//				err := syscall.Kill(cmd.Process.Pid, syscall.SIGTERM)
-	//				if err != nil {
-	//					panic(err)
-	//				}
-	//			})
-	//
-	//			time.Sleep(250 * time.Millisecond)
-	//			ch <- "done"
-	//		})
-	//		systemdUnitMock.On("EnableUnitFiles", []string{"service-discover.service"}, false, false).Return(false, nil, nil)
-	//		systemdUnitMock.On("Close").Return(nil)
-	//		businessDep.On("SystemdUnitHandler").Return(systemdUnitMock, nil)
-	//
-	//		_, err = s.importSetup(businessDep)
-	//		assert.NoError(t, err)
-	//	})
+	t.Run("import succeeds when running with correct configuration and flags", func(t *testing.T) {
+		setupFiles, cleanup := setup(t, "Run with correct configuration and flags", true)
+		defer cleanup()
+
+		businessDep := new(mocks2.BusinessDependencies)
+		setupNetwork(businessDep, "localhost")
+		setupBusinessDeps(businessDep)
+
+		s := &Setup{
+			ConsulConfigDir:   setupFiles.consulConfigDir,
+			ConsulHome:        setupFiles.consulHome,
+			LocalConfigPath:   setupFiles.FakeLocalConfig.Name(),
+			ConsulData:        setupFiles.consulData,
+			ConsulFileConfig:  setupFiles.consulFileConfig,
+			ClusterCredential: setupFiles.ClusterCredentialDownload.Name(),
+			MutableConfigFile: setupFiles.mutableConfigFile,
+			Password:          defaultClusterCredentialsPassword,
+			BindAddress:       "127.0.0.1",
+		}
+		clusterCredential, err := os.Create(setupFiles.ClusterCredentialDownload.Name())
+		assert.NoError(t, err)
+		tarWriter, err := encrypter.NewWriter(clusterCredential, []byte("password"))
+		assert.NoError(t, err)
+
+		assert.NoError(t, tarWriter.AddFile(
+			bytes.NewBuffer([]byte("Test")),
+			&FakeFileStat{size: 4},
+			command.ConsulCA,
+			setupFiles.consulHome+"/",
+		))
+		assert.NoError(t, tarWriter.AddFile(
+			bytes.NewBuffer([]byte("Test")),
+			&FakeFileStat{size: 4},
+			command.ConsulCAKey,
+			setupFiles.consulHome+"/",
+		))
+		assert.NoError(t, tarWriter.AddFile(
+			bytes.NewBuffer([]byte("{\"blabla\": \"123\",\"SecretID\": \"c182a76b-d26f-92fb-de9b-2f828e8730bd\"}")),
+			&FakeFileStat{size: 68},
+			command.ConsulACLBootstrap,
+			"/",
+		))
+		assert.NoError(t, tarWriter.AddFile(
+			bytes.NewBuffer([]byte("random")),
+			&FakeFileStat{size: 6},
+			command.GossipKey,
+			"/",
+		))
+		assert.NoError(t, tarWriter.Close())
+
+		tlsCertCreateMock := new(mocks3.Cmd)
+		tlsCertCreateMock.On("Output").Return([]byte("random"), nil)
+		businessDep.On("CreateCommand",
+			"/usr/bin/consul",
+			"tls",
+			"cert",
+			"create",
+			fmt.Sprintf("-days=%d", certificateExpiration),
+			"-server",
+		).Return(tlsCertCreateMock)
+
+		tokenCreateMock := new(mocks3.Cmd)
+		tokenCreateMock.On("Output").Return([]byte(`{
+				  "SecretID": "secret-token-2"
+				}`), nil)
+
+		setTokenCmd := new(mocks3.Cmd)
+		setTokenCmd.On("Output").Return(make([]byte, 0), nil)
+		businessDep.On("CreateCommand",
+			"/usr/bin/consul",
+			"acl",
+			"set-agent-token",
+			"default",
+			"secret-token-2",
+		).Return(setTokenCmd)
+
+		aclPolicyCreateMock := new(mocks3.Cmd)
+		aclPolicyCreateMock.On("Output").Return([]byte("something"), nil)
+		businessDep.On("CreateCommand",
+			"/usr/bin/consul",
+			"acl",
+			"policy",
+			"create",
+			"-name",
+			"server-localhost",
+			"-rules",
+			"{\n   \"node\":{\n      \"server-localhost\":{\n         \"policy\":\"write\"\n      }\n   },\n   \"node_prefix\":{\n      \"\":{\n         \"policy\":\"read\"\n      }\n   },\n   \"service_prefix\":{\n      \"\":{\n         \"policy\":\"write\"\n      }\n   }\n}",
+		).Return(aclPolicyCreateMock, nil).
+			On("CreateCommand",
+				"/usr/bin/consul",
+				"acl",
+				"token",
+				"create",
+				"-policy-name",
+				"server-localhost",
+				"-format",
+				"json").
+			Return(tokenCreateMock)
+
+		var cleanups = make([]func(), 0)
+		defer func() {
+			for _, f := range cleanups {
+				f()
+			}
+		}()
+		setupLdap(t, businessDep, setupFiles.FakeLocalConfig)
+
+		systemdUnitMock := new(mocks4.UnitManager)
+		systemdUnitMock.On("StartUnit", "service-discover.service", "replace", mock.Anything).Return(
+			0, nil,
+		).Run(func(args mock.Arguments) {
+			ch := args.Get(2).(chan<- string)
+			time.Sleep(250 * time.Millisecond)
+			ch <- "done"
+		})
+		systemdUnitMock.On("EnableUnitFiles", []string{"service-discover.service"}, false, false).Return(false, nil, nil)
+		systemdUnitMock.On("Close").Return(nil)
+		businessDep.On("SystemdUnitHandler").Return(systemdUnitMock, nil)
+
+		_, err = s.importSetup(businessDep)
+		assert.NoError(t, err)
+	})
 }
 
 func setupLdap(t *testing.T, businessDep *mocks2.BusinessDependencies, fakeLocalConfig *os.File) {
