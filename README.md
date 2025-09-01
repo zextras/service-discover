@@ -31,12 +31,6 @@ Jenkinsfile         # CI/CD pipeline
 
 ## Build Instructions
 
-### Clone the repository
-```sh
-git clone <repo-url>
-cd service-discover
-```
-
 ### IDE Setup
 If using an IDE like Intellij Idea, Ensure that you have go module support enabled in Go settings section.
 Then the IDE should automatically detect the modules and download dependencies.
@@ -70,14 +64,21 @@ cd pkg/encrypter
 go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml
 ```
 
-### Integration Environment
-Some tests require `service-discover-base` to be installed on the system. See Jenkinsfile for setup steps.
-
 ## Deployment & Release
 
 Artifacts are uploaded to Artifactory and promoted via Jenkins pipeline. See Jenkinsfile for details on upload and promotion steps.
 
 Please ensure all tests pass and code is linted before submitting.
+
+## RC
+Release is managed with [release-it](https://github.
+com/release-it/release-it).
+Install the dependencies with `npm i`.  
+Run `release-it --ci`. This will bump the versions, commit, tag and push the 
+code.  
+The make sure the tag was built. This will deliver the RC.  
+Finalize the work by merging the RC in the main branch. 
+
 
 ## License
 
