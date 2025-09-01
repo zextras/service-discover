@@ -53,12 +53,6 @@ func SpinUpCarbonioLdap(t *testing.T, address, version string) (testcontainers.C
 	cip, _ := ldapC.ContainerIP(ctx)
 	t.Log("Container ip: " + cip)
 
-	listNets, _ := ldapC.Networks(ctx)
-
-	for _, nName := range listNets {
-		t.Log("Connected network: " + nName)
-	}
-
 	ports, _ := ldapC.Ports(ctx)
 
 	for port, bindings := range ports {
