@@ -57,7 +57,7 @@ func TestLoadLocalConfig(t *testing.T) {
 				},
 				"ldap_port": {
 					Text:  "",
-					Value: "389",
+					Value: "1389",
 				},
 				"mailboxd_keystore": {
 					Text:  "",
