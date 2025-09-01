@@ -16,6 +16,14 @@ pipeline {
         GOPRIVATE="gitlab.com/zextras,bitbucket.org/zextras,github.com/zextras"
     }
     stages {
+        stage('Setup') {
+            steps {
+                sh '''
+sudo bash -c 'echo "deb [trusted=yes] https://repo.zextras.io/rc/ubuntu focal main" > /etc/apt/sources.list.d/zextras.list'
+'''
+                sh 'sudo apt-get update && sudo apt-get install -y service-discover-base'
+            }
+        }
         stage('Stash') {
             steps {
                 checkout scm
