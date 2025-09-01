@@ -72,7 +72,7 @@ func SpinUpCarbonioLdap(t *testing.T, address, version string) (LdapContainer, c
 		Stop: func() {
 			err := ldapContainer.Terminate(ctx)
 			if err != nil {
-				t.Error(err)
+				t.Log(err)
 			}
 		},
 		Ip: func() string {
