@@ -361,7 +361,7 @@ func TestSetup_importSetup(t *testing.T) {
 			}
 	}
 
-	t.Run("Cluster credentials is required", func(t *testing.T) {
+	t.Run("should fail if cluster credentials are missing", func(t *testing.T) {
 		setupFiles, cleanup := setup(t, "Test cluster credentials is required", false)
 		defer cleanup()
 
@@ -392,7 +392,7 @@ func TestSetup_importSetup(t *testing.T) {
 		)
 	})
 
-	t.Run("Returns error when using Wrong binding address", func(t *testing.T) {
+	t.Run("fails when using Wrong binding address", func(t *testing.T) {
 		setupFiles, cleanup := setup(t, "Wrong binding address", true)
 		defer cleanup()
 
@@ -421,7 +421,7 @@ func TestSetup_importSetup(t *testing.T) {
 		)
 	})
 
-	t.Run("Returns error when using wrong cluster credentials password", func(t *testing.T) {
+	t.Run("fails when using wrong cluster credentials password", func(t *testing.T) {
 		setupFiles, cleanup := setup(t, "Wrong cluster credentials password", true)
 		defer cleanup()
 
@@ -467,7 +467,7 @@ func TestSetup_importSetup(t *testing.T) {
 		)
 	})
 
-	t.Run("Run with correct configuration and flags", func(t *testing.T) {
+	t.Run("import succeeds when running with correct configuration and flags", func(t *testing.T) {
 		setupFiles, cleanup := setup(t, "Run with correct configuration and flags", true)
 		defer cleanup()
 
