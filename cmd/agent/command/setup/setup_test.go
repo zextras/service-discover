@@ -25,7 +25,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/testcontainers/testcontainers-go"
 	"github.com/zextras/service-discover/pkg/carbonio"
 	mocks5 "github.com/zextras/service-discover/pkg/carbonio/mocks"
 	"github.com/zextras/service-discover/pkg/command"
@@ -120,25 +119,19 @@ func TestSetup_setup(t *testing.T) {
 	type testDependencies struct {
 		FakeLocalConfig           *os.File
 		ClusterCredentialDownload *os.File
-		Container                 testcontainers.Container
+		Container                 test.LdapContainer
 		CtxContainer              context.Context
 	}
 
 	setup := func(t *testing.T, testName string, credentialsContent []byte) (*testDependencies, func()) {
 		t.Log("Starting LDAP container")
 		container, ctxContainer := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
-		containerIP, err := container.ContainerIP(ctxContainer)
-		containerPort, err := container.MappedPort(ctxContainer, "1389")
-		t.Logf("LDAP container started at %s", containerIP)
+		ldapUrl := container.URL()
+		t.Logf("LDAP container started at %s", ldapUrl)
 
-		if err != nil {
-			t.Error(err)
-		}
-
-		ldapUrl := "ldap://localhost:" + containerPort.Port()
 		localConfigByte := test.GenerateLocalConfig(
 			t,
-			containerIP,
+			container.Ip(),
 			ldapUrl,
 			ldapUrl,
 			test.DefaultLdapUserDN,
@@ -178,11 +171,8 @@ func TestSetup_setup(t *testing.T) {
 				container,
 				ctxContainer,
 			}, func() {
-				defer func(container testcontainers.Container, ctx context.Context) {
-					err := container.Terminate(ctx)
-					if err != nil {
-						t.Error(err)
-					}
+				defer func(container test.LdapContainer, ctx context.Context) {
+					container.Stop()
 				}(container, ctxContainer)
 
 				defer func(name string) {
@@ -440,7 +430,7 @@ func TestSetup_setup(t *testing.T) {
 		selectedInterface := net.Interface{
 			Name: "en1",
 		}
-		containerIP, err := testStruct.Container.ContainerIP(testStruct.CtxContainer)
+		containerIP := testStruct.Container.Ip()
 		assert.NoError(t, err)
 
 		aclTemplateData := struct {
@@ -615,7 +605,7 @@ func TestSetup_setup(t *testing.T) {
 		selectedInterface := net.Interface{
 			Name: "en1",
 		}
-		containerIP, err := testStruct.Container.ContainerIP(testStruct.CtxContainer)
+		containerIP := testStruct.Container.Ip()
 		assert.NoError(t, err)
 
 		aclTemplateData := struct {

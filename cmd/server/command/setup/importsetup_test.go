@@ -21,7 +21,6 @@ import (
 	"github.com/go-ldap/ldap/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/testcontainers/testcontainers-go"
 	"github.com/zextras/service-discover/cmd/server/config"
 	"github.com/zextras/service-discover/pkg/carbonio"
 	"github.com/zextras/service-discover/pkg/command"
@@ -208,7 +207,7 @@ func TestSetup_importSetup(t *testing.T) {
 	type setupOutput struct {
 		FakeLocalConfig           *os.File
 		ClusterCredentialDownload *os.File
-		Container                 testcontainers.Container
+		Container                 test.LdapContainer
 		CtxContainer              context.Context
 		consulConfigDir           string
 		consulHome                string
@@ -231,12 +230,7 @@ func TestSetup_importSetup(t *testing.T) {
 
 		container, ctxContainer := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
 
-		containerPort, err := container.MappedPort(ctxContainer, "1389")
-		if err != nil {
-			t.Error(err)
-		}
-
-		ldapUrl := "ldap://localhost:" + containerPort.Port()
+		ldapUrl := container.URL()
 		localConfigByte := test.GenerateLocalConfig(
 			t,
 			"localhost",
@@ -341,9 +335,7 @@ func TestSetup_importSetup(t *testing.T) {
 					t.Error(err)
 				}
 
-				if err := container.Terminate(ctxContainer); err != nil {
-					t.Error(err)
-				}
+				container.Stop()
 
 				if err := os.Remove(file.Name()); err != nil {
 					t.Error(err)
