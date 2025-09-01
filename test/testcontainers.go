@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	LatestRelease      = "24.3.0"
-	PublicImageAddress = "carbonio/ce-directory-server-u20:%s"
+	LatestRelease      = "latest"
+	PublicImageAddress = "registry.dev.zextras.com/dev/carbonio-openldap:%s"
 	CIDockerNetwork    = "ci_agent"
 	CINetworkMode      = "overlay"
 )
@@ -51,10 +51,8 @@ func SpinUpCarbonioLdap(t *testing.T, address, version string) (testcontainers.C
 	ulimits := []*units.Ulimit{{Name: "nofile", Soft: 32678, Hard: 32678}}
 	req := testcontainers.ContainerRequest{
 		Image:        fmt.Sprintf(address, version),
-		ExposedPorts: []string{"389/tcp"},
-		Entrypoint:   []string{"entrypoint"},
-		WaitingFor:   wait.ForListeningPort("389/tcp"),
-		Hostname:     "carbonio-ce-directory-server.carbonio-system.svc.cluster.local",
+		ExposedPorts: []string{"1389/tcp"},
+		WaitingFor:   wait.ForListeningPort("1389/tcp"),
 		HostConfigModifier: func(config *container.HostConfig) {
 			config.AutoRemove = true
 			config.NetworkMode = container.NetworkMode(netMode)

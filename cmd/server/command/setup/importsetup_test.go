@@ -242,8 +242,8 @@ func TestSetup_importSetup(t *testing.T) {
 		localConfigByte := test.GenerateLocalConfig(
 			t,
 			containerIP,
-			"ldap://"+containerIP+":389",
-			"ldap://"+containerIP+":389",
+			"ldap://"+containerIP+":1389",
+			"ldap://"+containerIP+":1389",
 			test.DefaultLdapUserDN,
 			"password",
 		)
@@ -257,7 +257,7 @@ func TestSetup_importSetup(t *testing.T) {
 			t.Error(err)
 		}
 
-		connection, err := ldap.DialURL("ldap://"+containerIP+":389", ldap.DialWithDialer(&net.Dialer{Timeout: 5 * time.Minute}))
+		connection, err := ldap.DialURL("ldap://"+containerIP+":1389", ldap.DialWithDialer(&net.Dialer{Timeout: 5 * time.Minute}))
 		if err != nil {
 			t.Error(err)
 		}
