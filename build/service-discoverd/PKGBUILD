@@ -14,15 +14,14 @@ depends=(
   "carbonio-core"
   "service-discover-base"
 )
-source=("service-discoverd-docker")
-sha256sums=('SKIP')
-
-build() {
-  cd "$(dirname "$(find / -name "yap.json" -print -quit)")/.."
-  CGO_ENABLED=0 go build \
-    -o "${srcdir}/service-discoverd" \
-    cmd/service-discoverd/service-discoverd.go
-}
+source=(
+  "service-discoverd-docker"
+  "service-discoverd"
+)
+sha256sums=(
+  'SKIP'
+  'SKIP'
+)
 
 package() {
   cd "${srcdir}"

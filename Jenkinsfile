@@ -26,7 +26,6 @@ pipeline {
                 script {
                     env.GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
                 }
-                stash includes: "**", name: 'project'
             }
         }
         stage('Tests') {
@@ -69,6 +68,14 @@ pipeline {
                             junit allowEmptyResults: false, checksName: "Test for server", testResults: 'tests.xml'
                         }
                     }
+                }
+            }
+        }
+        stage('Build') {
+            container('golang') {
+                script {
+                    sh 'CGO_ENABLED=0 ./build.sh'
+                    stash includes: "**", name: 'project'
                 }
             }
         }

@@ -21,18 +21,18 @@ depends=(
 conflicts=(
   "service-discover-server"
 )
-source=("service-discover.service")
-sha256sums=('SKIP')
-
-build() {
-  cd "$(dirname "$(find / -name "yap.json" -print -quit)")/.."
-  CGO_ENABLED=0 go build \
-    -o "${srcdir}/agent" \
-    cmd/agent/agent.go
-}
+source=(
+  "service-discover.service"
+  "agent"
+)
+sha256sums=(
+  'SKIP'
+  'SKIP'
+)
 
 package() {
   cd "${srcdir}"
+  ls
   install -Dm 755 agent \
     "${pkgdir}/usr/bin/service-discover"
   install -Dm 644 service-discover.service \
