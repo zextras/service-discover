@@ -32,7 +32,6 @@ sha256sums=(
 
 package() {
   cd "${srcdir}"
-  ls
   install -Dm 755 agent \
     "${pkgdir}/usr/bin/service-discover"
   install -Dm 644 service-discover.service \
