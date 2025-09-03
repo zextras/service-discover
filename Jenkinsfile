@@ -72,10 +72,12 @@ pipeline {
             }
         }
         stage('Build') {
-            container('golang') {
-                script {
-                    sh 'CGO_ENABLED=0 ./build.sh'
-                    stash includes: "**", name: 'project'
+            steps {
+                container('golang') {
+                    script {
+                        sh 'CGO_ENABLED=0 ./build.sh'
+                        stash includes: "**", name: 'project'
+                    }
                 }
             }
         }
