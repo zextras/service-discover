@@ -91,7 +91,7 @@ pipeline {
         stage ('Build Packages') {
             steps {
                 script {
-                    buildStage(getPackages(), 'project', 'build', true)()
+                    buildStage(["service-discover-server", "service-discover-agent", "service-discover-daemon"], 'project', 'build', true)()
                 }
             }
         }
