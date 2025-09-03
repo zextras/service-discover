@@ -5,8 +5,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 #
 
-docker run --rm --entrypoint=/bin/bash \
-  -v "$(pwd)/artifacts:/artifacts" \
-  -v "$(pwd):/tmp/service-discover" \
-  registry.dev.zextras.com/jenkins/pacur/ubuntu-20.04:v2 \
-  -c "yap build ubuntu-focal /tmp/service-discover/build -sd"
+OS=${1:-"ubuntu-jammy"}
+
+echo "Building for OS: $OS"
+
+docker run -it --rm \
+    --entrypoint=/bin/bash \
+    -v "$(pwd)/artifacts/${OS}":/artifacts \
+    -v "$(pwd)":/tmp/project \
+    "docker.io/m0rf30/yap-${OS}:1.8" \
+    -c "yap prepare ${OS} -g && yap build ${OS} /tmp/project/build"
