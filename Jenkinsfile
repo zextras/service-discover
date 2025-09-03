@@ -26,6 +26,7 @@ pipeline {
                 script {
                     env.GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
                 }
+                stash includes: "**", name: 'project'
             }
         }
         stage('Tests') {
@@ -76,7 +77,7 @@ pipeline {
                 container('golang') {
                     script {
                         sh 'CGO_ENABLED=0 ./build.sh'
-                        stash includes: "**", name: 'project'
+                        stash includes: "**", name: 'build'
                     }
                 }
             }
@@ -99,7 +100,7 @@ pipeline {
         stage ('Build Packages') {
             steps {
                 script {
-                    buildStage(getPackages(), 'project', '.')()
+                    buildStage(getPackages(), 'build', '.')()
                 }
             }
         }
