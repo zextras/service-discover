@@ -24,7 +24,7 @@ source=("service-discover.service")
 sha256sums=('SKIP')
 
 build() {
-  cd "/tmp/service-discover"
+  cd "$(dirname "$(find / -name "yap.json" -print -quit)")/.."
   CGO_ENABLED=0 go build \
     -o "${srcdir}/server" \
     cmd/server/server.go
