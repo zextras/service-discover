@@ -21,8 +21,12 @@ depends=(
 conflicts=(
   "service-discover-server"
 )
-source=("service-discover.service")
-sha256sums=('SKIP')
+source=(
+  "service-discover.service"
+)
+sha256sums=(
+  '0ec810efa5a80ab81a3bb6938f14878fb46671771f46e363155f5740b14d1e50'
+)
 
 build() {
   cd "$(dirname "$(find / -name "yap.json" -print -quit)")/.."
