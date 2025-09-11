@@ -20,8 +20,12 @@ depends=(
   "service-discover-template"
 )
 conflicts=("service-discover-agent")
-source=("service-discover.service")
-sha256sums=('SKIP')
+source=(
+  "service-discover.service"
+)
+sha256sums=(
+  '1c149587fb768cdaef5e85cbd64c78fff858ac25a94c3b7ec3c20b61b86f0665'
+)
 
 build() {
   cd "/tmp/service-discover"
