@@ -1,35 +1,55 @@
-library identifier: 'mailbox-packages-lib@master', retriever: modernSCM(
-        [$class: 'GitSCMSource',
-         remote: 'git@github.com:zextras/jenkins-packages-build-library.git',
-         credentialsId: 'jenkins-integration-with-github-account'])
+library(
+    identifier: 'jenkins-packages-build-library@1.0.0',
+    retriever: modernSCM([
+        $class: 'GitSCMSource',
+        remote: 'git@github.com:zextras/jenkins-packages-build-library.git',
+        credentialsId: 'jenkins-integration-with-github-account'
+    ])
+)
 
 pipeline {
+
     agent {
         node {
             label 'golang-v1'
         }
     }
-    parameters {
-        booleanParam defaultValue: false, description: 'Set to true to skip the test stage', name: 'SKIP_TEST'
-    }
-    options {
-        skipDefaultCheckout()
-        buildDiscarder(logRotator(numToKeepStr: '25'))
-        timeout(time: 2, unit: 'HOURS')
-    }
+
     environment {
         GOPRIVATE="gitlab.com/zextras,bitbucket.org/zextras,github.com/zextras"
     }
+    
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '25'))
+        parallelsAlwaysFailFast()
+        skipDefaultCheckout()
+        timeout(time: 2, unit: 'HOURS')
+    }
+
+    parameters {
+        booleanParam defaultValue: false, 
+            description: 'Upload packages in playground repositories.', 
+            name: 'PLAYGROUND'
+        booleanParam defaultValue: false,
+            description: 'Set to true to skip the test stage',
+            name: 'SKIP_TEST'
+    }
+
+    tools {
+        jfrog 'jfrog-cli'
+    }
+
     stages {
+
         stage('Stash') {
             steps {
                 checkout scm
                 script {
-                    env.GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+                    gitMetadata()
                 }
-                stash includes: "**", name: 'project'
             }
         }
+
         stage('Tests') {
             when { expression { params.SKIP_TEST != true } }
             steps {
@@ -73,6 +93,7 @@ pipeline {
                 }
             }
         }
+
         stage('SonarQube analysis') {
             steps {
                 container('golangci-lint') {
@@ -88,23 +109,34 @@ pipeline {
                 }
             }
         }
+
         stage ('Build Packages') {
             steps {
-                script {
-                    buildStage(["service-discover-server", "service-discover-agent", "service-discover-daemon"], 'project', 'build', true)()
-                }
+                echo "Building deb/rpm packages"
+                buildStage([
+                    buildDirs: ['build'],
+                    prepare: true,
+                    prepareFlags: [' -g ']
+                ])
             }
         }
+
+        stage('Upload artifacts')
+        {
+            steps {
+                uploadStage(
+                    packages: yapHelper.getPackageNames('build/yap.json')
+                )
+            }
+        }   
     }
     post {
         always {
-            script {
-                GIT_COMMIT_EMAIL = sh(
-                    script: 'git --no-pager show -s --format=\'%ae\'',
-                    returnStdout: true
-                ).trim()
-            }
-            emailext attachLog: true, body: '$DEFAULT_CONTENT', recipientProviders: [requestor()], subject: '$DEFAULT_SUBJECT', to: "${GIT_COMMIT_EMAIL}"
+            emailext attachLog: true, 
+                body: '$DEFAULT_CONTENT', 
+                recipientProviders: [requestor()], 
+                subject: '$DEFAULT_SUBJECT', 
+                to: "${env.GIT_COMMIT_EMAIL}"
             junit allowEmptyResults: true, testResults: 'test-out/**/*.xml'
         }
     }
