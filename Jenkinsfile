@@ -97,7 +97,6 @@ pipeline {
         stage('SonarQube analysis') {
             steps {
                 container('golangci-lint') {
-                    unstash 'project'
                     script {
                         scannerHome = tool 'SonarScanner';
                     }
