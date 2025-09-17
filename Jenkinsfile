@@ -1,5 +1,5 @@
 library(
-    identifier: 'jenkins-packages-build-library@1.0.0',
+    identifier: 'jenkins-packages-build-library@1.0.2',
     retriever: modernSCM([
         $class: 'GitSCMSource',
         remote: 'git@github.com:zextras/jenkins-packages-build-library.git',
@@ -8,7 +8,6 @@ library(
 )
 
 pipeline {
-
     agent {
         node {
             label 'golang-v1'
@@ -16,9 +15,9 @@ pipeline {
     }
 
     environment {
-        GOPRIVATE="gitlab.com/zextras,bitbucket.org/zextras,github.com/zextras"
+        GOPRIVATE = 'gitlab.com/zextras,bitbucket.org/zextras,github.com/zextras'
     }
-    
+
     options {
         buildDiscarder(logRotator(numToKeepStr: '25'))
         parallelsAlwaysFailFast()
@@ -27,8 +26,8 @@ pipeline {
     }
 
     parameters {
-        booleanParam defaultValue: false, 
-            description: 'Upload packages in playground repositories.', 
+        booleanParam defaultValue: false,
+            description: 'Upload packages in playground repositories.',
             name: 'PLAYGROUND'
         booleanParam defaultValue: false,
             description: 'Set to true to skip the test stage',
@@ -40,7 +39,6 @@ pipeline {
     }
 
     stages {
-
         stage('Stash') {
             steps {
                 checkout scm
@@ -60,13 +58,13 @@ pipeline {
                 }
                 container('golang') {
                     script {
-                        def modules = [:]
-                        def builds = [:]
-                        modules["encrypter"] = "pkg/encrypter"
-                        modules["exec"] = "pkg/exec"
-                        modules["formatter"] = "pkg/formatter"
-                        modules["parser"] = "pkg/parser"
-                        modules["carbonio"] = "pkg/carbonio"
+                        Map modules = [:]
+                        Map builds = [:]
+                        modules['encrypter'] = 'pkg/encrypter'
+                        modules['exec'] = 'pkg/exec'
+                        modules['formatter'] = 'pkg/formatter'
+                        modules['parser'] = 'pkg/parser'
+                        modules['carbonio'] = 'pkg/carbonio'
                         modules.each { key, value ->
                             builds[key] = {
                                 dir(value) {
@@ -79,15 +77,15 @@ pipeline {
                         parallel builds
                         dir('pkg/command') {
                             sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml'
-                            junit allowEmptyResults: false, checksName: "Test for command", testResults: 'tests.xml'
+                            junit allowEmptyResults: false, checksName: 'Test for command', testResults: 'tests.xml'
                         }
                         dir('cmd/agent') {
                             sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml'
-                            junit allowEmptyResults: false, checksName: "Test for agent", testResults: 'tests.xml'
+                            junit allowEmptyResults: false, checksName: 'Test for agent', testResults: 'tests.xml'
                         }
                         dir('cmd/server') {
                             sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml'
-                            junit allowEmptyResults: false, checksName: "Test for server", testResults: 'tests.xml'
+                            junit allowEmptyResults: false, checksName: 'Test for server', testResults: 'tests.xml'
                         }
                     }
                 }
@@ -98,7 +96,7 @@ pipeline {
             steps {
                 container('golangci-lint') {
                     script {
-                        scannerHome = tool 'SonarScanner';
+                        scannerHome = tool 'SonarScanner'
                     }
                     sh 'golangci-lint run ./... --issues-exit-code 0 --output.checkstyle.path linter.out'
                 }
@@ -109,11 +107,12 @@ pipeline {
             }
         }
 
-        stage ('Build Packages') {
+        stage('Build Packages') {
             steps {
-                echo "Building deb/rpm packages"
+                echo 'Building deb/rpm packages'
                 buildStage([
                     buildDirs: ['build'],
+                    buildFlags: ' -sd ',
                     prepare: true,
                     prepareFlags: [' -g ']
                 ])
@@ -127,15 +126,16 @@ pipeline {
                     packages: yapHelper.getPackageNames('build/yap.json')
                 )
             }
-        }   
+        }
     }
+
     post {
         always {
-            emailext attachLog: true, 
-                body: '$DEFAULT_CONTENT', 
-                recipientProviders: [requestor()], 
-                subject: '$DEFAULT_SUBJECT', 
-                to: "${env.GIT_COMMIT_EMAIL}"
+            emailext attachLog: true,
+                body: '$DEFAULT_CONTENT',
+                recipientProviders: [requestor()],
+                subject: '$DEFAULT_SUBJECT',
+                to: env.GIT_COMMIT_EMAIL
             junit allowEmptyResults: true, testResults: 'test-out/**/*.xml'
         }
     }
