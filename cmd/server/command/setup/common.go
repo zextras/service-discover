@@ -89,24 +89,36 @@ type connectConfig struct {
 	CaProvider string `json:"ca_provider"`
 }
 
+type tlsDefaults struct {
+	CaFile         string `json:"ca_file"`
+	CertFile       string `json:"cert_file"`
+	KeyFile        string `json:"key_file"`
+	VerifyIncoming bool   `json:"verify_incoming"`
+	VerifyOutgoing bool   `json:"verify_outgoing"`
+}
+
+type tlsInternalRPC struct {
+	VerifyServerHostname bool `json:"verify_server_hostname"`
+}
+
+type tlsConfig struct {
+	Defaults    tlsDefaults    `json:"defaults"`
+	InternalRPC tlsInternalRPC `json:"internal_rpc"`
+}
+
 type setupConfig struct {
 	ACLConfig               aclConfig     `json:"acl"`
 	AutoEncrypt             autoEncrypt   `json:"auto_encrypt,omitempty"`
-	CaFile                  string        `json:"ca_file"`
-	CertFile                string        `json:"cert_file"`
 	DataDir                 string        `json:"data_dir"`
 	EnableLocalScriptChecks bool          `json:"enable_local_script_checks"`
 	Encrypt                 string        `json:"encrypt"`
-	KeyFile                 string        `json:"key_file"`
 	LogLevel                string        `json:"log_level"`
 	NodeName                string        `json:"node_name"`
 	Server                  bool          `json:"server"`
-	VerifyIncoming          bool          `json:"verify_incoming"`
-	VerifyOutgoing          bool          `json:"verify_outgoing"`
-	VerifyServerHostname    bool          `json:"verify_server_hostname"`
 	UIConfig                uiConfig      `json:"ui_config"`
 	Ports                   portsConfig   `json:"ports"`
 	Connect                 connectConfig `json:"connect"`
+	TLS                     tlsConfig     `json:"tls"`
 }
 
 // nonInteractiveOutput is only an internal struct to output the result to the final user in an appropriate way.
@@ -337,21 +349,27 @@ func (s *Setup) generateCertificateAndConfig(deps businessDependencies,
 			DownPolicy:             "extend-cache",
 		},
 		AutoEncrypt:             autoEncrypt{AllowTLS: true},
-		CaFile:                  s.ConsulHome + "/" + command.ConsulCA,
-		CertFile:                s.ConsulHome + "/" + command.ConsulServerCertificate,
 		DataDir:                 s.ConsulData,
 		EnableLocalScriptChecks: true,
 		Encrypt:                 gossipKey,
-		KeyFile:                 s.ConsulHome + "/" + command.ConsulServerCertificateKey,
 		LogLevel:                defaultLogLevel,
 		NodeName:                command.ConsulNodeName(command.Server, zimbraHostname),
 		Server:                  true,
-		VerifyIncoming:          true,
-		VerifyOutgoing:          true,
-		VerifyServerHostname:    true,
 		UIConfig:                uiConfig{Enabled: true},
 		Ports:                   portsConfig{Grpc: 8502, GrpcTLS: 8503},
 		Connect:                 connectConfig{Enabled: true},
+		TLS: tlsConfig{
+			Defaults: tlsDefaults{
+				CaFile:         s.ConsulHome + "/" + command.ConsulCA,
+				CertFile:       s.ConsulHome + "/" + command.ConsulServerCertificate,
+				KeyFile:        s.ConsulHome + "/" + command.ConsulServerCertificateKey,
+				VerifyIncoming: true,
+				VerifyOutgoing: true,
+			},
+			InternalRPC: tlsInternalRPC{
+				VerifyServerHostname: true,
+			},
+		},
 	}
 
 	return consulConfigFile, nil
