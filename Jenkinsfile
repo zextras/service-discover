@@ -135,7 +135,6 @@ pipeline {
                 recipientProviders: [requestor()],
                 subject: '$DEFAULT_SUBJECT',
                 to: env.GIT_COMMIT_EMAIL
-            junit allowEmptyResults: true, testResults: 'test-out/**/*.xml'
         }
     }
 }
