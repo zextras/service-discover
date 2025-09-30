@@ -147,22 +147,34 @@ type portsConfig struct {
 	GrpcTLS int `json:"grpc_tls"`
 }
 
+type tlsDefaults struct {
+	CaFile         string `json:"ca_file"`
+	CertFile       string `json:"cert_file"`
+	KeyFile        string `json:"key_file"`
+	VerifyIncoming bool   `json:"verify_incoming"`
+	VerifyOutgoing bool   `json:"verify_outgoing"`
+}
+
+type tlsInternalRPC struct {
+	VerifyServerHostname bool `json:"verify_server_hostname"`
+}
+
+type tlsConfig struct {
+	Defaults    tlsDefaults    `json:"defaults"`
+	InternalRPC tlsInternalRPC `json:"internal_rpc"`
+}
+
 type setupConfig struct {
 	ACLConfig               aclConfig   `json:"acl"`
-	CaFile                  string      `json:"ca_file"`
-	CertFile                string      `json:"cert_file"`
 	DataDir                 string      `json:"data_dir"`
 	EnableLocalScriptChecks bool        `json:"enable_local_script_checks"`
 	Encrypt                 string      `json:"encrypt"`
-	KeyFile                 string      `json:"key_file"`
 	LogLevel                string      `json:"log_level"`
 	NodeName                string      `json:"node_name"`
 	Server                  bool        `json:"server"`
-	VerifyIncoming          bool        `json:"verify_incoming"`
-	VerifyOutgoing          bool        `json:"verify_outgoing"`
-	VerifyServerHostname    bool        `json:"verify_server_hostname"`
 	UIConfig                uiConfig    `json:"ui_config"`
 	Ports                   portsConfig `json:"ports"`
+	TLS                     tlsConfig   `json:"tls"`
 }
 
 type Setup struct {
@@ -437,24 +449,30 @@ func (s *Setup) setup(deps businessDependencies) (formatter.Formatter, error) {
 			DownPolicy:             "extend-cache",
 			EnableTokenPersistence: true,
 		},
-		CaFile:                  s.ConsulHome + "/" + command.ConsulCA,
-		CertFile:                s.ConsulHome + "/" + command.ConsulAgentCertificate,
 		DataDir:                 s.ConsulData,
 		EnableLocalScriptChecks: true,
 		Encrypt:                 string(extractedFiles[command.GossipKey]),
-		KeyFile:                 s.ConsulHome + "/" + command.ConsulAgentCertificateKey,
 		LogLevel:                defaultLogLevel,
 		NodeName:                command.ConsulNodeName(command.Agent, zimbraHostname),
 		Server:                  false,
-		VerifyIncoming:          true,
-		VerifyOutgoing:          true,
-		VerifyServerHostname:    true,
 		UIConfig: uiConfig{
 			Enabled: true,
 		},
 		Ports: portsConfig{
 			Grpc:    8502,
 			GrpcTLS: 8503,
+		},
+		TLS: tlsConfig{
+			Defaults: tlsDefaults{
+				CaFile:         s.ConsulHome + "/" + command.ConsulCA,
+				CertFile:       s.ConsulHome + "/" + command.ConsulAgentCertificate,
+				KeyFile:        s.ConsulHome + "/" + command.ConsulAgentCertificateKey,
+				VerifyIncoming: true,
+				VerifyOutgoing: true,
+			},
+			InternalRPC: tlsInternalRPC{
+				VerifyServerHostname: true,
+			},
 		},
 	}
 
