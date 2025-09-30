@@ -6,7 +6,7 @@
 /agent
 /server
 /service-discoverd
-/tests.xml
+tests.xml
 
 # Node artifact files
 node_modules/
