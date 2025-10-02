@@ -5,8 +5,13 @@
 package carbonio
 
 import (
+	"crypto/tls"
 	"encoding/base64"
 	"io"
+	"net"
+	"net/url"
+	"strings"
+	"time"
 
 	"github.com/go-ldap/ldap"
 	"github.com/pkg/errors"
@@ -182,6 +187,51 @@ func readLdapCredentials(localConfig LocalConfig) ldapCredentials {
 	}
 }
 
+// ConnectURL creates a connection to the LDAP server.
+// It checks that the ldap url contains within the ldaps scheme.
+// If found it performs a TLS connection otherwise the connection goes in clear.
+// It also implements a new connection timeout + retry 3 times otherwise it should be overkill to use default OS timeout.
+func (ctx *ldapContext) ConnectURL(rawurl string) (ldapConnInterface, error) {
+	u, err := url.Parse(rawurl)
+	if err != nil {
+		return nil, err
+	}
+
+	hostPort := u.Host
+	useTLS := u.Scheme == "ldaps"
+
+	// Set timeout for connection
+	dialer := &net.Dialer{Timeout: 10 * time.Second}
+
+	var conn net.Conn
+	var lastErr error
+	for attempt := 1; attempt <= 3; attempt++ {
+		if useTLS {
+			tlsConfig := &tls.Config{
+				InsecureSkipVerify: true,
+				ServerName:         strings.Split(u.Host, ":")[0],
+			}
+			conn, lastErr = tls.DialWithDialer(dialer, "tcp", hostPort, tlsConfig)
+		} else {
+			conn, lastErr = dialer.Dial("tcp", hostPort)
+		}
+		if lastErr == nil {
+			break
+		}
+		// Wait briefly before retrying (optional)
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	if conn == nil {
+		return nil, lastErr
+	}
+
+	ldapConn := ldap.NewConn(conn, useTLS)
+	ldapConn.Start()
+
+	return ldapConn, nil
+}
+
 func connect(context *ldapContext, writeAccess bool) (ldapConnInterface, error) {
 	var connection ldapConnInterface
 
@@ -197,7 +247,7 @@ func connect(context *ldapContext, writeAccess bool) (ldapConnInterface, error) 
 	var lastErr error
 
 	for _, url := range urls {
-		connection, err = context.Connect(url)
+		connection, err = context.ConnectURL(url)
 		if err == nil {
 			break
 		}
