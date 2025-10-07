@@ -5,7 +5,9 @@
 package setup
 
 import (
+	mocks22 "github.com/zextras/service-discover/pkg/exec/mocks"
 	"os"
+	"os/user"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -124,4 +126,53 @@ func TestSetup_isFirstInstance(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, false, got)
 	})
+}
+
+func TestSetup_generateCertificateAndConfig_TLS(t *testing.T) {
+	consulHome := test.GenerateRandomFolder(t.Name())
+	defer func(name string) {
+		os.Remove(name)
+	}(consulHome)
+	setup := Setup{
+		ConsulConfigDir:   "",
+		ConsulHome:        consulHome,
+		LocalConfigPath:   "",
+		ConsulData:        "",
+		ConsulFileConfig:  "",
+		ClusterCredential: "",
+		MutableConfigFile: "",
+		Password:          "",
+		BindAddress:       "",
+		FirstInstance:     false,
+	}
+	mockDep := new(mocks.BusinessDependencies)
+	tlsCommand := new(mocks22.Cmd)
+	// TODO: mocking so many calls is a smell to me, think about re-organizing mocks maybe
+	mockDep.On("CreateCommand", "/usr/bin/consul", "tls", "cert", "create", "-days=10950", "-server").Return(tlsCommand)
+	tlsCommand.On("Output").Return([]uint8{}, nil)
+	mockDep.On(
+		"LookupUser", "service-discover").Return(&user.User{
+		Uid:      "1234",
+		Gid:      "0",
+		Username: "service-discover",
+		Name:     "service-discover",
+		HomeDir:  "/var/lib/service-discover",
+	}, nil).On(
+		"LookupGroup", "service-discover").Return(&user.Group{
+		Gid:  "123456",
+		Name: "service-discover",
+	}, nil).On(
+		"Chown", mock.AnythingOfType("string"), 1234, 123456,
+	).Return(nil).On("Chmod", mock.AnythingOfType("string"), os.FileMode(0600)).Return(
+		nil,
+	)
+
+	config, err := setup.generateCertificateAndConfig(mockDep, "localhost", "gossipKey")
+	assert.NoError(t, err)
+	assert.Equal(t, consulHome+"/consul-agent-ca.pem", config.TLS.Defaults.CaFile)
+	assert.Equal(t, consulHome+"/dc1-server-consul-0-key.pem", config.TLS.Defaults.KeyFile)
+	assert.Equal(t, consulHome+"/dc1-server-consul-0.pem", config.TLS.Defaults.CertFile)
+	assert.Equal(t, true, config.TLS.Defaults.VerifyIncoming)
+	assert.Equal(t, true, config.TLS.Defaults.VerifyOutgoing)
+	assert.Equal(t, true, config.TLS.InternalRPC.VerifyServerHostname)
 }
