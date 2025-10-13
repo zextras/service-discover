@@ -11,6 +11,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/go-ldap/ldap"
 	"github.com/stretchr/testify/assert"
@@ -54,16 +55,25 @@ func Test_connect(t *testing.T) {
 		mockLdapConnection := new(MockLdapConnection)
 		mockLdapConnection.On("Bind", "username", "password").Return(nil)
 
+		ldapContainer, containerCtx := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
+
+		defer func(ldapContainer test.LdapContainer, ctx context.Context) {
+			ldapContainer.Stop()
+		}(ldapContainer, containerCtx)
+
+		masterUrl := ldapContainer.URL()
+
 		got, err := connect(
 			&ldapContext{
 				Credentials: ldapCredentials{
-					MasterUrls:  []string{"ldap://example.com:123"},
-					ReplicaUrls: []string{"never use me"},
+					MasterUrls:  []string{masterUrl},
+					ReplicaUrls: []string{},
 					Username:    "username",
 					Password:    "password",
+					ConnTimeout: 1 * time.Second,
 				},
 				Connect: func(url string) (ldapConnInterface, error) {
-					if url == "ldap://example.com:123" {
+					if url == masterUrl {
 						return mockLdapConnection, nil
 					} else {
 						return nil, errors.New("invalid")
@@ -80,15 +90,25 @@ func Test_connect(t *testing.T) {
 
 func TestEnableDisableService(t *testing.T) {
 	t.Run("replica is not used for writes", func(t *testing.T) {
+
+		ldapContainer, containerCtx := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
+
+		defer func(ldapContainer test.LdapContainer, ctx context.Context) {
+			ldapContainer.Stop()
+		}(ldapContainer, containerCtx)
+
+		masterUrl := ldapContainer.URL()
+
 		handler := ldapContext{
 			Credentials: ldapCredentials{
-				MasterUrls:  []string{"ldap://example.com:123"},
-				ReplicaUrls: []string{"never use me"},
+				MasterUrls:  []string{masterUrl},
+				ReplicaUrls: []string{},
 				Username:    "username",
 				Password:    "password",
+				ConnTimeout: 1 * time.Second,
 			},
 			Connect: func(url string) (ldapConnInterface, error) {
-				if url == "ldap://example.com:123" {
+				if url == masterUrl {
 					return nil, errors.New("master connection failed")
 				} else {
 					assert.Fail(t, "Replica must not be used")
@@ -138,15 +158,24 @@ func TestEnableDisableService(t *testing.T) {
 		expectedModifyRequest.Add("zimbraServiceEnabled", []string{"service"})
 		mockLdapConnection.On("Modify", &expectedModifyRequest).Return(nil)
 
+		ldapContainer, containerCtx := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
+
+		defer func(ldapContainer test.LdapContainer, ctx context.Context) {
+			ldapContainer.Stop()
+		}(ldapContainer, containerCtx)
+
+		masterUrl := ldapContainer.URL()
+
 		handler := ldapContext{
 			Credentials: ldapCredentials{
-				MasterUrls:  []string{"ldap://example.com:123"},
-				ReplicaUrls: []string{"never use me"},
+				MasterUrls:  []string{masterUrl},
+				ReplicaUrls: []string{},
 				Username:    "username",
 				Password:    "password",
+				ConnTimeout: 1 * time.Second,
 			},
 			Connect: func(url string) (ldapConnInterface, error) {
-				if url == "ldap://example.com:123" {
+				if url == masterUrl {
 					return mockLdapConnection, nil
 				} else {
 					assert.Fail(t, "Replica must not be used")
@@ -196,15 +225,24 @@ func TestEnableDisableService(t *testing.T) {
 		expectedModifyRequest.Delete("zimbraServiceEnabled", []string{"service"})
 		mockLdapConnection.On("Modify", &expectedModifyRequest).Return(nil)
 
+		ldapContainer, containerCtx := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
+
+		defer func(ldapContainer test.LdapContainer, ctx context.Context) {
+			ldapContainer.Stop()
+		}(ldapContainer, containerCtx)
+
+		masterUrl := ldapContainer.URL()
+
 		handler := ldapContext{
 			Credentials: ldapCredentials{
-				MasterUrls:  []string{"ldap://example.com:123"},
-				ReplicaUrls: []string{"never use me"},
+				MasterUrls:  []string{masterUrl},
+				ReplicaUrls: []string{},
 				Username:    "username",
 				Password:    "password",
+				ConnTimeout: 1 * time.Second,
 			},
 			Connect: func(url string) (ldapConnInterface, error) {
-				if url == "ldap://example.com:123" {
+				if url == masterUrl {
 					return mockLdapConnection, nil
 				} else {
 					assert.Fail(t, "Replica must not be used")
@@ -256,15 +294,24 @@ func TestQueryAllServiceDiscoverServers(t *testing.T) {
 		expectedModifyRequest.Delete("zimbraServiceEnabled", []string{"service"})
 		mockLdapConnection.On("Modify", &expectedModifyRequest).Return(nil)
 
+		ldapContainer, containerCtx := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
+
+		defer func(ldapContainer test.LdapContainer, ctx context.Context) {
+			ldapContainer.Stop()
+		}(ldapContainer, containerCtx)
+
+		masterUrl := ldapContainer.URL()
+
 		handler := ldapContext{
 			Credentials: ldapCredentials{
-				MasterUrls:  []string{"ldap://example.com:123"},
-				ReplicaUrls: []string{"never use me"},
+				MasterUrls:  []string{masterUrl},
+				ReplicaUrls: []string{},
 				Username:    "username",
 				Password:    "password",
+				ConnTimeout: 1 * time.Second,
 			},
 			Connect: func(url string) (ldapConnInterface, error) {
-				if url == "ldap://example.com:123" {
+				if url == masterUrl {
 					return mockLdapConnection, nil
 				} else {
 					assert.Fail(t, "Replica must not be used")
@@ -281,15 +328,23 @@ func TestQueryAllServiceDiscoverServers(t *testing.T) {
 	})
 
 	t.Run("both master and replica fails", func(t *testing.T) {
+		ldapContainer, containerCtx := test.SpinUpCarbonioLdap(t, test.PublicImageAddress, test.LatestRelease)
+
+		defer func(ldapContainer test.LdapContainer, ctx context.Context) {
+			ldapContainer.Stop()
+		}(ldapContainer, containerCtx)
+
+		masterUrl := ldapContainer.URL()
 		handler := ldapContext{
 			Credentials: ldapCredentials{
-				MasterUrls:  []string{"ldap://example.com:123"},
-				ReplicaUrls: []string{"never use me"},
+				MasterUrls:  []string{masterUrl},
+				ReplicaUrls: []string{},
 				Username:    "username",
 				Password:    "password",
+				ConnTimeout: 1 * time.Second,
 			},
 			Connect: func(url string) (ldapConnInterface, error) {
-				if url == "ldap://example.com:123" {
+				if url == masterUrl {
 					return nil, errors.New("connection failed")
 				} else {
 					return nil, errors.New("replica connection failed")
@@ -329,6 +384,7 @@ func TestLDAPDownloadAndUploadCapabilities(t *testing.T) {
 				ReplicaUrls: []string{},
 				Username:    "uid=zimbra,cn=admins,cn=zimbra",
 				Password:    "password",
+				ConnTimeout: 1 * time.Second,
 			},
 			Connect: standardLdapConnection(),
 		}
@@ -367,6 +423,7 @@ func TestLDAPDownloadAndUploadCapabilities(t *testing.T) {
 				ReplicaUrls: []string{},
 				Username:    "uid=zimbra,cn=admins,cn=zimbra",
 				Password:    "password",
+				ConnTimeout: 1 * time.Second,
 			},
 			Connect: standardLdapConnection(),
 		}
