@@ -49,6 +49,7 @@ type ldapCredentials struct {
 	ReplicaUrls []string
 	Username    string
 	Password    string
+	ConnTimeout time.Duration
 }
 
 type ldapContext struct {
@@ -184,6 +185,7 @@ func readLdapCredentials(localConfig LocalConfig) ldapCredentials {
 		localConfig.Values(LocalConfigLdapURL),
 		localConfig.Value(LocalConfigLdapUserDn),
 		localConfig.Value(LocalConfigLdapPassword),
+		10 * time.Second,
 	}
 }
 
@@ -197,11 +199,10 @@ func (ctx *ldapContext) ConnectURL(rawurl string) (ldapConnInterface, error) {
 		return nil, err
 	}
 
-	hostPort := u.Host
 	useTLS := u.Scheme == "ldaps"
 
 	// Set timeout for connection
-	dialer := &net.Dialer{Timeout: 10 * time.Second}
+	dialer := &net.Dialer{Timeout: ctx.Credentials.ConnTimeout}
 
 	var conn net.Conn
 	var lastErr error
@@ -211,9 +212,9 @@ func (ctx *ldapContext) ConnectURL(rawurl string) (ldapConnInterface, error) {
 				InsecureSkipVerify: true,
 				ServerName:         strings.Split(u.Host, ":")[0],
 			}
-			conn, lastErr = tls.DialWithDialer(dialer, "tcp", hostPort, tlsConfig)
+			conn, lastErr = tls.DialWithDialer(dialer, "tcp", u.Host, tlsConfig)
 		} else {
-			conn, lastErr = dialer.Dial("tcp", hostPort)
+			conn, lastErr = dialer.Dial("tcp", u.Host)
 		}
 		if lastErr == nil {
 			break
