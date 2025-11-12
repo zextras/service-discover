@@ -12,7 +12,7 @@ require (
 	github.com/go-ldap/ldap/v3 v3.4.8
 	github.com/hashicorp/consul/api v1.28.2
 	github.com/pkg/errors v0.9.1
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.30.0
 	golang.org/x/term v0.20.0
 )
