@@ -7,6 +7,8 @@ library(
     ])
 )
 
+properties(defaultPipelineProperties())
+
 pipeline {
     agent {
         node {
@@ -36,7 +38,6 @@ pipeline {
                 checkout scm
                 script {
                     gitMetadata()
-                    properties(defaultPipelineProperties())
                 }
             }
         }
