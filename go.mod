@@ -2,7 +2,7 @@ module github.com/zextras/service-discover
 
 go 1.23.0
 
-toolchain go1.24.6
+toolchain go1.25.5
 
 require (
 	github.com/ProtonMail/go-crypto v1.0.0
