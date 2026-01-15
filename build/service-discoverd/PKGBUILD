@@ -14,8 +14,14 @@ depends=(
   "carbonio-core"
   "service-discover-base"
 )
-source=("service-discoverd-docker")
-sha256sums=('SKIP')
+source=(
+  "service-discoverd-docker"
+  "systemd-tmpfile.conf"
+)
+sha256sums=(
+  'SKIP'
+  'e2f6bdb437c040a32046999a7a4b14b10698765a03d59b92a61f9267a97a87a0'
+)
 
 build() {
   cd "$(dirname "$(find / -name "yap.json" -print -quit)")/.."
@@ -30,24 +36,14 @@ package() {
     "${pkgdir}/usr/bin/service-discoverd"
   install -Dm 755 service-discoverd-docker \
     "${pkgdir}/usr/bin/service-discoverd-docker"
+
+  # systemd tmpfiles.d
+  install -Dm644 systemd-tmpfile.conf \
+    "${pkgdir}/usr/lib/tmpfiles.d/${pkgname}.conf"
 }
 
-postinst__apt() {
-  adduser --system --group --home '/var/lib/service-discover/' 'service-discover'
-  mkdir -p '/etc/zextras/service-discover/'
-  mkdir -p '/var/lib/service-discover/'
-  chown 'service-discover:service-discover' '/var/lib/service-discover/'
-}
-
-postinst__yum() {
-  getent group 'service-discover' >/dev/null ||
-    groupadd -r 'service-discover'
-  getent passwd 'service-discover' >/dev/null ||
-    useradd -r -g 'service-discover' -d '/var/lib/service-discover/' -s /sbin/nologin 'service-discover'
-
-  mkdir -p '/etc/zextras/service-discover/'
-  mkdir -p '/var/lib/service-discover/'
-  chown 'service-discover:service-discover' '/var/lib/service-discover/'
+postinst() {
+  systemd-tmpfiles --create /usr/lib/tmpfiles.d/service-discover-daemon.conf >/dev/null 2>&1 || :
 }
 
 postrm__apt() {
