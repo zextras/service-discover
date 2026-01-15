@@ -40,7 +40,10 @@ func SpinUpCarbonioLdap(t *testing.T, address, version string) (LdapContainer, c
 	req := testcontainers.ContainerRequest{
 		Image:        fmt.Sprintf(address, version),
 		ExposedPorts: []string{"1389/tcp"},
-		WaitingFor:   wait.ForLog("modifying entry \"uid=zimbra,cn=admins,cn=zimbra\""),
+		WaitingFor: wait.ForAll(
+			wait.ForLog("modifying entry \"uid=zimbra,cn=admins,cn=zimbra\""),
+			wait.ForListeningPort("1389/tcp"),
+		),
 		HostConfigModifier: func(config *container.HostConfig) {
 			config.AutoRemove = true
 			config.Ulimits = ulimits
