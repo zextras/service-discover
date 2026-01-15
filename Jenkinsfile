@@ -122,7 +122,7 @@ pipeline {
             }
             steps {
                 uploadStage(
-                    packages: yapHelper.resolvePackageNames()
+                    packages: yapHelper.resolvePackageNames('build/yap.json')
                 )
             }
         }
