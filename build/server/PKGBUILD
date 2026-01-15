@@ -1,5 +1,5 @@
 pkgname="service-discover-server"
-pkgver="0.2.2"
+pkgver="0.2.3"
 pkgrel="1"
 pkgdesc="Service discover server cli"
 maintainer="Zextras <packages@zextras.com>"

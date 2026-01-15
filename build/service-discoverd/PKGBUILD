@@ -1,5 +1,5 @@
 pkgname="service-discover-daemon"
-pkgver="0.2.2"
+pkgver="0.2.3"
 pkgrel="1"
 pkgdesc="Service discover daemon"
 maintainer="Zextras <packages@zextras.com>"
