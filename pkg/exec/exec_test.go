@@ -16,6 +16,25 @@ import (
 	"github.com/zextras/service-discover/test"
 )
 
+func TestCommand(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Command returns a valid Cmd", func(t *testing.T) {
+		cmd := Command("echo", "hello")
+		assert.NotNil(t, cmd)
+		// Command path may vary by system, just check it contains the command
+		assert.Contains(t, cmd.String(), "echo")
+		assert.Contains(t, cmd.String(), "hello")
+	})
+
+	t.Run("Command can execute successfully", func(t *testing.T) {
+		cmd := Command("echo", "test")
+		output, err := cmd.Output()
+		assert.NoError(t, err)
+		assert.Contains(t, string(output), "test")
+	})
+}
+
 func TestExecInPath(t *testing.T) {
 	t.Parallel()
 
