@@ -198,7 +198,7 @@ func TestSetup_setup(t *testing.T) {
 		mockDep := new(mocks.BusinessDependencies)
 		mockDep.On("NetInterfaces").Return([]net.Interface{
 			selectedInterface,
-			net.Interface{
+			{
 				Name: "lo",
 			},
 		}, nil).
@@ -229,7 +229,7 @@ func TestSetup_setup(t *testing.T) {
 		mockDep := new(mocks.BusinessDependencies)
 		mockDep.On("NetInterfaces").Return([]net.Interface{
 			selectedInterface,
-			net.Interface{
+			{
 				Name: "lo",
 			},
 		}, nil).
@@ -280,7 +280,7 @@ func TestSetup_setup(t *testing.T) {
 		mockDep := new(mocks.BusinessDependencies)
 		mockDep.On("NetInterfaces").Return([]net.Interface{
 			selectedInterface,
-			net.Interface{
+			{
 				Name: "lo",
 			},
 		}, nil).
@@ -330,7 +330,7 @@ func TestSetup_setup(t *testing.T) {
 		mockDep := new(mocks.BusinessDependencies)
 		mockDep.On("NetInterfaces").Return([]net.Interface{
 			selectedInterface,
-			net.Interface{
+			{
 				Name: "lo",
 			},
 		}, nil).
@@ -486,7 +486,7 @@ func TestSetup_setup(t *testing.T) {
 			).Return(setTokenCmd).
 			On("NetInterfaces").Return([]net.Interface{
 			selectedInterface,
-			net.Interface{
+			{
 				Name: "lo",
 			},
 		}, nil).
@@ -661,7 +661,7 @@ func TestSetup_setup(t *testing.T) {
 			).Return(setTokenCmd).
 			On("NetInterfaces").Return([]net.Interface{
 			selectedInterface,
-			net.Interface{
+			{
 				Name: "lo",
 			},
 		}, nil).
