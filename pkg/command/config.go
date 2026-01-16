@@ -17,6 +17,8 @@ import (
 
 const ConsulMutableConfigFile = "/etc/zextras/service-discover/config.json"
 
+const configErrorFormat = "%w %s: %w"
+
 // Config error definitions.
 var (
 	ErrConfigReadFailed  = errors.New("unable to read config file")
@@ -72,7 +74,7 @@ func (o *getConfigOutput) JSONRender() (string, error) {
 func (v *GetConfig) Run(globalFlags *GlobalCommonFlags) error {
 	data, err := v.ReadFile(ConsulMutableConfigFile)
 	if err != nil {
-		return fmt.Errorf("%w %s: %w", ErrConfigReadFailed, ConsulMutableConfigFile, err)
+		return fmt.Errorf(configErrorFormat, ErrConfigReadFailed, ConsulMutableConfigFile, err)
 	}
 
 	config := MutableConsulConfig{}
@@ -115,7 +117,7 @@ type SetConfig struct {
 func (v *SetConfig) Run(_ *GlobalCommonFlags) error {
 	data, err := v.ReadFile(ConsulMutableConfigFile)
 	if err != nil {
-		return fmt.Errorf("%w %s: %w", ErrConfigReadFailed, ConsulMutableConfigFile, err)
+		return fmt.Errorf(configErrorFormat, ErrConfigReadFailed, ConsulMutableConfigFile, err)
 	}
 
 	config := MutableConsulConfig{}
@@ -139,7 +141,7 @@ func (v *SetConfig) Run(_ *GlobalCommonFlags) error {
 
 	err = v.WriteFile(ConsulMutableConfigFile, data, 0600)
 	if err != nil {
-		return fmt.Errorf("%w %s: %w", ErrConfigWriteFailed, ConsulMutableConfigFile, err)
+		return fmt.Errorf(configErrorFormat, ErrConfigWriteFailed, ConsulMutableConfigFile, err)
 	}
 
 	return nil
