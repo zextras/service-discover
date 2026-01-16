@@ -359,33 +359,76 @@ func (s *Setup) createTLSCertificate(deps businessDependencies, caFile, caKeyFil
 
 //nolint:misspell
 func (s *Setup) setup(deps businessDependencies) (formatter.Formatter, error) {
-	networks, err := command.NonLoopbackInterfaces(deps)
+	zimbraHostname, _, err := s.setupNetworkAndConfig(deps)
 	if err != nil {
 		return nil, err
+	}
+
+	extractedFiles, err := s.extractCredentialsFromArchive()
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.setupCertificates(deps, extractedFiles)
+	if err != nil {
+		return nil, err
+	}
+
+	err = command.CheckHostnameAddress(deps, zimbraHostname)
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.writeConsulConfig(deps, extractedFiles, zimbraHostname)
+	if err != nil {
+		return nil, err
+	}
+
+	isContainer, err := s.startServiceDiscover(deps)
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.setupACLTokens(deps, extractedFiles, zimbraHostname, isContainer)
+	if err != nil {
+		return nil, err
+	}
+
+	return &formatter.EmptyFormatter{}, nil
+}
+
+func (s *Setup) setupNetworkAndConfig(deps businessDependencies) (string, carbonio.LdapHandler, error) {
+	networks, err := command.NonLoopbackInterfaces(deps)
+	if err != nil {
+		return "", nil, err
 	}
 
 	err = command.CheckValidBindingAddress(deps, networks, s.BindAddress)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
 	zimbraLocalConfig, err := carbonio.LoadLocalConfig(s.LocalConfigPath)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
 	ldapHandler := deps.LdapHandler(zimbraLocalConfig)
 
 	zimbraHostname, err := command.RetrieveZimbraHostname(zimbraLocalConfig, ldapHandler)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
 	err = command.DownloadCredentialsFromLDAP(ldapHandler, s.ClusterCredential)
 	if err != nil {
-		return nil, errors.WithMessage(err, "unable to download credentials from LDAP")
+		return "", nil, errors.WithMessage(err, "unable to download credentials from LDAP")
 	}
 
+	return zimbraHostname, ldapHandler, nil
+}
+
+func (s *Setup) extractCredentialsFromArchive() (map[string][]byte, error) {
 	clusterCredentialFile, err := command.OpenClusterCredential(s.ClusterCredential)
 	if err != nil {
 		return nil, errors.Errorf("unable to open %s: %s", s.ClusterCredential, err)
@@ -399,6 +442,7 @@ func (s *Setup) setup(deps businessDependencies) (formatter.Formatter, error) {
 	if err != nil {
 		return nil, errors.WithMessagef(err, "unable to read %s", clusterCredentialFile.Name())
 	}
+
 	// We calculate the path relative to the root (i.e. without the "/" at the beginning) since this should not be
 	// included in standard tarballs
 	caPath, err := filepath.Rel("/", filepath.Join(s.ConsulHome, command.ConsulCA))
@@ -417,53 +461,63 @@ func (s *Setup) setup(deps businessDependencies) (formatter.Formatter, error) {
 		return nil, err
 	}
 
+	return extractedFiles, nil
+}
+
+func (s *Setup) setupCertificates(deps businessDependencies, extractedFiles map[string][]byte) error {
+	caPath, _ := filepath.Rel("/", filepath.Join(s.ConsulHome, command.ConsulCA))
+	caKeyPath, _ := filepath.Rel("/", filepath.Join(s.ConsulHome, command.ConsulCAKey))
+
 	caFile, err := os.Create(s.ConsulHome + "/" + command.ConsulCA)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = os.WriteFile(caFile.Name(), extractedFiles[caPath], os.FileMode(0600))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = permissions.SetStrictPermissions(deps, caFile.Name())
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	caKeyFile, err := os.CreateTemp("", config.ApplicationName+"*")
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	defer os.Remove(caKeyFile.Name())
 
 	err = os.WriteFile(caKeyFile.Name(), extractedFiles[caKeyPath], os.FileMode(0600))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = permissions.SetStrictPermissions(deps, caKeyFile.Name())
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = s.createTLSCertificate(deps, caFile, caKeyFile)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = os.Remove(caKeyFile.Name())
 	if err != nil {
-		return nil, errors.WithMessage(err, "cannot remove secret "+caKeyFile.Name()+" please remove it manually")
+		return errors.WithMessage(err, "cannot remove secret "+caKeyFile.Name()+" please remove it manually")
 	}
 
-	err = command.CheckHostnameAddress(deps, zimbraHostname)
-	if err != nil {
-		return nil, err
-	}
+	return nil
+}
 
+func (s *Setup) writeConsulConfig(
+	deps businessDependencies,
+	extractedFiles map[string][]byte,
+	zimbraHostname string,
+) error {
 	consulAgentConfig := &setupConfig{
 		ACLConfig: aclConfig{
 			Enabled:                true,
@@ -498,66 +552,79 @@ func (s *Setup) setup(deps businessDependencies) (formatter.Formatter, error) {
 		},
 	}
 
-	err = writeSetupConfig(consulAgentConfig, s.ConsulFileConfig)
+	err := writeSetupConfig(consulAgentConfig, s.ConsulFileConfig)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = permissions.SetStrictPermissions(deps, s.ConsulFileConfig)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = command.SaveBindAddressConfiguration(s.MutableConfigFile, s.BindAddress)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = permissions.SetStrictPermissions(deps, s.MutableConfigFile)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
+	return nil
+}
+
+func (s *Setup) startServiceDiscover(deps businessDependencies) (bool, error) {
 	isContainer := command.CheckDockerContainer()
 	if isContainer && !testingMode {
 		cmd := exec.Command("service-discoverd-docker", "agent")
 
-		err = cmd.Run()
+		err := cmd.Run()
 		if err != nil {
-			return nil, errors.WithMessage(err, "unable to start service-discoverd")
+			return isContainer, errors.WithMessage(err, "unable to start service-discoverd")
 		}
 	} else {
-		err = systemd.StartSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
+		err := systemd.StartSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
 		if err != nil {
-			return nil, errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
+			return isContainer, errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
 		}
 	}
 
+	return isContainer, nil
+}
+
+func (s *Setup) setupACLTokens(
+	deps businessDependencies,
+	extractedFiles map[string][]byte,
+	zimbraHostname string,
+	isContainer bool,
+) error {
 	aclBootstrapToken := command.ACLTokenCreation{}
 
-	err = json.Unmarshal(extractedFiles[command.ConsulACLBootstrap], &aclBootstrapToken)
+	err := json.Unmarshal(extractedFiles[command.ConsulACLBootstrap], &aclBootstrapToken)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "unable to decode ACL Bootstrap token")
+		return errors.WithMessagef(err, "unable to decode ACL Bootstrap token")
 	}
 
 	token, err := command.CreateACLToken(deps.CreateCommand, command.Agent, zimbraHostname, aclBootstrapToken.SecretID)
 	if err != nil {
-		return nil, errors.WithMessage(err, "unable to create ACL policy for this agent")
+		return errors.WithMessage(err, "unable to create ACL policy for this agent")
 	}
 
 	err = command.SetACLToken(deps.CreateCommand, token, aclBootstrapToken.SecretID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if !isContainer || testingMode {
 		err = systemd.EnableSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
 		if err != nil {
-			return nil, errors.Errorf("unable to enable %s unit: %s", serviceDiscoverUnit, err)
+			return errors.Errorf("unable to enable %s unit: %s", serviceDiscoverUnit, err)
 		}
 	}
 
-	return &formatter.EmptyFormatter{}, nil
+	return nil
 }
 
 func writeSetupConfig(consulAgentConfig *setupConfig, destination string) error {
