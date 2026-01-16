@@ -61,38 +61,89 @@ func (s *Setup) firstSetup(deps businessDependencies) (formatter.Formatter, erro
 //
 //nolint:misspell
 func (s *Setup) performSetup(deps businessDependencies, inputs *setupConfiguration) error {
-	zimbraLocalConfig, err := carbonio.LoadLocalConfig(s.LocalConfigPath)
+	zimbraHostname, ldapHandler, consulConfigFile, _, err := s.setupConfigAndKeys(deps)
 	if err != nil {
 		return err
+	}
+
+	err = s.writeConsulConfiguration(deps, consulConfigFile, inputs.BindAddress)
+	if err != nil {
+		return err
+	}
+
+	err = command.AddServiceInLDAP(ldapHandler, zimbraHostname)
+	if err != nil {
+		return err
+	}
+
+	isContainer, err := s.startConsulServer(deps)
+	if err != nil {
+		return err
+	}
+
+	aclBootstrapJSON, err := s.setupACLAndTokens(deps, zimbraHostname)
+	if err != nil {
+		return err
+	}
+
+	err = s.createAndUploadSecrets(ldapHandler, consulConfigFile, aclBootstrapJSON, inputs.Password)
+	if err != nil {
+		return err
+	}
+
+	if !isContainer {
+		err = systemd.EnableSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
+		if err != nil {
+			return errors.Errorf("unable to enable %s unit: %s", serviceDiscoverUnit, err)
+		}
+	}
+
+	return nil
+}
+
+func (s *Setup) setupConfigAndKeys(
+	deps businessDependencies,
+) (string, carbonio.LdapHandler, *setupConfig, string, error) {
+	zimbraLocalConfig, err := carbonio.LoadLocalConfig(s.LocalConfigPath)
+	if err != nil {
+		return "", nil, nil, "", err
 	}
 
 	ldapHandler := deps.LdapHandler(zimbraLocalConfig)
 
 	zimbraHostname, err := command.RetrieveZimbraHostname(zimbraLocalConfig, ldapHandler)
 	if err != nil {
-		return err
+		return "", nil, nil, "", err
 	}
 
 	err = command.CheckHostnameAddress(deps, zimbraHostname)
 	if err != nil {
-		return err
+		return "", nil, nil, "", err
 	}
 
 	err = s.generateCertificationAuthority(deps)
 	if err != nil {
-		return err
+		return "", nil, nil, "", err
 	}
 
 	gossipKey, err := generateGossipKey()
 	if err != nil {
-		return err
+		return "", nil, nil, "", err
 	}
 
 	consulConfigFile, err := s.generateCertificateAndConfig(deps, zimbraHostname, gossipKey)
 	if err != nil {
-		return err
+		return "", nil, nil, "", err
 	}
 
+	return zimbraHostname, ldapHandler, consulConfigFile, gossipKey, nil
+}
+
+func (s *Setup) writeConsulConfiguration(
+	deps businessDependencies,
+	consulConfigFile *setupConfig,
+	bindAddress string,
+) error {
 	consulFileBytes, err := json.MarshalIndent(consulConfigFile, "", "  ")
 	if err != nil {
 		return err
@@ -108,7 +159,7 @@ func (s *Setup) performSetup(deps businessDependencies, inputs *setupConfigurati
 		return err
 	}
 
-	err = command.SaveBindAddressConfiguration(s.MutableConfigFile, inputs.BindAddress)
+	err = command.SaveBindAddressConfiguration(s.MutableConfigFile, bindAddress)
 	if err != nil {
 		return err
 	}
@@ -118,37 +169,40 @@ func (s *Setup) performSetup(deps businessDependencies, inputs *setupConfigurati
 		return err
 	}
 
-	err = command.AddServiceInLDAP(ldapHandler, zimbraHostname)
-	if err != nil {
-		return err
-	}
+	return nil
+}
 
+func (s *Setup) startConsulServer(deps businessDependencies) (bool, error) {
 	isContainer := command.CheckDockerContainer()
 
 	if isContainer && !testingMode {
 		cmd := exec.CommandContext(context.Background(), "service-discoverd-docker", "server")
 
-		err = cmd.Run()
+		err := cmd.Run()
 		if err != nil {
-			return errors.WithMessage(err, "unable to start service-discoverd server")
+			return isContainer, errors.WithMessage(err, "unable to start service-discoverd server")
 		}
 	} else {
 		err := systemd.StartSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
 		if err != nil {
-			return errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
+			return isContainer, errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
 		}
 	}
 
+	return isContainer, nil
+}
+
+func (s *Setup) setupACLAndTokens(deps businessDependencies, zimbraHostname string) ([]byte, error) {
 	aclBootstrapJSON, err := s.createACLBootstrapToken(deps)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	aclBootstrapUnmarshal := &command.ACLTokenCreation{}
 
 	err = json.Unmarshal(aclBootstrapJSON, aclBootstrapUnmarshal)
 	if err != nil {
-		return errors.WithMessage(
+		return nil, errors.WithMessage(
 			err,
 			"unable to decode ACL bootstrap response from Consul",
 		)
@@ -161,14 +215,23 @@ func (s *Setup) performSetup(deps businessDependencies, inputs *setupConfigurati
 		aclBootstrapUnmarshal.SecretID,
 	)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = command.SetACLToken(deps.CreateCommand, serverToken, aclBootstrapUnmarshal.SecretID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	return aclBootstrapJSON, nil
+}
+
+func (s *Setup) createAndUploadSecrets(
+	ldapHandler carbonio.LdapHandler,
+	consulConfigFile *setupConfig,
+	aclBootstrapJSON []byte,
+	password string,
+) error {
 	aclFile, err := os.CreateTemp("", command.ConsulACLBootstrap)
 	if err != nil {
 		return err
@@ -200,7 +263,7 @@ func (s *Setup) performSetup(deps businessDependencies, inputs *setupConfigurati
 		s.ConsulHome + "/" + command.ConsulCAKey: s.ConsulHome + "/" + command.ConsulCAKey,
 	}
 
-	err = s.createEncryptedSecret(filesToCompress, inputs.Password)
+	err = s.createEncryptedSecret(filesToCompress, password)
 	if err != nil {
 		return err
 	}
@@ -213,13 +276,6 @@ func (s *Setup) performSetup(deps businessDependencies, inputs *setupConfigurati
 	err = command.UploadCredentialsToLDAP(ldapHandler, s.ClusterCredential)
 	if err != nil {
 		return errors.WithMessage(err, "unable to upload credentials file to LDAP")
-	}
-
-	if !isContainer {
-		err = systemd.EnableSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
-		if err != nil {
-			return errors.Errorf("unable to enable %s unit: %s", serviceDiscoverUnit, err)
-		}
 	}
 
 	return nil
