@@ -6,10 +6,12 @@ package carbonio
 
 import (
 	"encoding/base64"
+	"errors"
+	"fmt"
 	"io"
+	"slices"
 
-	"github.com/go-ldap/ldap"
-	"github.com/pkg/errors"
+	"github.com/go-ldap/ldap/v3"
 )
 
 const (
@@ -19,6 +21,15 @@ const (
 	AttrServiceEnabled         = "zimbraServiceEnabled"
 	AttrServiceHostname        = "zimbraServiceHostname"
 	AttrCarbonioCredentials    = "carbonioMeshCredentials" // #nosec
+)
+
+// LDAP error definitions.
+var (
+	ErrLdapUnexpectedResultCount = errors.New("unexpected ldap result count")
+	ErrLdapNoURLsDefined         = errors.New("no ldap URLs defined in localconfig")
+	ErrLdapConnectionNil         = errors.New("ldap connection returned nil")
+	ErrLdapConnectionFailed      = errors.New("failed to connect to ldap")
+	ErrLdapServerNotFound        = errors.New("server not found on LDAP")
 )
 
 type LdapHandler interface {
@@ -36,7 +47,7 @@ type ldapConnInterface interface {
 	Bind(username, password string) error
 	Modify(modifyRequest *ldap.ModifyRequest) error
 	Search(searchRequest *ldap.SearchRequest) (*ldap.SearchResult, error)
-	Close()
+	Close() error
 }
 
 type ldapCredentials struct {
@@ -98,7 +109,7 @@ func (l *ldapContext) DownloadBinary(baseDN, attribute string) ([]byte, error) {
 	}
 
 	if len(result.Entries) == 0 || len(result.Entries) > 1 {
-		return nil, errors.Errorf("expected 1 ldap result but instead got %d", len(result.Entries))
+		return nil, fmt.Errorf("%w: expected 1 but got %d", ErrLdapUnexpectedResultCount, len(result.Entries))
 	}
 
 	entry := result.Entries[0]
@@ -183,10 +194,6 @@ func readLdapCredentials(localConfig LocalConfig) ldapCredentials {
 }
 
 func connect(context *ldapContext, writeAccess bool) (ldapConnInterface, error) {
-	var connection ldapConnInterface
-
-	var err error
-
 	urls := context.Credentials.MasterUrls
 	if !writeAccess {
 		// we want to query masters before replicas
@@ -194,26 +201,43 @@ func connect(context *ldapContext, writeAccess bool) (ldapConnInterface, error) 
 		urls = append(urls, context.Credentials.ReplicaUrls...)
 	}
 
-	var lastErr error
+	if len(urls) == 0 {
+		return nil, ErrLdapNoURLsDefined
+	}
+
+	var (
+		connection ldapConnInterface
+		lastErr    error
+	)
 
 	for _, url := range urls {
-		connection, err = context.Connect(url)
-		if err == nil {
-			break
+		conn, err := context.Connect(url)
+		if err != nil {
+			lastErr = err
+
+			continue
+		}
+		// Defensive check: ensure connection is not nil even if err is nil
+		if conn == nil {
+			lastErr = fmt.Errorf("%w for %s", ErrLdapConnectionNil, url)
+
+			continue
 		}
 
-		lastErr = err
+		connection = conn
+
+		break
 	}
 
 	if connection == nil {
 		if lastErr == nil {
-			return nil, errors.New("no ldap defined in localconfig")
+			return nil, ErrLdapConnectionFailed
 		}
 
-		return nil, lastErr
+		return nil, fmt.Errorf("%w: %w", ErrLdapConnectionFailed, lastErr)
 	}
 
-	err = connection.Bind(context.Credentials.Username, context.Credentials.Password)
+	err := connection.Bind(context.Credentials.Username, context.Credentials.Password)
 	if err != nil {
 		connection.Close()
 
@@ -251,19 +275,11 @@ func modifyEnabledServices(context *ldapContext, server, service string, change 
 	}
 
 	if len(result.Entries) == 0 {
-		return errors.New("server '" + server + "' not found on LDAP")
+		return fmt.Errorf("%w: %s", ErrLdapServerNotFound, server)
 	}
 
 	// check if already exist, other modify will fail
-	attributeExist := false
-
-	for _, serviceEnabled := range result.Entries[0].GetAttributeValues(AttrServiceEnabled) {
-		if serviceEnabled == service {
-			attributeExist = true
-
-			break
-		}
-	}
+	attributeExist := slices.Contains(result.Entries[0].GetAttributeValues(AttrServiceEnabled), service)
 
 	if attributeExist && change == changeAdd {
 		return nil
