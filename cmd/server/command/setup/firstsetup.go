@@ -16,18 +16,16 @@ import (
 	"github.com/pkg/errors"
 	"github.com/zextras/service-discover/pkg/carbonio"
 	"github.com/zextras/service-discover/pkg/command"
+	sharedsetup "github.com/zextras/service-discover/pkg/command/setup"
 	"github.com/zextras/service-discover/pkg/encrypter"
 	exec2 "github.com/zextras/service-discover/pkg/exec"
 	"github.com/zextras/service-discover/pkg/formatter"
 	"github.com/zextras/service-discover/pkg/permissions"
-	"github.com/zextras/service-discover/pkg/systemd"
 )
-
-var testingMode bool
 
 // firstSetup specifically handles the command sent by the final user in a non-interactive way. This will print
 // as less as possible and it is intended to be used in with power users or from other programs.
-func (s *Setup) firstSetup(deps businessDependencies) (formatter.Formatter, error) {
+func (s *Setup) firstSetup(deps sharedsetup.BusinessDependencies) (formatter.Formatter, error) {
 	networks, err := command.NonLoopbackInterfaces(deps)
 	if err != nil {
 		return nil, err
@@ -59,7 +57,7 @@ func (s *Setup) firstSetup(deps businessDependencies) (formatter.Formatter, erro
 // archive
 //
 //nolint:misspell
-func (s *Setup) performSetup(deps businessDependencies, inputs *setupConfiguration) error {
+func (s *Setup) performSetup(deps sharedsetup.BusinessDependencies, inputs *setupConfiguration) error {
 	zimbraHostname, ldapHandler, consulConfigFile, _, err := s.setupConfigAndKeys(deps)
 	if err != nil {
 		return err
@@ -90,18 +88,11 @@ func (s *Setup) performSetup(deps businessDependencies, inputs *setupConfigurati
 		return err
 	}
 
-	if !isContainer {
-		err = systemd.EnableSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
-		if err != nil {
-			return errors.Errorf("unable to enable %s unit: %s", serviceDiscoverUnit, err)
-		}
-	}
-
-	return nil
+	return sharedsetup.EnableSystemdUnitIfNotContainer(deps, isContainer)
 }
 
 func (s *Setup) setupConfigAndKeys(
-	deps businessDependencies,
+	deps sharedsetup.BusinessDependencies,
 ) (string, carbonio.LdapHandler, *setupConfig, string, error) {
 	zimbraLocalConfig, err := carbonio.LoadLocalConfig(s.LocalConfigPath)
 	if err != nil {
@@ -139,7 +130,7 @@ func (s *Setup) setupConfigAndKeys(
 }
 
 func (s *Setup) writeConsulConfiguration(
-	deps businessDependencies,
+	deps sharedsetup.BusinessDependencies,
 	consulConfigFile *setupConfig,
 	bindAddress string,
 ) error {
@@ -148,19 +139,19 @@ func (s *Setup) writeConsulConfiguration(
 		return err
 	}
 
-	err = writeFileWithStrictPermissions(deps, s.ConsulFileConfig, consulFileBytes, os.FileMode(0600))
+	err = sharedsetup.WriteFileWithStrictPermissions(deps, s.ConsulFileConfig, consulFileBytes, os.FileMode(0600))
 	if err != nil {
 		return errors.Errorf("unable to save generated configuration file in %s: %s", s.ConsulHome, err)
 	}
 
-	return saveBindAddressWithPermissions(deps, s.MutableConfigFile, bindAddress)
+	return sharedsetup.SaveBindAddressWithPermissions(deps, s.MutableConfigFile, bindAddress)
 }
 
-func (s *Setup) startConsulServer(deps businessDependencies) (bool, error) {
-	return startServiceDiscoverMode(deps, "server")
+func (s *Setup) startConsulServer(deps sharedsetup.BusinessDependencies) (bool, error) {
+	return sharedsetup.StartServiceDiscoverMode(deps, "server")
 }
 
-func (s *Setup) setupACLAndTokens(deps businessDependencies, zimbraHostname string) ([]byte, error) {
+func (s *Setup) setupACLAndTokens(deps sharedsetup.BusinessDependencies, zimbraHostname string) ([]byte, error) {
 	aclBootstrapJSON, err := s.createACLBootstrapToken(deps)
 	if err != nil {
 		return nil, err
@@ -293,7 +284,7 @@ func (s *Setup) createEncryptedSecret(filesToCompress map[string]string, passwor
 	return encWriter.Flush()
 }
 
-func (s *Setup) createACLBootstrapToken(deps businessDependencies) ([]byte, error) {
+func (s *Setup) createACLBootstrapToken(deps sharedsetup.BusinessDependencies) ([]byte, error) {
 	type returnResult struct {
 		data []byte
 		err  error
@@ -342,7 +333,7 @@ func (s *Setup) createACLBootstrapToken(deps businessDependencies) ([]byte, erro
 	}
 }
 
-func (s *Setup) generateCertificationAuthority(deps businessDependencies) error {
+func (s *Setup) generateCertificationAuthority(deps sharedsetup.BusinessDependencies) error {
 	certificateDaysFlag := fmt.Sprintf("-days=%d", certificateExpiration)
 
 	err := exec2.InPath(

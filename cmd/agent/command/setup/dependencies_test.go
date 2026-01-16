@@ -9,12 +9,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	sharedsetup "github.com/zextras/service-discover/pkg/command/setup"
 )
 
 func TestRealDependencies_LookupIP(t *testing.T) {
 	t.Parallel()
 
-	deps := realDependencies{}
+	deps := sharedsetup.RealDependencies{}
 
 	t.Run("Should resolve localhost successfully", func(t *testing.T) {
 		ips, err := deps.LookupIP("localhost")

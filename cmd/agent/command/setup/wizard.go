@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/zextras/service-discover/pkg/command"
+	sharedsetup "github.com/zextras/service-discover/pkg/command/setup"
 	"github.com/zextras/service-discover/pkg/formatter"
 	"github.com/zextras/service-discover/pkg/term"
 )
@@ -36,8 +37,8 @@ func (s *Wizard) Run(commonFlags *command.GlobalCommonFlags) error {
 
 	defer userInterface.Close()
 
-	dependency := realDependencies{
-		ui: &userInterface,
+	dependency := sharedsetup.RealDependencies{
+		UI: &userInterface,
 	}
 
 	err = preRun(s.originalSetup.ClusterCredential, &dependency)

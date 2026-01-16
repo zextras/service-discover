@@ -5,34 +5,27 @@
 package setup
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"net"
 	"os"
-	"os/user"
 	"path/filepath"
 	"strings"
 
-	"github.com/coreos/go-systemd/v22/dbus"
 	"github.com/pkg/errors"
 	"github.com/zextras/service-discover/cmd/agent/config"
 	"github.com/zextras/service-discover/pkg/carbonio"
 	"github.com/zextras/service-discover/pkg/command"
+	sharedsetup "github.com/zextras/service-discover/pkg/command/setup"
 	"github.com/zextras/service-discover/pkg/encrypter"
 	"github.com/zextras/service-discover/pkg/exec"
 	"github.com/zextras/service-discover/pkg/formatter"
 	"github.com/zextras/service-discover/pkg/permissions"
-	"github.com/zextras/service-discover/pkg/systemd"
 	"github.com/zextras/service-discover/pkg/term"
 )
-
-var testingMode bool
 
 const (
 	rootUID               = 0
 	certificateExpiration = 365 * 30
-	serviceDiscoverUnit   = "service-discover.service"
 	defaultLogLevel       = "INFO"
 )
 
@@ -48,145 +41,23 @@ func New() Setup {
 	}
 }
 
-type interactiveDependencies interface {
-	Term() term.Terminal
-	NetInterfaces() ([]net.Interface, error)
-	AddrResolver(n net.Interface) ([]net.Addr, error)
-	LookupIP(s string) ([]net.IP, error)
-}
-
-type businessDependencies interface {
-	NetInterfaces() ([]net.Interface, error)
-	AddrResolver(n net.Interface) ([]net.Addr, error)
-	LookupIP(s string) ([]net.IP, error)
-	LdapHandler(ldapHandler carbonio.LocalConfig) carbonio.LdapHandler
-	LocalConfigLoader(path string) (carbonio.LocalConfig, error)
-	SystemdUnitHandler() (systemd.UnitManager, error)
-	CreateCommand(name string, args ...string) exec.Cmd
-	GetuidSyscall() int
-	LookupUser(name string) (*user.User, error)
-	LookupGroup(name string) (*user.Group, error)
-	Chown(path string, userUID int, groupUID int) error
-	Chmod(path string, mode os.FileMode) error
-}
-
-type realDependencies struct {
-	ui *term.Terminal
-}
-
-func (r realDependencies) Term() term.Terminal {
-	return *r.ui
-}
-
-func (r realDependencies) NetInterfaces() ([]net.Interface, error) {
-	return net.Interfaces()
-}
-
-func (r realDependencies) AddrResolver(n net.Interface) ([]net.Addr, error) {
-	return n.Addrs()
-}
-
-func (r realDependencies) LookupIP(s string) ([]net.IP, error) {
-	resolver := &net.Resolver{}
-
-	ipAddrs, err := resolver.LookupIPAddr(context.Background(), s)
-	if err != nil {
-		return nil, err
-	}
-
-	ips := make([]net.IP, len(ipAddrs))
-	for i, addr := range ipAddrs {
-		ips[i] = addr.IP
-	}
-
-	return ips, nil
-}
-
-func (r realDependencies) LdapHandler(localConfig carbonio.LocalConfig) carbonio.LdapHandler {
-	return carbonio.CreateNewHandler(localConfig)
-}
-
-func (r realDependencies) LocalConfigLoader(path string) (carbonio.LocalConfig, error) {
-	return carbonio.LoadLocalConfig(path)
-}
-
-func (r realDependencies) SystemdUnitHandler() (systemd.UnitManager, error) {
-	return dbus.NewWithContext(context.Background())
-}
-
-func (r realDependencies) CreateCommand(name string, args ...string) exec.Cmd {
-	return exec.Command(name, args...)
-}
-
-func (r realDependencies) GetuidSyscall() int {
-	return os.Getuid()
-}
-
-func (r realDependencies) LookupUser(name string) (*user.User, error) {
-	return user.Lookup(name)
-}
-
-func (r realDependencies) LookupGroup(name string) (*user.Group, error) {
-	return user.LookupGroup(name)
-}
-
-func (r realDependencies) Chown(path string, userUID, groupUID int) error {
-	return os.Chown(path, userUID, groupUID)
-}
-
-func (r realDependencies) Chmod(path string, mode os.FileMode) error {
-	return os.Chmod(path, mode)
-}
-
 type setupConfiguration struct {
 	Password    string
 	BindAddress string
 }
 
-type aclConfig struct {
-	Enabled                bool   `json:"enabled"`
-	DefaultPolicy          string `json:"default_policy"`
-	EnableTokenPersistence bool   `json:"enable_token_persistence"`
-	DownPolicy             string `json:"down_policy"`
-}
-
-type uiConfig struct {
-	Enabled bool `json:"enabled"`
-}
-
-type portsConfig struct {
-	Grpc    int `json:"grpc"`
-	GrpcTLS int `json:"grpc_tls"`
-}
-
-type tlsDefaults struct {
-	CaFile         string `json:"ca_file"`
-	CertFile       string `json:"cert_file"`
-	KeyFile        string `json:"key_file"`
-	VerifyIncoming bool   `json:"verify_incoming"`
-	VerifyOutgoing bool   `json:"verify_outgoing"`
-}
-
-type tlsInternalRPC struct {
-	VerifyServerHostname bool `json:"verify_server_hostname"`
-}
-
-type tlsConfig struct {
-	Defaults    tlsDefaults    `json:"defaults"`
-	InternalRPC tlsInternalRPC `json:"internal_rpc"`
-}
-
+// setupConfig is the agent-specific configuration structure.
 type setupConfig struct {
-	ACLConfig               aclConfig   `json:"acl"`
-	DataDir                 string      `json:"data_dir"`
-	EnableLocalScriptChecks bool        `json:"enable_local_script_checks"`
-	Encrypt                 string      `json:"encrypt"`
-	LogLevel                string      `json:"log_level"`
-	NodeName                string      `json:"node_name"`
-	Server                  bool        `json:"server"`
-	UIConfig                uiConfig    `json:"ui_config"`
-	Ports                   portsConfig `json:"ports"`
-	TLS                     tlsConfig   `json:"tls"`
+	ACLConfig               sharedsetup.ACLConfig   `json:"acl"`
+	DataDir                 string                  `json:"data_dir"`
+	EnableLocalScriptChecks bool                    `json:"enable_local_script_checks"`
+	Encrypt                 string                  `json:"encrypt"`
+	LogLevel                string                  `json:"log_level"`
+	NodeName                string                  `json:"node_name"`
+	Server                  bool                    `json:"server"`
+	UIConfig                sharedsetup.UIConfig    `json:"ui_config"`
+	Ports                   sharedsetup.PortsConfig `json:"ports"`
+	TLS                     sharedsetup.TLSConfig   `json:"tls"`
 }
 
 type Setup struct {
@@ -204,7 +75,7 @@ type Setup struct {
 	BindAddress string `arg:"" optional:"" help:"The binding address to bind service-discoverd daemon"`
 }
 
-func gatherInputs(deps interactiveDependencies) (*setupConfiguration, error) {
+func gatherInputs(deps sharedsetup.InteractiveDependencies) (*setupConfiguration, error) {
 	networks, err := deps.NetInterfaces()
 	if err != nil {
 		return nil, err
@@ -263,7 +134,7 @@ func gatherInputs(deps interactiveDependencies) (*setupConfiguration, error) {
 	}, nil
 }
 
-func preRun(_ string, deps businessDependencies) error {
+func preRun(_ string, deps sharedsetup.BusinessDependencies) error {
 	// We need to check that the executable is in $PATH
 	cmd := deps.CreateCommand(command.ConsulBin, "version")
 
@@ -284,17 +155,6 @@ func preRun(_ string, deps businessDependencies) error {
 	return nil
 }
 
-// saveBindAddressWithPermissions saves the bind address configuration and sets strict permissions.
-// This combines two operations that always appear together in the setup workflow.
-func saveBindAddressWithPermissions(deps businessDependencies, configPath, bindAddress string) error {
-	err := command.SaveBindAddressConfiguration(configPath, bindAddress)
-	if err != nil {
-		return err
-	}
-
-	return permissions.SetStrictPermissions(deps, configPath)
-}
-
 func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 	userInterface, err := term.New(os.Stdin, os.Stdout, term.DefaultTermPrompt)
 	if err != nil {
@@ -303,8 +163,8 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 
 	defer userInterface.Close()
 
-	deps := realDependencies{
-		ui: &userInterface,
+	deps := sharedsetup.RealDependencies{
+		UI: &userInterface,
 	}
 
 	err = preRun(s.ClusterCredential, &deps)
@@ -333,7 +193,7 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 	return nil
 }
 
-func (s *Setup) createTLSCertificate(deps businessDependencies, caFile, caKeyFile *os.File) error {
+func (s *Setup) createTLSCertificate(deps sharedsetup.BusinessDependencies, caFile, caKeyFile *os.File) error {
 	certificateDaysFlag := fmt.Sprintf("-days=%d", certificateExpiration)
 
 	err := exec.InPath(
@@ -369,7 +229,7 @@ func (s *Setup) createTLSCertificate(deps businessDependencies, caFile, caKeyFil
 }
 
 //nolint:misspell
-func (s *Setup) setup(deps businessDependencies) (formatter.Formatter, error) {
+func (s *Setup) setup(deps sharedsetup.BusinessDependencies) (formatter.Formatter, error) {
 	zimbraHostname, _, err := s.setupNetworkAndConfig(deps)
 	if err != nil {
 		return nil, err
@@ -408,7 +268,7 @@ func (s *Setup) setup(deps businessDependencies) (formatter.Formatter, error) {
 	return &formatter.EmptyFormatter{}, nil
 }
 
-func (s *Setup) setupNetworkAndConfig(deps businessDependencies) (string, carbonio.LdapHandler, error) {
+func (s *Setup) setupNetworkAndConfig(deps sharedsetup.BusinessDependencies) (string, carbonio.LdapHandler, error) {
 	networks, err := command.NonLoopbackInterfaces(deps)
 	if err != nil {
 		return "", nil, err
@@ -475,7 +335,7 @@ func (s *Setup) extractCredentialsFromArchive() (map[string][]byte, error) {
 	return extractedFiles, nil
 }
 
-func (s *Setup) setupCertificates(deps businessDependencies, extractedFiles map[string][]byte) error {
+func (s *Setup) setupCertificates(deps sharedsetup.BusinessDependencies, extractedFiles map[string][]byte) error {
 	caPath, _ := filepath.Rel("/", filepath.Join(s.ConsulHome, command.ConsulCA))
 	caKeyPath, _ := filepath.Rel("/", filepath.Join(s.ConsulHome, command.ConsulCAKey))
 
@@ -525,41 +385,29 @@ func (s *Setup) setupCertificates(deps businessDependencies, extractedFiles map[
 }
 
 func (s *Setup) writeConsulConfig(
-	deps businessDependencies,
+	deps sharedsetup.BusinessDependencies,
 	extractedFiles map[string][]byte,
 	zimbraHostname string,
 ) error {
 	consulAgentConfig := &setupConfig{
-		ACLConfig: aclConfig{
-			Enabled:                true,
-			DefaultPolicy:          "deny",
-			DownPolicy:             "extend-cache",
-			EnableTokenPersistence: true,
-		},
+		ACLConfig:               sharedsetup.DefaultACLConfig(),
 		DataDir:                 s.ConsulData,
 		EnableLocalScriptChecks: true,
 		Encrypt:                 string(extractedFiles[command.GossipKey]),
 		LogLevel:                defaultLogLevel,
 		NodeName:                command.ConsulNodeName(command.Agent, zimbraHostname),
 		Server:                  false,
-		UIConfig: uiConfig{
-			Enabled: true,
-		},
-		Ports: portsConfig{
-			Grpc:    8502,
-			GrpcTLS: 8503,
-		},
-		TLS: tlsConfig{
-			Defaults: tlsDefaults{
+		UIConfig:                sharedsetup.DefaultUIConfig(),
+		Ports:                   sharedsetup.DefaultPortsConfig(),
+		TLS: sharedsetup.TLSConfig{
+			Defaults: sharedsetup.TLSDefaults{
 				CaFile:         s.ConsulHome + "/" + command.ConsulCA,
 				CertFile:       s.ConsulHome + "/" + command.ConsulAgentCertificate,
 				KeyFile:        s.ConsulHome + "/" + command.ConsulAgentCertificateKey,
 				VerifyIncoming: true,
 				VerifyOutgoing: true,
 			},
-			InternalRPC: tlsInternalRPC{
-				VerifyServerHostname: true,
-			},
+			InternalRPC: sharedsetup.DefaultTLSInternalRPC(),
 		},
 	}
 
@@ -573,65 +421,25 @@ func (s *Setup) writeConsulConfig(
 		return err
 	}
 
-	return saveBindAddressWithPermissions(deps, s.MutableConfigFile, s.BindAddress)
+	return sharedsetup.SaveBindAddressWithPermissions(deps, s.MutableConfigFile, s.BindAddress)
 }
 
-func (s *Setup) startServiceDiscover(deps businessDependencies) (bool, error) {
-	return startServiceDiscoverMode(deps, "agent")
-}
-
-// startServiceDiscoverMode starts service-discover in the specified mode (agent or server).
-// It handles both container and systemd environments.
-func startServiceDiscoverMode(deps businessDependencies, mode string) (bool, error) {
-	isContainer := command.CheckDockerContainer()
-	if isContainer && !testingMode {
-		cmd := exec.Command("service-discoverd-docker", mode)
-
-		err := cmd.Run()
-		if err != nil {
-			return isContainer, errors.WithMessagef(err, "unable to start service-discoverd")
-		}
-	} else {
-		err := systemd.StartSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
-		if err != nil {
-			return isContainer, errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
-		}
-	}
-
-	return isContainer, nil
+func (s *Setup) startServiceDiscover(deps sharedsetup.BusinessDependencies) (bool, error) {
+	return sharedsetup.StartServiceDiscoverMode(deps, "agent")
 }
 
 func (s *Setup) setupACLTokens(
-	deps businessDependencies,
+	deps sharedsetup.BusinessDependencies,
 	extractedFiles map[string][]byte,
 	zimbraHostname string,
 	isContainer bool,
 ) error {
-	aclBootstrapToken := command.ACLTokenCreation{}
-
-	err := json.Unmarshal(extractedFiles[command.ConsulACLBootstrap], &aclBootstrapToken)
-	if err != nil {
-		return errors.WithMessagef(err, "unable to decode ACL Bootstrap token")
-	}
-
-	token, err := command.CreateACLToken(deps.CreateCommand, command.Agent, zimbraHostname, aclBootstrapToken.SecretID)
-	if err != nil {
-		return errors.WithMessage(err, "unable to create ACL policy for this agent")
-	}
-
-	err = command.SetACLToken(deps.CreateCommand, token, aclBootstrapToken.SecretID)
+	err := sharedsetup.ACLTokenFromExtractedFiles(deps, command.Agent, zimbraHostname, extractedFiles)
 	if err != nil {
 		return err
 	}
 
-	if !isContainer || testingMode {
-		err = systemd.EnableSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
-		if err != nil {
-			return errors.Errorf("unable to enable %s unit: %s", serviceDiscoverUnit, err)
-		}
-	}
-
-	return nil
+	return sharedsetup.EnableSystemdUnitIfNotContainer(deps, isContainer)
 }
 
 func writeSetupConfig(consulAgentConfig *setupConfig, destination string) error {

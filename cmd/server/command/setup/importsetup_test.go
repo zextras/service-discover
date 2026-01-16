@@ -24,7 +24,9 @@ import (
 	"github.com/zextras/service-discover/cmd/server/config"
 	"github.com/zextras/service-discover/pkg/carbonio"
 	"github.com/zextras/service-discover/pkg/command"
+	sharedsetup "github.com/zextras/service-discover/pkg/command/setup"
 	mocks2 "github.com/zextras/service-discover/pkg/command/setup/mocks"
+	"github.com/zextras/service-discover/pkg/command/setup/testhelpers"
 	"github.com/zextras/service-discover/pkg/encrypter"
 	"github.com/zextras/service-discover/test"
 )
@@ -220,7 +222,7 @@ func TestSetup_importSetup(t *testing.T) {
 	}
 
 	defaultClusterCredentialsPassword := "assext"
-	testingMode = true
+	sharedsetup.TestingMode = true
 
 	setup := func(t *testing.T, testName string, includeTar bool) (*setupOutput, func()) {
 		var clusterCredentialsContent []byte
@@ -622,7 +624,7 @@ func setupNetwork(businessDep *mocks2.BusinessDependencies, containerIp string) 
 		},
 	}, nil).
 		On("AddrResolver", mock.AnythingOfType("net.Interface")).Return([]net.Addr{
-		&addrStub{ip: "127.0.0.1"},
+		&testhelpers.AddrStub{IP: "127.0.0.1"},
 		// We don't need any particular data here, just return something it is not the
 		// bind address
 	}, nil)

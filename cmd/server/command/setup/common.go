@@ -5,13 +5,11 @@
 package setup
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
 	"net"
 	"os"
-	stdexec "os/exec"
 	"path/filepath"
 	"strings"
 
@@ -19,10 +17,10 @@ import (
 	"github.com/zextras/service-discover/cmd/server/config"
 	"github.com/zextras/service-discover/pkg/carbonio"
 	"github.com/zextras/service-discover/pkg/command"
+	sharedsetup "github.com/zextras/service-discover/pkg/command/setup"
 	"github.com/zextras/service-discover/pkg/exec"
 	"github.com/zextras/service-discover/pkg/formatter"
 	"github.com/zextras/service-discover/pkg/permissions"
-	"github.com/zextras/service-discover/pkg/systemd"
 	"github.com/zextras/service-discover/pkg/term"
 )
 
@@ -31,7 +29,6 @@ const (
 	consulBin             = "/usr/bin/consul"
 	certificateExpiration = 365 * 30
 	defaultLogLevel       = "INFO"
-	serviceDiscoverUnit   = "service-discover.service"
 )
 
 type setupConfiguration struct {
@@ -68,24 +65,9 @@ func NewSetup() Setup {
 	}
 }
 
+// Server-specific config types.
 type autoEncrypt struct {
 	AllowTLS bool `json:"allow_tls"`
-}
-
-type aclConfig struct {
-	Enabled                bool   `json:"enabled"`
-	DefaultPolicy          string `json:"default_policy"`
-	DownPolicy             string `json:"down_policy"`
-	EnableTokenPersistence bool   `json:"enable_token_persistence"`
-}
-
-type uiConfig struct {
-	Enabled bool `json:"enabled"`
-}
-
-type portsConfig struct {
-	Grpc    int `json:"grpc"`
-	GrpcTLS int `json:"grpc_tls"`
 }
 
 type connectConfig struct {
@@ -93,36 +75,20 @@ type connectConfig struct {
 	CaProvider string `json:"ca_provider"`
 }
 
-type tlsDefaults struct {
-	CaFile         string `json:"ca_file"`
-	CertFile       string `json:"cert_file"`
-	KeyFile        string `json:"key_file"`
-	VerifyIncoming bool   `json:"verify_incoming"`
-	VerifyOutgoing bool   `json:"verify_outgoing"`
-}
-
-type tlsInternalRPC struct {
-	VerifyServerHostname bool `json:"verify_server_hostname"`
-}
-
-type tlsConfig struct {
-	Defaults    tlsDefaults    `json:"defaults"`
-	InternalRPC tlsInternalRPC `json:"internal_rpc"`
-}
-
+// setupConfig is the server-specific configuration structure.
 type setupConfig struct {
-	ACLConfig               aclConfig     `json:"acl"`
-	AutoEncrypt             autoEncrypt   `json:"auto_encrypt"`
-	DataDir                 string        `json:"data_dir"`
-	EnableLocalScriptChecks bool          `json:"enable_local_script_checks"`
-	Encrypt                 string        `json:"encrypt"`
-	LogLevel                string        `json:"log_level"`
-	NodeName                string        `json:"node_name"`
-	Server                  bool          `json:"server"`
-	UIConfig                uiConfig      `json:"ui_config"`
-	Ports                   portsConfig   `json:"ports"`
-	Connect                 connectConfig `json:"connect"`
-	TLS                     tlsConfig     `json:"tls"`
+	ACLConfig               sharedsetup.ACLConfig   `json:"acl"`
+	AutoEncrypt             autoEncrypt             `json:"auto_encrypt"`
+	DataDir                 string                  `json:"data_dir"`
+	EnableLocalScriptChecks bool                    `json:"enable_local_script_checks"`
+	Encrypt                 string                  `json:"encrypt"`
+	LogLevel                string                  `json:"log_level"`
+	NodeName                string                  `json:"node_name"`
+	Server                  bool                    `json:"server"`
+	UIConfig                sharedsetup.UIConfig    `json:"ui_config"`
+	Ports                   sharedsetup.PortsConfig `json:"ports"`
+	Connect                 connectConfig           `json:"connect"`
+	TLS                     sharedsetup.TLSConfig   `json:"tls"`
 }
 
 // nonInteractiveOutput is only an internal struct to output the result to the final user in an appropriate way.
@@ -139,7 +105,7 @@ func (n *nonInteractiveOutput) JSONRender() (string, error) {
 	return formatter.DefaultJSONRender(n)
 }
 
-func gatherInputs(deps interactiveDependencies, firstInstance bool) (*setupConfiguration, error) {
+func gatherInputs(deps sharedsetup.InteractiveDependencies, firstInstance bool) (*setupConfiguration, error) {
 	bindAddress, err := wizardBindAddressSelection(deps)
 	if err != nil {
 		return nil, err
@@ -174,8 +140,8 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 
 	defer userInterface.Close()
 
-	dependency := realDependencies{
-		ui: &userInterface,
+	dependency := sharedsetup.RealDependencies{
+		UI: &userInterface,
 	}
 
 	err = preRun(dependency)
@@ -216,7 +182,7 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 	return nil
 }
 
-func (s *Setup) isFirstInstance(deps businessDependencies) (bool, error) {
+func (s *Setup) isFirstInstance(deps sharedsetup.BusinessDependencies) (bool, error) {
 	_, err := command.OpenClusterCredential(s.ClusterCredential)
 	if err != nil {
 		zimbraLocalConfig, err := carbonio.LoadLocalConfig(s.LocalConfigPath)
@@ -237,7 +203,7 @@ func (s *Setup) isFirstInstance(deps businessDependencies) (bool, error) {
 	return false, nil
 }
 
-func preRun(deps businessDependencies) error {
+func preRun(deps sharedsetup.BusinessDependencies) error {
 	// We need to check that the executable is in $PATH
 	cmd := deps.CreateCommand(consulBin, "version")
 
@@ -286,7 +252,7 @@ func generateGossipKey() (string, error) {
 	return base64.StdEncoding.EncodeToString(key), nil
 }
 
-func wizardBindAddressSelection(deps interactiveDependencies) (string, error) {
+func wizardBindAddressSelection(deps sharedsetup.InteractiveDependencies) (string, error) {
 	networks, err := command.NonLoopbackInterfaces(deps)
 	if err != nil {
 		return "", err
@@ -319,7 +285,7 @@ func wizardBindAddressSelection(deps interactiveDependencies) (string, error) {
 // generateCertificateAndConfig creates the TLS certificates for consul and
 // finally it generates the gossip key. This ensure secure communications
 // inside Consul.
-func (s *Setup) generateCertificateAndConfig(deps businessDependencies,
+func (s *Setup) generateCertificateAndConfig(deps sharedsetup.BusinessDependencies,
 	zimbraHostname string, gossipKey string) (*setupConfig, error) {
 	certificateDaysFlag := fmt.Sprintf("-days=%d", certificateExpiration)
 
@@ -347,12 +313,7 @@ func (s *Setup) generateCertificateAndConfig(deps businessDependencies,
 	}
 
 	consulConfigFile := &setupConfig{
-		ACLConfig: aclConfig{
-			Enabled:                true,
-			EnableTokenPersistence: true,
-			DefaultPolicy:          "deny",
-			DownPolicy:             "extend-cache",
-		},
+		ACLConfig:               sharedsetup.DefaultACLConfig(),
 		AutoEncrypt:             autoEncrypt{AllowTLS: true},
 		DataDir:                 s.ConsulData,
 		EnableLocalScriptChecks: true,
@@ -360,70 +321,22 @@ func (s *Setup) generateCertificateAndConfig(deps businessDependencies,
 		LogLevel:                defaultLogLevel,
 		NodeName:                command.ConsulNodeName(command.Server, zimbraHostname),
 		Server:                  true,
-		UIConfig:                uiConfig{Enabled: true},
-		Ports:                   portsConfig{Grpc: 8502, GrpcTLS: 8503},
+		UIConfig:                sharedsetup.DefaultUIConfig(),
+		Ports:                   sharedsetup.DefaultPortsConfig(),
 		Connect:                 connectConfig{Enabled: true},
-		TLS: tlsConfig{
-			Defaults: tlsDefaults{
+		TLS: sharedsetup.TLSConfig{
+			Defaults: sharedsetup.TLSDefaults{
 				CaFile:         s.ConsulHome + "/" + command.ConsulCA,
 				CertFile:       s.ConsulHome + "/" + command.ConsulServerCertificate,
 				KeyFile:        s.ConsulHome + "/" + command.ConsulServerCertificateKey,
 				VerifyIncoming: true,
 				VerifyOutgoing: true,
 			},
-			InternalRPC: tlsInternalRPC{
-				VerifyServerHostname: true,
-			},
+			InternalRPC: sharedsetup.DefaultTLSInternalRPC(),
 		},
 	}
 
 	return consulConfigFile, nil
-}
-
-// writeFileWithStrictPermissions writes content to a file and sets strict permissions (0600).
-// This helper reduces duplication across setup files where we repeatedly write files and
-// immediately set permissions.
-func writeFileWithStrictPermissions(deps businessDependencies, path string, data []byte, perm os.FileMode) error {
-	err := os.WriteFile(path, data, perm)
-	if err != nil {
-		return err
-	}
-
-	return permissions.SetStrictPermissions(deps, path)
-}
-
-// saveBindAddressWithPermissions saves the bind address configuration and sets strict permissions.
-// This combines two operations that always appear together in the setup workflows.
-func saveBindAddressWithPermissions(deps businessDependencies, configPath, bindAddress string) error {
-	err := command.SaveBindAddressConfiguration(configPath, bindAddress)
-	if err != nil {
-		return err
-	}
-
-	return permissions.SetStrictPermissions(deps, configPath)
-}
-
-// startServiceDiscoverMode starts service-discover in the specified mode (agent or server).
-// It handles both container and systemd environments, reducing duplication across setup files.
-func startServiceDiscoverMode(deps businessDependencies, mode string) (bool, error) {
-	isContainer := command.CheckDockerContainer()
-
-	if isContainer && !testingMode {
-		// #nosec G204 -- mode is always a hardcoded constant ("agent" or "server"), not user input
-		cmd := stdexec.CommandContext(context.Background(), "service-discoverd-docker", mode)
-
-		err := cmd.Run()
-		if err != nil {
-			return isContainer, errors.WithMessagef(err, "unable to start service-discoverd %s", mode)
-		}
-	} else {
-		err := systemd.StartSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
-		if err != nil {
-			return isContainer, errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
-		}
-	}
-
-	return isContainer, nil
 }
 
 // writePasswordFile writes the password to a file with restricted permissions (0400).

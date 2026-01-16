@@ -28,24 +28,14 @@ import (
 	"github.com/zextras/service-discover/pkg/carbonio"
 	mocks5 "github.com/zextras/service-discover/pkg/carbonio/mocks"
 	"github.com/zextras/service-discover/pkg/command"
+	sharedsetup "github.com/zextras/service-discover/pkg/command/setup"
 	"github.com/zextras/service-discover/pkg/command/setup/mocks"
+	"github.com/zextras/service-discover/pkg/command/setup/testhelpers"
 	"github.com/zextras/service-discover/pkg/encrypter"
 	mocks2 "github.com/zextras/service-discover/pkg/exec/mocks"
 	mocks4 "github.com/zextras/service-discover/pkg/systemd/mocks"
 	"github.com/zextras/service-discover/test"
 )
-
-type addrStub struct {
-	ip string
-}
-
-func (a *addrStub) Network() string {
-	return "tcp"
-}
-
-func (a *addrStub) String() string {
-	return a.ip
-}
 
 func TestSetup_preRun(t *testing.T) {
 	t.Parallel()
@@ -114,7 +104,7 @@ func TestSetup_preRun(t *testing.T) {
 }
 
 func TestSetup_setup(t *testing.T) {
-	testingMode = true
+	sharedsetup.TestingMode = true
 
 	type testDependencies struct {
 		FakeLocalConfig           *os.File
@@ -203,7 +193,7 @@ func TestSetup_setup(t *testing.T) {
 			},
 		}, nil).
 			On("AddrResolver", selectedInterface).Return([]net.Addr{
-			&addrStub{ip: "192.168.1.1"},
+			&testhelpers.AddrStub{IP: "192.168.1.1"},
 		}, nil)
 
 		s := &Setup{
@@ -234,7 +224,7 @@ func TestSetup_setup(t *testing.T) {
 			},
 		}, nil).
 			On("AddrResolver", selectedInterface).Return([]net.Addr{
-			&addrStub{ip: "192.168.1.1"},
+			&testhelpers.AddrStub{IP: "192.168.1.1"},
 		}, nil).On("LdapHandler", mock.Anything).Return(carbonio.CreateNewHandler(localConfig))
 
 		s := &Setup{
@@ -285,7 +275,7 @@ func TestSetup_setup(t *testing.T) {
 			},
 		}, nil).
 			On("AddrResolver", selectedInterface).Return([]net.Addr{
-			&addrStub{ip: "192.168.1.1"},
+			&testhelpers.AddrStub{IP: "192.168.1.1"},
 		}, nil).On("LdapHandler", mock.Anything).Return(carbonio.CreateNewHandler(localConfig))
 
 		s := &Setup{
@@ -335,7 +325,7 @@ func TestSetup_setup(t *testing.T) {
 			},
 		}, nil).
 			On("AddrResolver", selectedInterface).Return([]net.Addr{
-			&addrStub{ip: "192.168.1.1"},
+			&testhelpers.AddrStub{IP: "192.168.1.1"},
 		}, nil).On("LdapHandler", mock.Anything).Return(carbonio.CreateNewHandler(localConfig))
 
 		s := &Setup{
@@ -491,7 +481,7 @@ func TestSetup_setup(t *testing.T) {
 			},
 		}, nil).
 			On("AddrResolver", selectedInterface).Return([]net.Addr{
-			&addrStub{ip: "192.168.1.1"},
+			&testhelpers.AddrStub{IP: "192.168.1.1"},
 		}, nil)
 
 		unitManager := new(mocks4.UnitManager)
@@ -666,7 +656,7 @@ func TestSetup_setup(t *testing.T) {
 			},
 		}, nil).
 			On("AddrResolver", selectedInterface).Return([]net.Addr{
-			&addrStub{ip: "192.168.1.1"},
+			&testhelpers.AddrStub{IP: "192.168.1.1"},
 		}, nil)
 
 		unitManager := new(mocks4.UnitManager)

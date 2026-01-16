@@ -13,17 +13,17 @@ import (
 	"github.com/zextras/service-discover/cmd/server/config"
 	"github.com/zextras/service-discover/pkg/carbonio"
 	"github.com/zextras/service-discover/pkg/command"
+	sharedsetup "github.com/zextras/service-discover/pkg/command/setup"
 	"github.com/zextras/service-discover/pkg/encrypter"
 	"github.com/zextras/service-discover/pkg/formatter"
 	"github.com/zextras/service-discover/pkg/permissions"
-	"github.com/zextras/service-discover/pkg/systemd"
 )
 
 // importSetup refers to the run performed on a non-first cluster instance in a non-interactive way.
 // The output returned is always empty
 //
 //nolint:misspell
-func (s *Setup) importSetup(deps businessDependencies) (formatter.Formatter, error) {
+func (s *Setup) importSetup(deps sharedsetup.BusinessDependencies) (formatter.Formatter, error) {
 	zimbraHostname, ldapHandler, err := s.loadConfigAndValidate(deps)
 	if err != nil {
 		return nil, err
@@ -54,17 +54,15 @@ func (s *Setup) importSetup(deps businessDependencies) (formatter.Formatter, err
 		return nil, err
 	}
 
-	if !isContainer {
-		err = systemd.EnableSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
-		if err != nil {
-			return nil, errors.Errorf("unable to enable %s unit: %s", serviceDiscoverUnit, err)
-		}
+	err = sharedsetup.EnableSystemdUnitIfNotContainer(deps, isContainer)
+	if err != nil {
+		return nil, err
 	}
 
 	return &formatter.EmptyFormatter{}, nil
 }
 
-func (s *Setup) loadConfigAndValidate(deps businessDependencies) (string, carbonio.LdapHandler, error) {
+func (s *Setup) loadConfigAndValidate(deps sharedsetup.BusinessDependencies) (string, carbonio.LdapHandler, error) {
 	networks, err := command.NonLoopbackInterfaces(deps)
 	if err != nil {
 		return "", nil, err
@@ -96,7 +94,7 @@ func (s *Setup) loadConfigAndValidate(deps businessDependencies) (string, carbon
 }
 
 func (s *Setup) extractAndWriteCertificates(
-	deps businessDependencies,
+	deps sharedsetup.BusinessDependencies,
 	ldapHandler carbonio.LdapHandler,
 ) (map[string][]byte, error) {
 	err := command.DownloadCredentialsFromLDAP(ldapHandler, s.ClusterCredential)
@@ -168,7 +166,7 @@ func (s *Setup) extractAndWriteCertificates(
 }
 
 func (s *Setup) generateAndWriteConfig(
-	deps businessDependencies,
+	deps sharedsetup.BusinessDependencies,
 	zimbraHostname string,
 	extractedFiles map[string][]byte,
 ) error {
@@ -184,42 +182,25 @@ func (s *Setup) generateAndWriteConfig(
 		return err
 	}
 
-	err = writeFileWithStrictPermissions(deps, s.ConsulFileConfig, consulFileBytes, os.FileMode(0600))
+	err = sharedsetup.WriteFileWithStrictPermissions(deps, s.ConsulFileConfig, consulFileBytes, os.FileMode(0600))
 	if err != nil {
 		return errors.Errorf("unable to save generated configuration file in %s: %s", s.ConsulHome, err)
 	}
 
-	return saveBindAddressWithPermissions(deps, s.MutableConfigFile, s.BindAddress)
+	return sharedsetup.SaveBindAddressWithPermissions(deps, s.MutableConfigFile, s.BindAddress)
 }
 
 func (s *Setup) startServerAndSetupACL(
-	deps businessDependencies,
+	deps sharedsetup.BusinessDependencies,
 	zimbraHostname string,
 	extractedFiles map[string][]byte,
 ) (bool, error) {
-	isContainer, err := startServiceDiscoverMode(deps, "server")
+	isContainer, err := sharedsetup.StartServiceDiscoverMode(deps, "server")
 	if err != nil {
 		return isContainer, err
 	}
 
-	aclBootstrapToken := command.ACLTokenCreation{}
-
-	err = json.Unmarshal(extractedFiles[command.ConsulACLBootstrap], &aclBootstrapToken)
-	if err != nil {
-		return isContainer, errors.WithMessagef(err, "unable to decode ACL Bootstrap token")
-	}
-
-	token, err := command.CreateACLToken(
-		deps.CreateCommand,
-		command.Server,
-		zimbraHostname,
-		aclBootstrapToken.SecretID,
-	)
-	if err != nil {
-		return isContainer, errors.WithMessage(err, "unable to create ACL policy for this server")
-	}
-
-	err = command.SetACLToken(deps.CreateCommand, token, aclBootstrapToken.SecretID)
+	err = sharedsetup.ACLTokenFromExtractedFiles(deps, command.Server, zimbraHostname, extractedFiles)
 	if err != nil {
 		return isContainer, err
 	}

@@ -21,7 +21,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/zextras/service-discover/pkg/carbonio"
 	mocks5 "github.com/zextras/service-discover/pkg/carbonio/mocks"
+	sharedsetup "github.com/zextras/service-discover/pkg/command/setup"
 	mocks2 "github.com/zextras/service-discover/pkg/command/setup/mocks"
+	"github.com/zextras/service-discover/pkg/command/setup/testhelpers"
 	"github.com/zextras/service-discover/pkg/encrypter"
 	"github.com/zextras/service-discover/pkg/exec"
 	mocks4 "github.com/zextras/service-discover/pkg/exec/mocks"
@@ -29,18 +31,6 @@ import (
 	"github.com/zextras/service-discover/pkg/term/mocks"
 	"github.com/zextras/service-discover/test"
 )
-
-type addrStub struct {
-	ip string
-}
-
-func (a *addrStub) Network() string {
-	return "tcp"
-}
-
-func (a *addrStub) String() string {
-	return a.ip
-}
 
 func Test_addrsToSingleString(t *testing.T) {
 	t.Parallel()
@@ -61,7 +51,7 @@ func Test_addrsToSingleString(t *testing.T) {
 			name: "Single interface",
 			args: args{
 				addrs: &[]net.Addr{
-					&addrStub{ip: "127.0.0.1"},
+					&testhelpers.AddrStub{IP: "127.0.0.1"},
 				},
 				sep: separator,
 			},
@@ -71,8 +61,8 @@ func Test_addrsToSingleString(t *testing.T) {
 			name: "Multiple interfaces",
 			args: args{
 				addrs: &[]net.Addr{
-					&addrStub{ip: "127.0.0.1"},
-					&addrStub{ip: "10.0.0.1"},
+					&testhelpers.AddrStub{IP: "127.0.0.1"},
+					&testhelpers.AddrStub{IP: "10.0.0.1"},
 				},
 				sep: separator,
 			},
@@ -381,7 +371,7 @@ func mockBusinessDependencies(
 }
 
 func createSetup(t *testing.T) (Setup, func()) {
-	testingMode = true
+	sharedsetup.TestingMode = true
 	tmpDir := t.TempDir()
 	setup := Setup{
 		ConsulConfigDir:   tmpDir + "/config",
@@ -588,7 +578,7 @@ func mockNetwork(network mocked, withoutLocalHost bool, includeSubnet bool) {
 
 	network.On("AddrResolver", localhost).Return(
 		[]net.Addr{
-			&addrStub{ip: "127.0.0.1"},
+			&testhelpers.AddrStub{IP: "127.0.0.1"},
 		},
 		nil,
 	)
@@ -596,14 +586,14 @@ func mockNetwork(network mocked, withoutLocalHost bool, includeSubnet bool) {
 	if includeSubnet {
 		network.On("AddrResolver", card0).Return(
 			[]net.Addr{
-				&addrStub{ip: "10.0.0.1/8"},
+				&testhelpers.AddrStub{IP: "10.0.0.1/8"},
 			},
 			nil,
 		)
 	} else {
 		network.On("AddrResolver", card0).Return(
 			[]net.Addr{
-				&addrStub{ip: "10.0.0.1"},
+				&testhelpers.AddrStub{IP: "10.0.0.1"},
 			},
 			nil,
 		)
@@ -611,7 +601,7 @@ func mockNetwork(network mocked, withoutLocalHost bool, includeSubnet bool) {
 
 	network.On("AddrResolver", card1).Return(
 		[]net.Addr{
-			&addrStub{ip: "10.0.0.2"},
+			&testhelpers.AddrStub{IP: "10.0.0.2"},
 		},
 		nil,
 	)
