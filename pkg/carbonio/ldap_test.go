@@ -12,7 +12,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/go-ldap/ldap"
+	"github.com/go-ldap/ldap/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/zextras/service-discover/test"
@@ -35,8 +35,9 @@ func (mock *MockLdapConnection) Bind(username, password string) error {
 	return args.Error(0)
 }
 
-func (mock *MockLdapConnection) Close() {
+func (mock *MockLdapConnection) Close() error {
 	mock.Called()
+	return nil
 }
 
 func (mock *MockLdapConnection) Modify(modifyRequest *ldap.ModifyRequest) error {
@@ -102,7 +103,7 @@ func TestEnableDisableService(t *testing.T) {
 			"service",
 		)
 		assert.NotNil(t, err)
-		assert.Equal(t, "master connection failed", err.Error())
+		assert.Contains(t, err.Error(), "master connection failed")
 	})
 
 	t.Run("service added", func(t *testing.T) {
@@ -302,7 +303,7 @@ func TestQueryAllServiceDiscoverServers(t *testing.T) {
 		)
 		assert.Nil(t, got)
 		assert.NotNil(t, err)
-		assert.Equal(t, "replica connection failed", err.Error())
+		assert.Contains(t, err.Error(), "replica connection failed")
 	})
 }
 

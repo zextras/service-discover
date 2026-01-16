@@ -373,7 +373,7 @@ func TestSetup_importSetup(t *testing.T) {
 		assert.EqualError(
 			t,
 			err,
-			"unable to download credentials from LDAP: unable to download data from ldap: expected 1 ldap result but instead got 0",
+			"unable to download credentials from LDAP: unable to download data from ldap: unexpected ldap result count: expected 1 but got 0",
 		)
 	})
 
