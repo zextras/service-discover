@@ -22,13 +22,15 @@ const (
 )
 
 type BootstrapToken struct {
+	Command `kong:"-"`
+
 	termUIProvider                term.UIProvider
-	clusterCredentialFileLocation string `kong:"-"`
-	Command                       `kong:"-"`
+	clusterCredentialFileLocation string    `kong:"-"`
 	writer                        io.Writer `kong:"-"`
 	agentName                     string    `kong:"-"`
-	Setup                         bool      `optional:"" name:"setup" help:"Used in setup scripts, doesn't prompt anything and returns $SETUP_CONSUL_TOKEN if defined."`
-	Password                      string    `optional:"" name:"password" help:"feed bootstrap password"`
+	// Setup is used in setup scripts, doesn't prompt anything and returns $SETUP_CONSUL_TOKEN if defined.
+	Setup    bool   `optional:"" name:"setup" help:"Used in setup scripts, returns $SETUP_CONSUL_TOKEN if defined."`
+	Password string `optional:"" name:"password" help:"feed bootstrap password"`
 }
 
 type outputBootstrapToken struct {
@@ -86,11 +88,14 @@ func (v *BootstrapToken) ReadToken() (string, error) {
 
 		password, err = userInterface.ReadPassword(prompt)
 		if err != nil {
-			switch err.(type) {
-			case term.NotATerminalError:
-				password = term.MustRead(userInterface.ReadLine())
-			default:
-				return "", err
+			{
+				var errCase0 term.NotATerminalError
+				switch {
+				case errors.As(err, &errCase0):
+					password = term.MustRead(userInterface.ReadLine())
+				default:
+					return "", err
+				}
 			}
 		}
 	} else {
@@ -117,7 +122,9 @@ func (v *BootstrapToken) ReadToken() (string, error) {
 	}
 
 	aclBootstrapToken := ACLTokenCreation{}
-	if err := json.Unmarshal(extractedFiles[ConsulACLBootstrap], &aclBootstrapToken); err != nil {
+
+	err = json.Unmarshal(extractedFiles[ConsulACLBootstrap], &aclBootstrapToken)
+	if err != nil {
 		return "", errors.WithMessagef(err, "unable to decode ACL Bootstrap token")
 	}
 

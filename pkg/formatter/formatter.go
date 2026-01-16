@@ -58,11 +58,11 @@ func DefaultJSONRender(v any) (string, error) {
 // Render function will format the passed Formatter to the desired OutputFormat.
 func Render(formatter Formatter, outputType OutputFormat) (string, error) {
 	switch outputType {
-	case 0:
+	case PlainFormatOutput:
 		return formatter.PlainRender()
-	case 1:
+	case JSONFormatOutput:
 		return formatter.JSONRender()
-	default:
-		return "", errors.New("The passed formatting option is not valid")
 	}
+
+	return "", errors.New("the passed formatting option is not valid")
 }

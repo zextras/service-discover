@@ -103,7 +103,7 @@ func TestGetConfig(t *testing.T) {
 		}
 		err := cmd.Run(&flags)
 		assert.NotNil(t, err)
-		assert.Equal(t, "unknown configuration 'random-name'", err.Error())
+		assert.Equal(t, "unknown configuration: 'random-name'", err.Error())
 		assert.Equal(t, "", buffer.String())
 	})
 
@@ -122,7 +122,7 @@ func TestGetConfig(t *testing.T) {
 		}
 		err := cmd.Run(&flags)
 		assert.NotNil(t, err)
-		assert.Equal(t, "unable to read /etc/zextras/service-discover/config.json: fake error", err.Error())
+		assert.Equal(t, "unable to read config file /etc/zextras/service-discover/config.json: fake error", err.Error())
 	})
 }
 
@@ -177,7 +177,7 @@ func TestSetConfig(t *testing.T) {
 		}
 		err := cmd.Run(&flags)
 		assert.NotNil(t, err)
-		assert.Equal(t, "unknown configuration 'random-name'", err.Error())
+		assert.Equal(t, "unknown configuration: 'random-name'", err.Error())
 		assert.Equal(t, "", consoleOutput.String())
 	})
 
@@ -201,7 +201,7 @@ func TestSetConfig(t *testing.T) {
 		}
 		err := cmd.Run(&flags)
 		assert.NotNil(t, err)
-		assert.Equal(t, "unable to read /etc/zextras/service-discover/config.json: fake error", err.Error())
+		assert.Equal(t, "unable to read config file /etc/zextras/service-discover/config.json: fake error", err.Error())
 		assert.Equal(t, "", consoleOutput.String())
 	})
 
@@ -224,7 +224,7 @@ func TestSetConfig(t *testing.T) {
 		}
 		err := cmd.Run(&flags)
 		assert.NotNil(t, err)
-		assert.Equal(t, "unable to write /etc/zextras/service-discover/config.json: fake error", err.Error())
+		assert.Equal(t, "unable to write config file /etc/zextras/service-discover/config.json: fake error", err.Error())
 		assert.Equal(t, "", consoleOutput.String())
 	})
 }

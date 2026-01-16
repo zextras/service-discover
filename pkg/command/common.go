@@ -147,7 +147,8 @@ func NonLoopbackInterfaces(d NetworkInterfaces) ([]net.Interface, error) {
 
 // UploadCredentialsToLDAP uploads the credentials tarball file into LDAP.
 func UploadCredentialsToLDAP(ldapHandler carbonio.LdapHandler, credentials string) error {
-	if err := ldapHandler.CheckServerAvailability(true); err != nil {
+	err := ldapHandler.CheckServerAvailability(true)
+	if err != nil {
 		return errors.WithMessage(err, "unable to connect to ldap")
 	}
 
@@ -156,7 +157,8 @@ func UploadCredentialsToLDAP(ldapHandler carbonio.LdapHandler, credentials strin
 		return errors.WithMessage(err, "unable to read credentials file")
 	}
 
-	if err := ldapHandler.UploadBinary(file, carbonio.LdapConfigBaseDn, carbonio.AttrCarbonioCredentials); err != nil {
+	err = ldapHandler.UploadBinary(file, carbonio.LdapConfigBaseDn, carbonio.AttrCarbonioCredentials)
+	if err != nil {
 		return errors.WithMessage(err, "unable to upload data to ldap")
 	}
 
@@ -165,7 +167,8 @@ func UploadCredentialsToLDAP(ldapHandler carbonio.LdapHandler, credentials strin
 
 // DownloadCredentialsFromLDAP downloads the credentials from ldap and puts them into the given destination.
 func DownloadCredentialsFromLDAP(ldapHandler carbonio.LdapHandler, destination string) error {
-	if err := ldapHandler.CheckServerAvailability(false); err != nil {
+	err := ldapHandler.CheckServerAvailability(false)
+	if err != nil {
 		return errors.WithMessage(err, "unable to connect to ldap")
 	}
 
@@ -224,9 +227,11 @@ func CreateACLToken(
 	zimbraHostname string,
 	rootToken string,
 ) (string, error) {
-	if err := os.Setenv(ConsulHTTPToken, rootToken); err != nil {
+	err := os.Setenv(ConsulHTTPToken, rootToken)
+	if err != nil {
 		return "", errors.WithMessage(err, "unable to set correct env variable before starting ACL token creation")
 	}
+
 	defer os.Unsetenv(ConsulHTTPToken)
 
 	agentPolicyName := ConsulNodeName(prefix, zimbraHostname)
@@ -236,7 +241,9 @@ func CreateACLToken(
 	aclPolicyTemplate := template.Must(template.New("agent-config").Parse(ACLPolicyTemplateText))
 
 	aclPolicyRenderBuffer := bytes.Buffer{}
-	if err := aclPolicyTemplate.Execute(&aclPolicyRenderBuffer, templateRender); err != nil {
+
+	err = aclPolicyTemplate.Execute(&aclPolicyRenderBuffer, templateRender)
+	if err != nil {
 		return "", err
 	}
 
@@ -282,7 +289,8 @@ func CreateACLToken(
 			}
 		}
 
-		if err := json.Unmarshal(tokenCmdResp, &token); err != nil {
+		err = json.Unmarshal(tokenCmdResp, &token)
+		if err != nil {
 			return "", errors.WithMessage(err, "unable to decode response from consul agent")
 		}
 
@@ -293,7 +301,8 @@ func CreateACLToken(
 }
 
 func SetACLToken(commandCreator func(name string, args ...string) exec.Cmd, token, rootToken string) error {
-	if err := os.Setenv(ConsulHTTPToken, rootToken); err != nil {
+	err := os.Setenv(ConsulHTTPToken, rootToken)
+	if err != nil {
 		return errors.WithMessage(err, "unable to set correct env variable before starting ACL token creation")
 	}
 	defer os.Unsetenv(ConsulHTTPToken)
@@ -304,7 +313,9 @@ func SetACLToken(commandCreator func(name string, args ...string) exec.Cmd, toke
 		"default",
 		token,
 	)
-	if _, err := setupACLCmd.Output(); err != nil {
+
+	_, err = setupACLCmd.Output()
+	if err != nil {
 		return exec.ErrorFromStderr(err, "unable to set agent token")
 	}
 

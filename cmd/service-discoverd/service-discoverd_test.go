@@ -334,10 +334,10 @@ func Test_runAddGrpcTLS(t *testing.T) {
 
 		inputData, err := os.ReadFile("test_without_tls.json")
 		assert.Nil(t, err)
-		var jsonData map[string]interface{}
+		var jsonData map[string]any
 		err = json.Unmarshal(inputData, &jsonData)
 		assert.Nil(t, err)
-		ports, ok := jsonData["ports"].(map[string]interface{})
+		ports, ok := jsonData["ports"].(map[string]any)
 		assert.Equal(t, true, ok)
 		var x float64 = 8503
 		assert.Equal(t, x, ports["grpc_tls"])

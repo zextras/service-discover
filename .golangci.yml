@@ -4,6 +4,7 @@ run:
 linters:
   default: all
   disable:
+    - cyclop
     - depguard
     - exhaustruct
     - forbidigo
@@ -11,8 +12,12 @@ linters:
     - funlen
     - gochecknoglobals
     - gochecknoinits
+    - gocognit
+    - gocyclo
     - godox
+    - interfacebloat
     - ireturn
+    - maintidx
     - misspell
     - mnd
     - tagalign

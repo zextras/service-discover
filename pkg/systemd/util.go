@@ -38,7 +38,8 @@ func EnableSystemdUnit(systemdHandler func() (UnitManager, error), unitName stri
 	}
 	defer dBusConn.Close()
 
-	if _, _, err = dBusConn.EnableUnitFiles([]string{unitName}, false, false); err != nil {
+	_, _, err = dBusConn.EnableUnitFiles([]string{unitName}, false, false)
+	if err != nil {
 		return err
 	}
 

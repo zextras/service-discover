@@ -60,6 +60,8 @@ func GenerateLocalConfig(
 	ldapUserDN string,
 	ldapPassword string,
 ) []byte {
+	t.Helper()
+
 	res := bytes.Buffer{}
 	ldapData := &localConfigFields{
 		Hostname:      hostname,

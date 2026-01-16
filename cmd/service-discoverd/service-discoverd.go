@@ -11,9 +11,10 @@ import (
 	"github.com/zextras/service-discover/pkg/carbonio"
 )
 
+const consulBinPath = "/usr/bin/consul"
+
+// ExitCodeWrongArgs and following exit codes start from 1000 to avoid conflicts with consul exit codes.
 const (
-	consulBinPath = "/usr/bin/consul"
-	// Starting from 1000 to avoid conflicts with consul exit codes.
 	ExitCodeWrongArgs  = 1001
 	ExitCodeUserStuff  = 1002
 	ExitCodeLocalCfg   = 1003
@@ -337,7 +338,7 @@ func addGrpcTLS(inputFile string) *ErrorWithExitCode {
 	}
 
 	// Parse the JSON data
-	var jsonData map[string]interface{}
+	var jsonData map[string]any
 
 	err = json.Unmarshal(inputData, &jsonData)
 	if err != nil {
@@ -348,7 +349,7 @@ func addGrpcTLS(inputFile string) *ErrorWithExitCode {
 	}
 
 	// Check if the 'ports' field exists and is a map
-	ports, ok := jsonData["ports"].(map[string]interface{})
+	ports, ok := jsonData["ports"].(map[string]any)
 	if !ok {
 		return &ErrorWithExitCode{
 			Log:      "Invalid JSON structure: 'ports' field is missing or not an object",
@@ -359,6 +360,7 @@ func addGrpcTLS(inputFile string) *ErrorWithExitCode {
 	// Check if 'grpc_tls' port does not exist and add it
 	if _, exists := ports["grpc_tls"]; !exists {
 		ports["grpc_tls"] = 8503
+
 		modifiedData, err := json.MarshalIndent(jsonData, "", "  ")
 		if err != nil {
 			return &ErrorWithExitCode{
@@ -369,7 +371,8 @@ func addGrpcTLS(inputFile string) *ErrorWithExitCode {
 
 		// Write the modified JSON data to the output file
 		outputFile := inputFile
-		err = os.WriteFile(outputFile, modifiedData, 0644)
+
+		err = os.WriteFile(outputFile, modifiedData, 0600)
 		if err != nil {
 			return &ErrorWithExitCode{
 				Log:      "Failed to write output file:" + err.Error(),

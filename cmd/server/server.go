@@ -21,7 +21,7 @@ type CLI struct {
 	internalCommand.ServerFlags
 
 	Setup          setup.Setup            `cmd:"" help:"Perform first time setup of the server installation"`
-	WizardSetup    setup.Wizard           `cmd:"" help:"Perform first time setup of the server installation in an interactive way" name:"setup-wizard"`
+	WizardSetup    setup.Wizard           `cmd:"" help:"Run interactive first time setup" name:"setup-wizard"`
 	Config         command.Config         `cmd:"" help:"Manage service-discover configuration"`
 	BootstrapToken command.BootstrapToken `cmd:"" help:"Print the bootstrap-token" name:"bootstrap-token"`
 

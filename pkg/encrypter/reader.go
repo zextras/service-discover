@@ -8,6 +8,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"io"
+	"strings"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
@@ -46,7 +47,9 @@ func NewReader(reader io.Reader, passphrase []byte) (*tar.Reader, error) {
 // still have to call tarReader.Next() in order to iterate over all the tarball files.
 func ReadFile(tarReader *tar.Reader) ([]byte, error) {
 	contentBuffer := &bytes.Buffer{}
-	if _, err := io.Copy(contentBuffer, tarReader); err != nil {
+
+	_, err := io.Copy(contentBuffer, tarReader)
+	if err != nil {
 		return nil, err
 	}
 
@@ -76,28 +79,31 @@ func ReadFiles(tarReader *tar.Reader, files ...string) (map[string][]byte, error
 		}
 
 		for index, fileName := range files {
-			if header.Name == fileName {
-				content, err := ReadFile(tarReader)
-				if err != nil {
-					return nil, err
-				}
-
-				result[fileName] = content
-				remainingFiles[index] = remainingFiles[len(remainingFiles)-1]
-				remainingFiles = remainingFiles[:len(remainingFiles)-1]
-
-				break
+			if header.Name != fileName {
+				continue
 			}
+
+			content, err := ReadFile(tarReader)
+			if err != nil {
+				return nil, err
+			}
+
+			result[fileName] = content
+			remainingFiles[index] = remainingFiles[len(remainingFiles)-1]
+			remainingFiles = remainingFiles[:len(remainingFiles)-1]
+
+			break
 		}
 	}
 
 	if len(result) != len(files) {
-		missingFiles := ""
+		var missingFilesSb strings.Builder
+
 		for _, f := range remainingFiles {
-			missingFiles += " " + f
+			missingFilesSb.WriteString(" " + f)
 		}
 
-		return nil, errors.Errorf("not all files where found in the archive:%s", missingFiles)
+		return nil, errors.Errorf("not all files where found in the archive:%s", missingFilesSb.String())
 	}
 
 	return result, nil

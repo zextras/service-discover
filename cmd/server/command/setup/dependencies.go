@@ -65,7 +65,19 @@ func (r realDependencies) AddrResolver(n net.Interface) ([]net.Addr, error) {
 }
 
 func (r realDependencies) LookupIP(s string) ([]net.IP, error) {
-	return net.LookupIP(s)
+	resolver := &net.Resolver{}
+
+	ipAddrs, err := resolver.LookupIPAddr(context.Background(), s)
+	if err != nil {
+		return nil, err
+	}
+
+	ips := make([]net.IP, len(ipAddrs))
+	for i, addr := range ipAddrs {
+		ips[i] = addr.IP
+	}
+
+	return ips, nil
 }
 
 func (r realDependencies) LdapHandler(config carbonio.LocalConfig) carbonio.LdapHandler {

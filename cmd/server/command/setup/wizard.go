@@ -13,7 +13,15 @@ import (
 	"github.com/zextras/service-discover/pkg/term"
 )
 
-// NewWizardSetup is just a wrapper over the original setup, that performs interactive UI experience.
+// Wizard is a wrap of the standard setup procedure that includes interactive setup.
+type Wizard struct {
+	originalSetup *Setup `kong:"-"`
+	Password      string `help:"Custom password for encrypted secret files. If unset, one is generated"`
+	BindAddress   string `arg:"" optional:"" help:"The binding address to bind service-discoverd daemon"`
+	FirstInstance bool   `optional:"" default:"false" help:"Force the setup to behave as first server setup"`
+}
+
+// NewWizardSetup is a wrapper over the original setup that performs interactive UI experience.
 func NewWizardSetup(setup *Setup) Wizard {
 	return Wizard{
 		originalSetup: setup,
@@ -23,14 +31,6 @@ func NewWizardSetup(setup *Setup) Wizard {
 	}
 }
 
-// Wizard si a wrap of the standard setup procedure that includes interactive setup.
-type Wizard struct {
-	originalSetup *Setup `kong:"-"`
-	Password      string `help:"Set a custom password for the encrypted secret files. If none is set, a random one will be generated and printed"`
-	BindAddress   string `arg:"" optional:"" help:"The binding address to bind service-discoverd daemon"`
-	FirstInstance bool   `optional:"" default:"false" help:"Force the setup to behave as this was the first server setup"`
-}
-
 func (s *Wizard) Run(commonFlags *command.GlobalCommonFlags) error {
 	userInterface, err := term.New(os.Stdin, os.Stdout, term.DefaultTermPrompt)
 	if err != nil {
@@ -38,6 +38,7 @@ func (s *Wizard) Run(commonFlags *command.GlobalCommonFlags) error {
 	}
 
 	defer userInterface.Close()
+
 	deps := realDependencies{
 		ui: &userInterface,
 	}

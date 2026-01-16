@@ -37,18 +37,6 @@ type setupConfiguration struct {
 	BindAddress   string
 }
 
-func NewSetup() Setup {
-	return Setup{
-		ConsulConfigDir:   config.ConsulHome,
-		ConsulHome:        config.ConsulHome,
-		LocalConfigPath:   config.LocalConfigPath,
-		ConsulData:        config.ConsulData,
-		ConsulFileConfig:  config.ConsultFileConfig,
-		ClusterCredential: config.ClusterCredential,
-		MutableConfigFile: command.ConsulMutableConfigFile,
-	}
-}
-
 // Setup command allows the final user to perform first time or add a server to an already existing cluster.
 type Setup struct {
 	ConsulConfigDir   string `kong:"-"`
@@ -59,9 +47,22 @@ type Setup struct {
 	ClusterCredential string `kong:"-"`
 	MutableConfigFile string `kong:"-"`
 
-	Password      string `help:"Set a custom password for the encrypted secret files. If none is set, a random one will be generated and printed"`
+	Password      string `help:"Custom password for encrypted secret files. If unset, one is generated"`
 	BindAddress   string `arg:"" optional:"" help:"The binding address to bind service-discoverd daemon"`
-	FirstInstance bool   `optional:"" default:"false" help:"Force the setup to behave as this was the first server setup"`
+	FirstInstance bool   `optional:"" default:"false" help:"Force the setup to behave as first server setup"`
+}
+
+// NewSetup creates a new Setup with default configuration values.
+func NewSetup() Setup {
+	return Setup{
+		ConsulConfigDir:   config.ConsulHome,
+		ConsulHome:        config.ConsulHome,
+		LocalConfigPath:   config.LocalConfigPath,
+		ConsulData:        config.ConsulData,
+		ConsulFileConfig:  config.ConsultFileConfig,
+		ClusterCredential: config.ClusterCredential,
+		MutableConfigFile: command.ConsulMutableConfigFile,
+	}
 }
 
 type autoEncrypt struct {
@@ -108,7 +109,7 @@ type tlsConfig struct {
 
 type setupConfig struct {
 	ACLConfig               aclConfig     `json:"acl"`
-	AutoEncrypt             autoEncrypt   `json:"auto_encrypt,omitempty"`
+	AutoEncrypt             autoEncrypt   `json:"auto_encrypt"`
 	DataDir                 string        `json:"data_dir"`
 	EnableLocalScriptChecks bool          `json:"enable_local_script_checks"`
 	Encrypt                 string        `json:"encrypt"`
@@ -169,6 +170,7 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 	}
 
 	defer userInterface.Close()
+
 	dependency := realDependencies{
 		ui: &userInterface,
 	}
@@ -220,8 +222,8 @@ func (s *Setup) isFirstInstance(deps businessDependencies) (bool, error) {
 		}
 
 		ldapHandler := deps.LdapHandler(zimbraLocalConfig)
-		servers, err := ldapHandler.QueryAllServersWithService(carbonio.ServiceDiscoverServiceName)
 
+		servers, err := ldapHandler.QueryAllServersWithService(carbonio.ServiceDiscoverServiceName)
 		if err != nil {
 			return false, err
 		}
@@ -235,8 +237,8 @@ func (s *Setup) isFirstInstance(deps businessDependencies) (bool, error) {
 func preRun(deps businessDependencies) error {
 	// We need to check that the executable is in $PATH
 	cmd := deps.CreateCommand(consulBin, "version")
-	err := cmd.Run()
 
+	err := cmd.Run()
 	if err != nil {
 		return errors.Errorf("unable to execute consul binary: %s", err)
 	}
@@ -268,8 +270,8 @@ func addrsToSingleString(addrs *[]net.Addr, sep string) string {
 // generateGossipKey is directly taken from the way Consul generates it.
 func generateGossipKey() (string, error) {
 	key := make([]byte, 32)
-	num, err := rand.Reader.Read(key)
 
+	num, err := rand.Reader.Read(key)
 	if err != nil {
 		return "", errors.Errorf("error reading random data: %s", err)
 	}
@@ -317,6 +319,7 @@ func wizardBindAddressSelection(deps interactiveDependencies) (string, error) {
 func (s *Setup) generateCertificateAndConfig(deps businessDependencies,
 	zimbraHostname string, gossipKey string) (*setupConfig, error) {
 	certificateDaysFlag := fmt.Sprintf("-days=%d", certificateExpiration)
+
 	err := exec.InPath(
 		deps.CreateCommand(consulBin,
 			"tls",
@@ -326,7 +329,6 @@ func (s *Setup) generateCertificateAndConfig(deps businessDependencies,
 			"-server"),
 		s.ConsulHome,
 	)
-
 	if err != nil {
 		return nil, errors.New("unable to create a valid certificate with Consul")
 	}

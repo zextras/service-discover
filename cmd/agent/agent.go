@@ -21,7 +21,7 @@ type CLI struct {
 	internalCommand.AgentFlags
 
 	Setup          setup.Setup            `cmd:"" help:"Run first time setup for an agent node"`
-	SetupWizard    setup.Wizard           `cmd:"" help:"Run first time setup for an agent node in an interactive way" name:"setup-wizard"`
+	SetupWizard    setup.Wizard           `cmd:"" help:"Run interactive first time setup" name:"setup-wizard"`
 	Config         command.Config         `cmd:"" help:"Manage service-discover configuration"`
 	BootstrapToken command.BootstrapToken `cmd:"" help:"Print the bootstrap-token" name:"bootstrap-token"`
 

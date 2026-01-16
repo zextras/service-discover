@@ -117,9 +117,9 @@ type UIProvider interface {
 	Get(writer io.Writer) (Terminal, error)
 }
 
-type TermUIProvider struct {
+type UIProviderImpl struct {
 }
 
-func (c *TermUIProvider) Get(writer io.Writer) (Terminal, error) {
+func (c *UIProviderImpl) Get(writer io.Writer) (Terminal, error) {
 	return New(os.Stdin, writer, DefaultTermPrompt)
 }

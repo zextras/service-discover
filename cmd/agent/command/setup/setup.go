@@ -87,7 +87,19 @@ func (r realDependencies) AddrResolver(n net.Interface) ([]net.Addr, error) {
 }
 
 func (r realDependencies) LookupIP(s string) ([]net.IP, error) {
-	return net.LookupIP(s)
+	resolver := &net.Resolver{}
+
+	ipAddrs, err := resolver.LookupIPAddr(context.Background(), s)
+	if err != nil {
+		return nil, err
+	}
+
+	ips := make([]net.IP, len(ipAddrs))
+	for i, addr := range ipAddrs {
+		ips[i] = addr.IP
+	}
+
+	return ips, nil
 }
 
 func (r realDependencies) LdapHandler(localConfig carbonio.LocalConfig) carbonio.LdapHandler {
@@ -186,9 +198,9 @@ type Setup struct {
 	ClusterCredential string `kong:"-"`
 	MutableConfigFile string `kong:"-"`
 
-	Wizard bool `help:"Initialize the setup in interactive mode. All the non interactive flags will be ignored if this is set"`
+	Wizard bool `help:"Initialize in interactive mode. Non-interactive flags will be ignored"`
 
-	Password    string `help:"Set a custom password for the encrypted secret files. If none is set, a random one will be generated and printed"`
+	Password    string `help:"Custom password for encrypted secret files. If unset, one is generated"`
 	BindAddress string `arg:"" optional:"" help:"The binding address to bind service-discoverd daemon"`
 }
 
@@ -226,19 +238,22 @@ func gatherInputs(deps interactiveDependencies) (*setupConfiguration, error) {
 
 	term.MustWrite(fmt.Fprint(deps.Term(), "Specify the binding address for service discovery: "))
 	bindingAddress := term.MustRead(deps.Term().ReadLine())
-	err = command.CheckValidBindingAddress(deps, networks, bindingAddress)
 
+	err = command.CheckValidBindingAddress(deps, networks, bindingAddress)
 	if err != nil {
 		return nil, err
 	}
 
 	pass, err := deps.Term().ReadPassword("Insert the cluster credential password: ")
 	if err != nil {
-		switch err.(type) {
-		case term.NotATerminalError:
-			pass = term.MustRead(deps.Term().ReadLine())
-		default:
-			return nil, err
+		{
+			var errCase0 term.NotATerminalError
+			switch {
+			case errors.As(err, &errCase0):
+				pass = term.MustRead(deps.Term().ReadLine())
+			default:
+				return nil, err
+			}
 		}
 	}
 
@@ -248,11 +263,11 @@ func gatherInputs(deps interactiveDependencies) (*setupConfiguration, error) {
 	}, nil
 }
 
-func preRun(clusterCredentialPath string, deps businessDependencies) error {
+func preRun(_ string, deps businessDependencies) error {
 	// We need to check that the executable is in $PATH
 	cmd := deps.CreateCommand(command.ConsulBin, "version")
-	err := cmd.Run()
 
+	err := cmd.Run()
 	if err != nil {
 		return errors.Errorf("unable to execute consul binary: %s", err)
 	}
@@ -276,6 +291,7 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 	}
 
 	defer userInterface.Close()
+
 	deps := realDependencies{
 		ui: &userInterface,
 	}
@@ -308,6 +324,7 @@ func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 
 func (s *Setup) createTLSCertificate(deps businessDependencies, caFile, caKeyFile *os.File) error {
 	certificateDaysFlag := fmt.Sprintf("-days=%d", certificateExpiration)
+
 	err := exec.InPath(
 		// FIXME idea: what if we try to pass the caFile by pipe instead of passing a file?
 		// we save I/O and speed up the whole stuff 🤙
@@ -323,7 +340,6 @@ func (s *Setup) createTLSCertificate(deps businessDependencies, caFile, caKeyFil
 			"-client"),
 		s.ConsulHome,
 	)
-
 	if err != nil {
 		return exec.ErrorFromStderr(err, "unable to generate correct CA certificate")
 	}
@@ -348,7 +364,8 @@ func (s *Setup) setup(deps businessDependencies) (formatter.Formatter, error) {
 		return nil, err
 	}
 
-	if err := command.CheckValidBindingAddress(deps, networks, s.BindAddress); err != nil {
+	err = command.CheckValidBindingAddress(deps, networks, s.BindAddress)
+	if err != nil {
 		return nil, err
 	}
 
@@ -364,7 +381,8 @@ func (s *Setup) setup(deps businessDependencies) (formatter.Formatter, error) {
 		return nil, err
 	}
 
-	if err := command.DownloadCredentialsFromLDAP(ldapHandler, s.ClusterCredential); err != nil {
+	err = command.DownloadCredentialsFromLDAP(ldapHandler, s.ClusterCredential)
+	if err != nil {
 		return nil, errors.WithMessage(err, "unable to download credentials from LDAP")
 	}
 
@@ -404,7 +422,8 @@ func (s *Setup) setup(deps businessDependencies) (formatter.Formatter, error) {
 		return nil, err
 	}
 
-	if err := os.WriteFile(caFile.Name(), extractedFiles[caPath], os.FileMode(0600)); err != nil {
+	err = os.WriteFile(caFile.Name(), extractedFiles[caPath], os.FileMode(0600))
+	if err != nil {
 		return nil, err
 	}
 
@@ -420,7 +439,8 @@ func (s *Setup) setup(deps businessDependencies) (formatter.Formatter, error) {
 
 	defer os.Remove(caKeyFile.Name())
 
-	if err := os.WriteFile(caKeyFile.Name(), extractedFiles[caKeyPath], os.FileMode(0600)); err != nil {
+	err = os.WriteFile(caKeyFile.Name(), extractedFiles[caKeyPath], os.FileMode(0600))
+	if err != nil {
 		return nil, err
 	}
 
@@ -429,11 +449,13 @@ func (s *Setup) setup(deps businessDependencies) (formatter.Formatter, error) {
 		return nil, err
 	}
 
-	if err := s.createTLSCertificate(deps, caFile, caKeyFile); err != nil {
+	err = s.createTLSCertificate(deps, caFile, caKeyFile)
+	if err != nil {
 		return nil, err
 	}
 
-	if err := os.Remove(caKeyFile.Name()); err != nil {
+	err = os.Remove(caKeyFile.Name())
+	if err != nil {
 		return nil, errors.WithMessage(err, "cannot remove secret "+caKeyFile.Name()+" please remove it manually")
 	}
 
@@ -476,7 +498,8 @@ func (s *Setup) setup(deps businessDependencies) (formatter.Formatter, error) {
 		},
 	}
 
-	if err := writeSetupConfig(consulAgentConfig, s.ConsulFileConfig); err != nil {
+	err = writeSetupConfig(consulAgentConfig, s.ConsulFileConfig)
+	if err != nil {
 		return nil, err
 	}
 
@@ -485,7 +508,8 @@ func (s *Setup) setup(deps businessDependencies) (formatter.Formatter, error) {
 		return nil, err
 	}
 
-	if err := command.SaveBindAddressConfiguration(s.MutableConfigFile, s.BindAddress); err != nil {
+	err = command.SaveBindAddressConfiguration(s.MutableConfigFile, s.BindAddress)
+	if err != nil {
 		return nil, err
 	}
 
@@ -503,13 +527,16 @@ func (s *Setup) setup(deps businessDependencies) (formatter.Formatter, error) {
 			return nil, errors.WithMessage(err, "unable to start service-discoverd")
 		}
 	} else {
-		if err := systemd.StartSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit); err != nil {
+		err = systemd.StartSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
+		if err != nil {
 			return nil, errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
 		}
 	}
 
 	aclBootstrapToken := command.ACLTokenCreation{}
-	if err := json.Unmarshal(extractedFiles[command.ConsulACLBootstrap], &aclBootstrapToken); err != nil {
+
+	err = json.Unmarshal(extractedFiles[command.ConsulACLBootstrap], &aclBootstrapToken)
+	if err != nil {
 		return nil, errors.WithMessagef(err, "unable to decode ACL Bootstrap token")
 	}
 
@@ -539,9 +566,10 @@ func writeSetupConfig(consulAgentConfig *setupConfig, destination string) error 
 		return err
 	}
 
-	if err := os.WriteFile(destination, consulAgentBs, os.FileMode(0600)); err != nil {
+	err = os.WriteFile(destination, consulAgentBs, os.FileMode(0600))
+	if err != nil {
 		return errors.WithMessagef(err, "unable to save generated configuration file in %s", destination)
 	}
 
-	return err
+	return nil
 }

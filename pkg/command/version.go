@@ -16,7 +16,8 @@ import (
 // be found in Confluence at the following page:
 // https://zextras.atlassian.net/wiki/spaces/PROP/pages/1250230396/CLI+Guideline, code CLI-7
 type Version struct {
-	Command   `kong:"-"`
+	Command `kong:"-"`
+
 	writer    io.Writer `kong:"-"`
 	agentName string    `kong:"-"`
 }
