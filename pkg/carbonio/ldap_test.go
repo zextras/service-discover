@@ -77,6 +77,118 @@ func Test_connect(t *testing.T) {
 		assert.Same(t, mockLdapConnection, got)
 		mockLdapConnection.AssertCalled(t, "Bind", "username", "password")
 	})
+
+	t.Run("empty URLs returns error", func(t *testing.T) {
+		got, err := connect(
+			&ldapContext{
+				Credentials: ldapCredentials{
+					MasterUrls:  []string{},
+					ReplicaUrls: []string{},
+					Username:    "username",
+					Password:    "password",
+				},
+				Connect: func(url string) (ldapConnInterface, error) {
+					return nil, errors.New("should not be called")
+				},
+			},
+			true,
+		)
+		assert.Nil(t, got)
+		assert.ErrorIs(t, err, ErrLdapNoURLsDefined)
+	})
+
+	t.Run("nil connection with no error returns ErrLdapConnectionNil", func(t *testing.T) {
+		got, err := connect(
+			&ldapContext{
+				Credentials: ldapCredentials{
+					MasterUrls:  []string{"ldap://example.com:123"},
+					ReplicaUrls: []string{},
+					Username:    "username",
+					Password:    "password",
+				},
+				Connect: func(url string) (ldapConnInterface, error) {
+					// Simulate the bug: return nil, nil
+					return nil, nil
+				},
+			},
+			true,
+		)
+		assert.Nil(t, got)
+		assert.ErrorIs(t, err, ErrLdapConnectionNil)
+		assert.ErrorIs(t, err, ErrLdapConnectionFailed)
+		assert.Contains(t, err.Error(), "ldap://example.com:123")
+	})
+
+	t.Run("all connections fail returns wrapped error", func(t *testing.T) {
+		got, err := connect(
+			&ldapContext{
+				Credentials: ldapCredentials{
+					MasterUrls:  []string{"ldap://master1:389", "ldap://master2:389"},
+					ReplicaUrls: []string{},
+					Username:    "username",
+					Password:    "password",
+				},
+				Connect: func(url string) (ldapConnInterface, error) {
+					return nil, errors.New("connection refused")
+				},
+			},
+			true,
+		)
+		assert.Nil(t, got)
+		assert.ErrorIs(t, err, ErrLdapConnectionFailed)
+		assert.Contains(t, err.Error(), "connection refused")
+	})
+
+	t.Run("bind failure closes connection", func(t *testing.T) {
+		mockLdapConnection := new(MockLdapConnection)
+		mockLdapConnection.On("Bind", "username", "password").Return(errors.New("invalid credentials"))
+		mockLdapConnection.On("Close").Return()
+
+		got, err := connect(
+			&ldapContext{
+				Credentials: ldapCredentials{
+					MasterUrls:  []string{"ldap://example.com:123"},
+					ReplicaUrls: []string{},
+					Username:    "username",
+					Password:    "password",
+				},
+				Connect: func(url string) (ldapConnInterface, error) {
+					return mockLdapConnection, nil
+				},
+			},
+			true,
+		)
+		assert.Nil(t, got)
+		assert.NotNil(t, err)
+		assert.Contains(t, err.Error(), "invalid credentials")
+		mockLdapConnection.AssertCalled(t, "Close")
+	})
+
+	t.Run("fallback to replica on master failure", func(t *testing.T) {
+		mockLdapConnection := new(MockLdapConnection)
+		mockLdapConnection.On("Bind", "username", "password").Return(nil)
+
+		got, err := connect(
+			&ldapContext{
+				Credentials: ldapCredentials{
+					MasterUrls:  []string{"ldap://master:389"},
+					ReplicaUrls: []string{"ldap://replica:389"},
+					Username:    "username",
+					Password:    "password",
+				},
+				Connect: func(url string) (ldapConnInterface, error) {
+					if url == "ldap://master:389" {
+						return nil, errors.New("master down")
+					}
+					return mockLdapConnection, nil
+				},
+			},
+			false, // writeAccess=false allows replicas
+		)
+		assert.Nil(t, err)
+		assert.Same(t, mockLdapConnection, got)
+		mockLdapConnection.AssertCalled(t, "Bind", "username", "password")
+	})
 }
 
 func TestEnableDisableService(t *testing.T) {
