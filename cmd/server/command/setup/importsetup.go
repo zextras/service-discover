@@ -5,10 +5,8 @@
 package setup
 
 import (
-	"context"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/pkg/errors"
@@ -51,7 +49,7 @@ func (s *Setup) importSetup(deps businessDependencies) (formatter.Formatter, err
 		return nil, err
 	}
 
-	err = os.WriteFile(s.ConsulHome+"/password", []byte(s.Password), 0400)
+	err = writePasswordFile(s.ConsulHome, s.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -186,27 +184,12 @@ func (s *Setup) generateAndWriteConfig(
 		return err
 	}
 
-	err = os.WriteFile(s.ConsulFileConfig, consulFileBytes, os.FileMode(0600))
+	err = writeFileWithStrictPermissions(deps, s.ConsulFileConfig, consulFileBytes, os.FileMode(0600))
 	if err != nil {
 		return errors.Errorf("unable to save generated configuration file in %s: %s", s.ConsulHome, err)
 	}
 
-	err = permissions.SetStrictPermissions(deps, s.ConsulFileConfig)
-	if err != nil {
-		return err
-	}
-
-	err = command.SaveBindAddressConfiguration(s.MutableConfigFile, s.BindAddress)
-	if err != nil {
-		return err
-	}
-
-	err = permissions.SetStrictPermissions(deps, s.MutableConfigFile)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return saveBindAddressWithPermissions(deps, s.MutableConfigFile, s.BindAddress)
 }
 
 func (s *Setup) startServerAndSetupACL(
@@ -214,25 +197,14 @@ func (s *Setup) startServerAndSetupACL(
 	zimbraHostname string,
 	extractedFiles map[string][]byte,
 ) (bool, error) {
-	isContainer := command.CheckDockerContainer()
-
-	if isContainer && !testingMode {
-		cmd := exec.CommandContext(context.Background(), "service-discoverd-docker", "server")
-
-		err := cmd.Run()
-		if err != nil {
-			return isContainer, errors.WithMessage(err, "unable to start service-discoverd server")
-		}
-	} else {
-		err := systemd.StartSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
-		if err != nil {
-			return isContainer, errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
-		}
+	isContainer, err := startServiceDiscoverMode(deps, "server")
+	if err != nil {
+		return isContainer, err
 	}
 
 	aclBootstrapToken := command.ACLTokenCreation{}
 
-	err := json.Unmarshal(extractedFiles[command.ConsulACLBootstrap], &aclBootstrapToken)
+	err = json.Unmarshal(extractedFiles[command.ConsulACLBootstrap], &aclBootstrapToken)
 	if err != nil {
 		return isContainer, errors.WithMessagef(err, "unable to decode ACL Bootstrap token")
 	}

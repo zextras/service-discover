@@ -284,6 +284,17 @@ func preRun(_ string, deps businessDependencies) error {
 	return nil
 }
 
+// saveBindAddressWithPermissions saves the bind address configuration and sets strict permissions.
+// This combines two operations that always appear together in the setup workflow.
+func saveBindAddressWithPermissions(deps businessDependencies, configPath, bindAddress string) error {
+	err := command.SaveBindAddressConfiguration(configPath, bindAddress)
+	if err != nil {
+		return err
+	}
+
+	return permissions.SetStrictPermissions(deps, configPath)
+}
+
 func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
 	userInterface, err := term.New(os.Stdin, os.Stdout, term.DefaultTermPrompt)
 	if err != nil {
@@ -562,27 +573,23 @@ func (s *Setup) writeConsulConfig(
 		return err
 	}
 
-	err = command.SaveBindAddressConfiguration(s.MutableConfigFile, s.BindAddress)
-	if err != nil {
-		return err
-	}
-
-	err = permissions.SetStrictPermissions(deps, s.MutableConfigFile)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return saveBindAddressWithPermissions(deps, s.MutableConfigFile, s.BindAddress)
 }
 
 func (s *Setup) startServiceDiscover(deps businessDependencies) (bool, error) {
+	return startServiceDiscoverMode(deps, "agent")
+}
+
+// startServiceDiscoverMode starts service-discover in the specified mode (agent or server).
+// It handles both container and systemd environments.
+func startServiceDiscoverMode(deps businessDependencies, mode string) (bool, error) {
 	isContainer := command.CheckDockerContainer()
 	if isContainer && !testingMode {
-		cmd := exec.Command("service-discoverd-docker", "agent")
+		cmd := exec.Command("service-discoverd-docker", mode)
 
 		err := cmd.Run()
 		if err != nil {
-			return isContainer, errors.WithMessage(err, "unable to start service-discoverd")
+			return isContainer, errors.WithMessagef(err, "unable to start service-discoverd")
 		}
 	} else {
 		err := systemd.StartSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)

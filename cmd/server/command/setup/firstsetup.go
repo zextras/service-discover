@@ -6,7 +6,6 @@ package setup
 
 import (
 	"bufio"
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -149,47 +148,16 @@ func (s *Setup) writeConsulConfiguration(
 		return err
 	}
 
-	err = os.WriteFile(s.ConsulFileConfig, consulFileBytes, os.FileMode(0600))
+	err = writeFileWithStrictPermissions(deps, s.ConsulFileConfig, consulFileBytes, os.FileMode(0600))
 	if err != nil {
 		return errors.Errorf("unable to save generated configuration file in %s: %s", s.ConsulHome, err)
 	}
 
-	err = permissions.SetStrictPermissions(deps, s.ConsulFileConfig)
-	if err != nil {
-		return err
-	}
-
-	err = command.SaveBindAddressConfiguration(s.MutableConfigFile, bindAddress)
-	if err != nil {
-		return err
-	}
-
-	err = permissions.SetStrictPermissions(deps, s.MutableConfigFile)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return saveBindAddressWithPermissions(deps, s.MutableConfigFile, bindAddress)
 }
 
 func (s *Setup) startConsulServer(deps businessDependencies) (bool, error) {
-	isContainer := command.CheckDockerContainer()
-
-	if isContainer && !testingMode {
-		cmd := exec.CommandContext(context.Background(), "service-discoverd-docker", "server")
-
-		err := cmd.Run()
-		if err != nil {
-			return isContainer, errors.WithMessage(err, "unable to start service-discoverd server")
-		}
-	} else {
-		err := systemd.StartSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
-		if err != nil {
-			return isContainer, errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
-		}
-	}
-
-	return isContainer, nil
+	return startServiceDiscoverMode(deps, "server")
 }
 
 func (s *Setup) setupACLAndTokens(deps businessDependencies, zimbraHostname string) ([]byte, error) {
@@ -268,7 +236,7 @@ func (s *Setup) createAndUploadSecrets(
 		return err
 	}
 
-	err = os.WriteFile(s.ConsulHome+"/password", []byte(s.Password), 0400)
+	err = writePasswordFile(s.ConsulHome, s.Password)
 	if err != nil {
 		return err
 	}

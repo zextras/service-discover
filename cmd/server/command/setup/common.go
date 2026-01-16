@@ -5,11 +5,13 @@
 package setup
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
 	"net"
 	"os"
+	stdexec "os/exec"
 	"path/filepath"
 	"strings"
 
@@ -20,6 +22,7 @@ import (
 	"github.com/zextras/service-discover/pkg/exec"
 	"github.com/zextras/service-discover/pkg/formatter"
 	"github.com/zextras/service-discover/pkg/permissions"
+	"github.com/zextras/service-discover/pkg/systemd"
 	"github.com/zextras/service-discover/pkg/term"
 )
 
@@ -375,4 +378,56 @@ func (s *Setup) generateCertificateAndConfig(deps businessDependencies,
 	}
 
 	return consulConfigFile, nil
+}
+
+// writeFileWithStrictPermissions writes content to a file and sets strict permissions (0600).
+// This helper reduces duplication across setup files where we repeatedly write files and
+// immediately set permissions.
+func writeFileWithStrictPermissions(deps businessDependencies, path string, data []byte, perm os.FileMode) error {
+	err := os.WriteFile(path, data, perm)
+	if err != nil {
+		return err
+	}
+
+	return permissions.SetStrictPermissions(deps, path)
+}
+
+// saveBindAddressWithPermissions saves the bind address configuration and sets strict permissions.
+// This combines two operations that always appear together in the setup workflows.
+func saveBindAddressWithPermissions(deps businessDependencies, configPath, bindAddress string) error {
+	err := command.SaveBindAddressConfiguration(configPath, bindAddress)
+	if err != nil {
+		return err
+	}
+
+	return permissions.SetStrictPermissions(deps, configPath)
+}
+
+// startServiceDiscoverMode starts service-discover in the specified mode (agent or server).
+// It handles both container and systemd environments, reducing duplication across setup files.
+func startServiceDiscoverMode(deps businessDependencies, mode string) (bool, error) {
+	isContainer := command.CheckDockerContainer()
+
+	if isContainer && !testingMode {
+		// #nosec G204 -- mode is always a hardcoded constant ("agent" or "server"), not user input
+		cmd := stdexec.CommandContext(context.Background(), "service-discoverd-docker", mode)
+
+		err := cmd.Run()
+		if err != nil {
+			return isContainer, errors.WithMessagef(err, "unable to start service-discoverd %s", mode)
+		}
+	} else {
+		err := systemd.StartSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
+		if err != nil {
+			return isContainer, errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
+		}
+	}
+
+	return isContainer, nil
+}
+
+// writePasswordFile writes the password to a file with restricted permissions (0400).
+// This is used during setup to store the cluster credential password for later use.
+func writePasswordFile(consulHome, password string) error {
+	return os.WriteFile(consulHome+"/password", []byte(password), 0400)
 }
