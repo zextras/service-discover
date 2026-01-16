@@ -5,11 +5,9 @@
 package encrypter
 
 import (
-	"archive/tar"
 	"bytes"
 	"io"
 	"os"
-	"os/exec"
 	"testing"
 	"time"
 
@@ -17,133 +15,83 @@ import (
 	mocks2 "github.com/zextras/service-discover/test/mocks"
 )
 
+// createEncryptedArchive creates an encrypted archive using NewWriter with the given password.
+func createEncryptedArchive(t *testing.T, password string) (*bytes.Buffer, []byte) {
+	t.Helper()
+
+	encFile := &bytes.Buffer{}
+	encWriter, err := NewWriter(encFile, []byte(password))
+	assert.NoError(t, err)
+
+	dummyFile := []byte("TestString")
+	dummyFileStat := new(mocks2.FileInfoMock)
+	dummyFileStat.
+		On("Name").Return("test").
+		On("Size").Return(int64(len(dummyFile))).
+		On("Mode").Return(os.FileMode(0755)).
+		On("ModTime").Return(time.Now())
+
+	assert.NoError(t, encWriter.AddFile(
+		bytes.NewBuffer(dummyFile),
+		dummyFileStat,
+		"test",
+		"/",
+	))
+	assert.NoError(t, encWriter.Close())
+
+	return encFile, dummyFile
+}
+
 func TestNewReader(t *testing.T) {
 	t.Parallel()
 
-	type args struct {
-		reader     io.Reader
-		passphrase []byte
-	}
+	t.Run("Open a valid encrypted archive with valid password", func(t *testing.T) {
+		encFile, dummyFile := createEncryptedArchive(t, "password")
 
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "Open a valid gpg armored archived with valid password",
-			args: args{
-				reader:     nil,
-				passphrase: []byte("password"),
-			},
-			wantErr: false,
-		},
-		{
-			name: "Gives error when an archive with wrong password is accessed",
-			args: args{
-				reader:     nil,
-				passphrase: []byte("wrong_password"),
-			},
-			wantErr: true,
-		},
-	}
+		encReader, err := NewReader(encFile, []byte("password"))
+		assert.NoError(t, err)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			clearTar := bytes.Buffer{}
-			tarWriter := tar.NewWriter(&clearTar)
+		type tarFile struct {
+			name string
+			data []byte
+		}
 
-			defer tarWriter.Close()
+		listOfCompressedFiles := make([]tarFile, 0)
 
-			dummyFile := []byte("TestString")
-			assert.NoError(t, tarWriter.WriteHeader(&tar.Header{
-				Name:    "test",
-				Size:    int64(len(dummyFile)),
-				Mode:    int64(os.FileMode(0755)),
-				ModTime: time.Now(),
-			}))
+		for {
+			header, err := encReader.Next()
+			if err == io.EOF {
+				t.Log("Reached EOF")
 
-			_, err := io.Copy(tarWriter, bytes.NewBuffer(dummyFile))
-			assert.NoError(t, err)
-			assert.NoError(t, tarWriter.Close())
-
-			pipeReader, pipeWriter, err := os.Pipe()
-			assert.NoError(t, err)
-
-			defer pipeReader.Close()
-			defer pipeWriter.Close()
-
-			encFile := bytes.Buffer{}
-			stderr := bytes.Buffer{}
-			// gpg --symmetric --cipher-algo aes256
-			gpgEncCmd := exec.Command(
-				"gpg",
-				"--batch",
-				"--yes",
-				"--armor",
-				"--quiet",
-				"--passphrase",
-				"password",
-				"--symmetric",
-				"--cipher-algo",
-				"aes256",
-				"--output",
-				"-",
-			)
-			gpgEncCmd.Stdin = pipeReader
-			gpgEncCmd.Stdout = &encFile
-			gpgEncCmd.Stderr = &stderr
-			bs, err := io.ReadAll(&clearTar)
-			assert.NoError(t, err)
-			_, err = pipeWriter.Write(bs)
-			assert.NoError(t, err)
-			assert.NoError(t, pipeWriter.Close())
-			assert.NoError(t, gpgEncCmd.Run(), stderr.String())
-			assert.NoError(t, pipeReader.Close())
-
-			encReader, err := NewReader(&encFile, tt.args.passphrase)
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-
-				type tarFile struct {
-					name string
-					data []byte
-				}
-
-				listOfCompressedFiles := make([]tarFile, 0)
-
-				for {
-					header, err := encReader.Next()
-					if err == io.EOF {
-						t.Log("Reached EOF")
-						break
-					}
-
-					assert.NoError(t, err, "Error while reading tar file")
-					t.Logf("Header name file: %s\n", header.Name)
-
-					bs, _ := io.ReadAll(encReader)
-					listOfCompressedFiles = append(listOfCompressedFiles, tarFile{
-						name: header.Name,
-						data: bs,
-					})
-				}
-
-				assert.Equal(
-					t,
-					1,
-					len(listOfCompressedFiles),
-					"Only one file should be contained in this archive",
-				)
-
-				// Let's read the content and see if it is equal to the one created in the setup
-				assert.NoError(t, err)
-				assert.Equal(t, dummyFile, listOfCompressedFiles[0].data)
+				break
 			}
-		})
-	}
+
+			assert.NoError(t, err, "Error while reading tar file")
+			t.Logf("Header name file: %s\n", header.Name)
+
+			bs, _ := io.ReadAll(encReader)
+			listOfCompressedFiles = append(listOfCompressedFiles, tarFile{
+				name: header.Name,
+				data: bs,
+			})
+		}
+
+		assert.Equal(
+			t,
+			1,
+			len(listOfCompressedFiles),
+			"Only one file should be contained in this archive",
+		)
+
+		assert.Equal(t, dummyFile, listOfCompressedFiles[0].data)
+	})
+
+	t.Run("Gives error when an archive with wrong password is accessed", func(t *testing.T) {
+		encFile, _ := createEncryptedArchive(t, "password")
+
+		_, err := NewReader(encFile, []byte("wrong_password"))
+		assert.Error(t, err)
+	})
 }
 
 func TestReadFiles(t *testing.T) {
