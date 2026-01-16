@@ -3,10 +3,17 @@
 # Learn more about .gitignore:
 #     https://www.atlassian.com/git/tutorials/saving-changes/gitignore
 
+# Binaries (root level)
 /agent
 /server
 /service-discoverd
+
+# Build artifacts
+/bin/
 tests.xml
+coverage.out
+coverage.html
+*.test
 
 # Node artifact files
 node_modules/
@@ -53,8 +60,20 @@ Thumbs.db
 *.mov
 *.wmv
 
-# My ignores
+# Go specific
+*.sum~
+vendor/
+
+# Build and package artifacts
 *.deb
+*.rpm
 *.gpg
 **/localconfig.xml
 /artifacts/
+
+# Editor backups
+*~
+*.swp
+*.swo
+.vscode/
+*.code-workspace

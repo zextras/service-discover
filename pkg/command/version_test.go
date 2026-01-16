@@ -36,21 +36,21 @@ func TestVersion_Run(t *testing.T) {
 	}{
 		{
 			"Plain output without available agent",
-			fields{&buffer, "0.1.0", "service-discover", "agent"},
+			fields{&buffer, "0.2.3", "service-discover", "agent"},
 			args{
 				globalFlags: &GlobalCommonFlags{Format: formatter.PlainFormatOutput},
 			},
-			`service-discover version: 0.1.0
+			`service-discover version: 0.2.3
 agent version: N/A
 `,
 		},
 		{
 			"Json output without available agent",
-			fields{&buffer, "0.1.0", "service-discover", "agent"},
+			fields{&buffer, "0.2.3", "service-discover", "agent"},
 			args{
 				globalFlags: &GlobalCommonFlags{Format: formatter.JSONFormatOutput},
 			},
-			`{"cli_version":"0.1.0","agent_version":"N/A"}`,
+			`{"cli_version":"0.2.3","agent_version":"N/A"}`,
 		},
 	}
 
