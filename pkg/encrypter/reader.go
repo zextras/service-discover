@@ -7,13 +7,14 @@ package encrypter
 import (
 	"archive/tar"
 	"bytes"
+	"errors"
 	"io"
 	"strings"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
 	pgpErrors "github.com/ProtonMail/go-crypto/openpgp/errors"
-	"github.com/pkg/errors"
+	pkgErrors "github.com/pkg/errors"
 )
 
 // NewReader returns a pointer to a tar.Reader. This reader automatically decrypts the passed reader, assuming it is a
@@ -61,6 +62,47 @@ func ReadFile(tarReader *tar.Reader) ([]byte, error) {
 	return bs, nil
 }
 
+func processNextTarEntry(
+	tarReader *tar.Reader,
+	files []string,
+	result map[string][]byte,
+	remainingFiles *[]string,
+) error {
+	header, err := tarReader.Next()
+	if err != nil {
+		return err
+	}
+
+	for index, fileName := range files {
+		if header.Name != fileName {
+			continue
+		}
+
+		content, err := ReadFile(tarReader)
+		if err != nil {
+			return err
+		}
+
+		result[fileName] = content
+		(*remainingFiles)[index] = (*remainingFiles)[len(*remainingFiles)-1]
+		*remainingFiles = (*remainingFiles)[:len(*remainingFiles)-1]
+
+		break
+	}
+
+	return nil
+}
+
+func formatMissingFiles(remainingFiles []string) string {
+	var missingFilesSb strings.Builder
+
+	for _, f := range remainingFiles {
+		missingFilesSb.WriteString(" " + f)
+	}
+
+	return missingFilesSb.String()
+}
+
 // ReadFiles reads multiples files. It iterates over the tarReader, calling Next() for you. All the files passed must
 // exists, otherwise an error will be returned. The path passed in files must be equal to the one contained inside the
 // tarball, otherwise the file will not be found.
@@ -69,41 +111,21 @@ func ReadFiles(tarReader *tar.Reader, files ...string) (map[string][]byte, error
 	remainingFiles := files
 
 	for {
-		header, err := tarReader.Next()
-		if err == io.EOF {
+		err := processNextTarEntry(tarReader, files, result, &remainingFiles)
+		if errors.Is(err, io.EOF) {
 			break
 		}
 
 		if err != nil {
 			return nil, err
 		}
-
-		for index, fileName := range files {
-			if header.Name != fileName {
-				continue
-			}
-
-			content, err := ReadFile(tarReader)
-			if err != nil {
-				return nil, err
-			}
-
-			result[fileName] = content
-			remainingFiles[index] = remainingFiles[len(remainingFiles)-1]
-			remainingFiles = remainingFiles[:len(remainingFiles)-1]
-
-			break
-		}
 	}
 
 	if len(result) != len(files) {
-		var missingFilesSb strings.Builder
-
-		for _, f := range remainingFiles {
-			missingFilesSb.WriteString(" " + f)
-		}
-
-		return nil, errors.Errorf("not all files where found in the archive:%s", missingFilesSb.String())
+		return nil, pkgErrors.Errorf(
+			"not all files where found in the archive:%s",
+			formatMissingFiles(remainingFiles),
+		)
 	}
 
 	return result, nil

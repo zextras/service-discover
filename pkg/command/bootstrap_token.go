@@ -58,50 +58,67 @@ func (o OutputWrapper) Write(buffer []byte) (int, error) {
 	return numBytes, err
 }
 
-func (v *BootstrapToken) ReadToken() (string, error) {
-	var wrapper io.Writer
-	if v.Setup {
-		// avoid printing "\r\n token"
-		wrapper = OutputWrapper{os.Stdout}
-	} else {
-		wrapper = os.Stdout
-	}
-
-	prompt := "Insert the cluster credential password: "
-	if v.Setup {
-		prompt = ""
-	}
-
-	var password string
-
-	if v.Password == "" {
+func (v *BootstrapToken) Run(globalFlags *GlobalCommonFlags) error {
+	token, present := os.LookupEnv(SetupConsulToken)
+	if !v.Setup || !present || token == "" {
 		var err error
 
-		userInterface, err := v.termUIProvider.Get(wrapper)
+		token, err = v.ReadToken()
 		if err != nil {
-			return "", err
+			return err
 		}
-
-		defer func(ui term.Terminal) {
-			_ = ui.Close()
-		}(userInterface)
-
-		password, err = userInterface.ReadPassword(prompt)
-		if err != nil {
-			{
-				var errCase0 term.NotATerminalError
-				switch {
-				case errors.As(err, &errCase0):
-					password = term.MustRead(userInterface.ReadLine())
-				default:
-					return "", err
-				}
-			}
-		}
-	} else {
-		password = v.Password
 	}
 
+	res := &outputBootstrapToken{
+		token,
+	}
+
+	out, err := formatter.Render(res, globalFlags.Format)
+	if err != nil {
+		return err
+	}
+
+	_, err = fmt.Fprint(v.writer, out)
+
+	return err
+}
+
+func (v *BootstrapToken) ReadToken() (string, error) {
+	wrapper := v.getOutputWrapper()
+	prompt := v.getPasswordPrompt()
+
+	password, err := v.getPassword(wrapper, prompt)
+	if err != nil {
+		return "", err
+	}
+
+	return v.extractTokenFromCredentials(password)
+}
+
+func (v *BootstrapToken) getPasswordFromUser(wrapper io.Writer, prompt string) (string, error) {
+	userInterface, err := v.termUIProvider.Get(wrapper)
+	if err != nil {
+		return "", err
+	}
+
+	defer func(ui term.Terminal) {
+		_ = ui.Close()
+	}(userInterface)
+
+	password, err := userInterface.ReadPassword(prompt)
+	if err != nil {
+		var errCase0 term.NotATerminalError
+		if errors.As(err, &errCase0) {
+			return term.MustRead(userInterface.ReadLine()), nil
+		}
+
+		return "", err
+	}
+
+	return password, nil
+}
+
+func (v *BootstrapToken) extractTokenFromCredentials(password string) (string, error) {
 	clusterCredentialFile, err := OpenClusterCredential(v.clusterCredentialFileLocation)
 	if err != nil {
 		return "", errors.Errorf("unable to open %s: %s", v.clusterCredentialFileLocation, err)
@@ -131,27 +148,27 @@ func (v *BootstrapToken) ReadToken() (string, error) {
 	return aclBootstrapToken.SecretID, nil
 }
 
-func (v *BootstrapToken) Run(globalFlags *GlobalCommonFlags) error {
-	token, present := os.LookupEnv(SetupConsulToken)
-	if !v.Setup || !present || token == "" {
-		var err error
-
-		token, err = v.ReadToken()
-		if err != nil {
-			return err
-		}
+func (v *BootstrapToken) getOutputWrapper() io.Writer {
+	if v.Setup {
+		// avoid printing "\r\n token"
+		return OutputWrapper{os.Stdout}
 	}
 
-	res := &outputBootstrapToken{
-		token,
+	return os.Stdout
+}
+
+func (v *BootstrapToken) getPasswordPrompt() string {
+	if v.Setup {
+		return ""
 	}
 
-	out, err := formatter.Render(res, globalFlags.Format)
-	if err != nil {
-		return err
+	return "Insert the cluster credential password: "
+}
+
+func (v *BootstrapToken) getPassword(wrapper io.Writer, prompt string) (string, error) {
+	if v.Password != "" {
+		return v.Password, nil
 	}
 
-	_, err = fmt.Fprint(v.writer, out)
-
-	return err
+	return v.getPasswordFromUser(wrapper, prompt)
 }
