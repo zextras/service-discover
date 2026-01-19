@@ -7,8 +7,15 @@ package carbonio
 import (
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
+)
+
+// LocalConfig error definitions.
+var (
+	ErrLocalConfigParseFailed  = errors.New("unable to parse local config")
+	ErrLocalConfigMissingField = errors.New("missing required field in localconfig")
 )
 
 const LocalConfigLdapMasterURL = "ldap_master_url"
@@ -40,10 +47,10 @@ type LocalConfigEntry struct {
 
 func loadLocalConfig(path string) (*rawLocalConfig, error) {
 	carbonioLocalConfig := &rawLocalConfig{}
-	localConfigBytes, err := os.ReadFile(path) // #nosec
 
+	localConfigBytes, err := os.ReadFile(path) // #nosec
 	if err != nil {
-		return nil, errors.New("unable to parse local config at: " + path)
+		return nil, fmt.Errorf("%w: %s", ErrLocalConfigParseFailed, path)
 	}
 
 	err = xml.Unmarshal(localConfigBytes, carbonioLocalConfig)
@@ -96,7 +103,9 @@ func LoadLocalConfig(path string) (LocalConfig, error) {
 	for _, field := range requiredFields {
 		_, present := localConfigIndex[field]
 		if !present {
-			return nil, errors.New("Carbonio is not correctly initialized, please run carbonio-bootstrap (missing required field '" + field + "' in localconfig)")
+			return nil, fmt.Errorf(
+				"carbonio is not correctly initialized, please run carbonio-bootstrap (%w: '%s')",
+				ErrLocalConfigMissingField, field)
 		}
 	}
 
