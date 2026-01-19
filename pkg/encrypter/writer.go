@@ -29,15 +29,18 @@ func (e *Writer) Write(p []byte) (int, error) {
 }
 
 func (e *Writer) Close() error {
-	if err := e.tarballWriter.Close(); err != nil {
+	err := e.tarballWriter.Close()
+	if err != nil {
 		return err
 	}
 
-	if err := e.openPgpWriter.Close(); err != nil {
+	err = e.openPgpWriter.Close()
+	if err != nil {
 		return err
 	}
 
-	if err := e.armorWriter.Close(); err != nil {
+	err = e.armorWriter.Close()
+	if err != nil {
 		return err
 	}
 
