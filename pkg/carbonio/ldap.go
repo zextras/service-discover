@@ -67,7 +67,8 @@ func (l *ldapContext) UploadBinary(reader io.Reader, baseDN, attribute string) e
 	if err != nil {
 		return err
 	}
-	defer connection.Close()
+
+	defer func() { _ = connection.Close() }()
 
 	content, err := io.ReadAll(reader)
 	encodedContent := base64.StdEncoding.EncodeToString(content)
@@ -87,7 +88,8 @@ func (l *ldapContext) DownloadBinary(baseDN, attribute string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer connection.Close()
+
+	defer func() { _ = connection.Close() }()
 
 	searchRequest := ldap.NewSearchRequest(
 		baseDN,
@@ -140,7 +142,7 @@ func (l *ldapContext) CheckServerAvailability(write bool) error {
 		return err
 	}
 
-	connection.Close()
+	_ = connection.Close()
 
 	return nil
 }
@@ -161,7 +163,8 @@ func (l *ldapContext) QueryAllServersWithService(service string) ([]string, erro
 	if err != nil {
 		return nil, err
 	}
-	defer connection.Close()
+
+	defer func() { _ = connection.Close() }()
 
 	result, err := connection.Search(&ldap.SearchRequest{
 		Scope:  ldap.ScopeSingleLevel,
@@ -239,7 +242,7 @@ func connect(context *ldapContext, writeAccess bool) (ldapConnInterface, error) 
 
 	err := connection.Bind(context.Credentials.Username, context.Credentials.Password)
 	if err != nil {
-		connection.Close()
+		_ = connection.Close()
 
 		return nil, err
 	}
@@ -259,7 +262,8 @@ func modifyEnabledServices(context *ldapContext, server, service string, change 
 	if err != nil {
 		return err
 	}
-	defer connection.Close()
+
+	defer func() { _ = connection.Close() }()
 
 	result, err := connection.Search(&ldap.SearchRequest{
 		Scope:  ldap.ScopeSingleLevel,

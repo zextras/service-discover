@@ -108,7 +108,7 @@ func TestEnableDisableService(t *testing.T) {
 
 	t.Run("service added", func(t *testing.T) {
 		mockLdapConnection := new(MockLdapConnection)
-		mockLdapConnection.On("Close").Return()
+		mockLdapConnection.On("Close").Return(nil)
 		mockLdapConnection.On("Bind", "username", "password").Return(nil)
 
 		searchQuery := ldap.SearchRequest{
@@ -166,7 +166,7 @@ func TestEnableDisableService(t *testing.T) {
 
 	t.Run("service removed", func(t *testing.T) {
 		mockLdapConnection := new(MockLdapConnection)
-		mockLdapConnection.On("Close").Return()
+		mockLdapConnection.On("Close").Return(nil)
 		mockLdapConnection.On("Bind", "username", "password").Return(nil)
 
 		searchQuery := ldap.SearchRequest{
@@ -226,7 +226,7 @@ func TestEnableDisableService(t *testing.T) {
 func TestQueryAllServiceDiscoverServers(t *testing.T) {
 	t.Run("query all servers", func(t *testing.T) {
 		mockLdapConnection := new(MockLdapConnection)
-		mockLdapConnection.On("Close").Return()
+		mockLdapConnection.On("Close").Return(nil)
 		mockLdapConnection.On("Bind", "username", "password").Return(nil)
 
 		searchQuery := ldap.SearchRequest{

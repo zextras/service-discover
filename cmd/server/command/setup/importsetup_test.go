@@ -29,6 +29,31 @@ import (
 	"github.com/zextras/service-discover/test"
 )
 
+// retryLdapConnection attempts to connect to LDAP with retry logic.
+func retryLdapConnection(ldapUrl, userDN, password string, maxRetries int) (*ldap.Conn, error) {
+	var connection *ldap.Conn
+	var err error
+
+	for i := 0; i < maxRetries; i++ {
+		connection, err = ldap.DialURL(ldapUrl, ldap.DialWithDialer(&net.Dialer{Timeout: 10 * time.Second}))
+		if err != nil {
+			time.Sleep(time.Duration(i+1) * 500 * time.Millisecond)
+			continue
+		}
+
+		if err = connection.Bind(userDN, password); err != nil {
+			_ = connection.Close()
+			time.Sleep(time.Duration(i+1) * 500 * time.Millisecond)
+			continue
+		}
+
+		// Connection successful
+		return connection, nil
+	}
+
+	return nil, fmt.Errorf("failed to connect to LDAP after %d retries: %w", maxRetries, err)
+}
+
 // fakeCredentialsTar represents a valid credentials.tar.gpg file. It has
 // been pasted as part of the codebase because golang doens't have a well
 // defined way to point out test resources, so in order to avoid tests
@@ -249,17 +274,11 @@ func TestSetup_importSetup(t *testing.T) {
 			t.Error(err)
 		}
 
-		connection, err := ldap.DialURL(ldapUrl, ldap.DialWithDialer(&net.Dialer{Timeout: 5 * time.Minute}))
+		connection, err := retryLdapConnection(ldapUrl, test.DefaultLdapUserDN, "password", 5)
 		if err != nil {
 			t.Error(err)
 		}
-
-		//if err := connection.Bind(test.DefaultLdapUserDN, "password"); err != nil {
-		//	t.Error(err)
-		//}
-		if err := connection.Bind(test.DefaultLdapUserDN, "password"); err != nil {
-			t.Error(err)
-		}
+		defer connection.Close()
 
 		if includeTar {
 			encodedContent := base64.StdEncoding.EncodeToString(clusterCredentialsContent)
