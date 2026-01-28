@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2021-2026 Zextras <https://www.zextras.com>
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
 pkgname="service-discover-daemon"
 pkgver="0.2.3"
 pkgrel="1"
@@ -19,8 +23,8 @@ source=(
   "systemd-tmpfile.conf"
 )
 sha256sums=(
-  'SKIP'
-  'e2f6bdb437c040a32046999a7a4b14b10698765a03d59b92a61f9267a97a87a0'
+  '74f36bec7b501dcfbc5b24f0dea8fc3a59e9426e06de78375b8df7ae483e5a42'
+  'c29bdd60b0ded321201d875f3db460b1aa5d365105f7f4f734892081c6744d7f'
 )
 
 build() {
