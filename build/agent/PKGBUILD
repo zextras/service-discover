@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2021-2026 Zextras <https://www.zextras.com>
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
 pkgname="service-discover-agent"
 pkgver="0.2.3"
 pkgrel="1"
@@ -25,7 +29,7 @@ source=(
   "service-discover.service"
 )
 sha256sums=(
-  '0ec810efa5a80ab81a3bb6938f14878fb46671771f46e363155f5740b14d1e50'
+  '217caccf9ecbb4c607dc9aadd2ba47b39de0c71aee5bb496bc84a4f99159fb22'
 )
 
 build() {
