@@ -3,15 +3,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 [Unit]
-Description=Zextras Service Discover Agent
+Description=Zextras Service Discover Server
 Documentation=https://docs.zextras.com/
 Requires=network-online.target
 After=network-online.target
-PartOf=carbonio-appserver.target carbonio-mta.target carbonio-proxy.target carbonio.target
 
 [Service]
 Type=notify
-ExecStart=/usr/bin/service-discoverd agent
+ExecStart=/usr/bin/service-discoverd server
 Restart=on-failure
 RestartSec=15s
 KillMode=process
@@ -21,4 +20,4 @@ TimeoutSec=120s
 TimeoutStopSec=120s
 
 [Install]
-WantedBy=carbonio-appserver.target carbonio-mta.target carbonio-proxy.target carbonio.target
+WantedBy=multi-user.target

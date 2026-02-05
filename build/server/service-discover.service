@@ -3,22 +3,22 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 [Unit]
-Description=Service discover server for Zextras
+Description=Zextras Service Discover Server
 Documentation=https://docs.zextras.com/
 Requires=network-online.target
 After=network-online.target
-PartOf=carbonio.target
+PartOf=carbonio-directory-server.target
 
 [Service]
 Type=notify
 ExecStart=/usr/bin/service-discoverd server
 Restart=on-failure
-RestartSec=15
+RestartSec=15s
 KillMode=process
 LimitNOFILE=65536
 ExecReload=/usr/bin/consul reload
-TimeoutSec=120
-TimeoutStopSec=120
+TimeoutSec=120s
+TimeoutStopSec=120s
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=carbonio-directory-server.target
