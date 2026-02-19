@@ -26,10 +26,28 @@ depends=(
 conflicts=("service-discover-agent")
 source=(
   "service-discover.service"
+  "service-discover-legacy.service"
 )
 sha256sums=(
-  '66f5ebdf2a93fdbf7a155daecfebb0c8d72ab0bce8148eb1c7a346d3658f7e60'
+  'b7d5be9bb79a5afb5784ddfe302db4fadbc60668c44f0f1aafd8f450819c63c7'
+  '5780163ac614276da1c812580686eb8adfdbfe9eebe62397d6a354ca461db1a9'
 )
+
+_package_legacy() {
+  cd "${srcdir}"
+  install -Dm 755 server \
+    "${pkgdir}/usr/bin/service-discover"
+  install -Dm 644 service-discover-legacy.service \
+    "${pkgdir}/lib/systemd/system/service-discover.service"
+}
+
+_package_systemd() {
+  cd "${srcdir}"
+  install -Dm 755 server \
+    "${pkgdir}/usr/bin/service-discover"
+  install -Dm 644 service-discover.service \
+    "${pkgdir}/lib/systemd/system/service-discover.service"
+}
 
 build() {
   cd "$(dirname "$(find / -name "yap.json" -print -quit)")/.."
@@ -39,11 +57,23 @@ build() {
 }
 
 package() {
-  cd "${srcdir}"
-  install -Dm 755 server \
-    "${pkgdir}/usr/bin/service-discover"
-  install -Dm 644 service-discover.service \
-    "${pkgdir}/lib/systemd/system/service-discover.service"
+  _package_systemd
+}
+
+package__rocky_8() {
+  _package_legacy
+}
+
+package__rocky_9() {
+  _package_systemd
+}
+
+package__ubuntu_jammy() {
+  _package_legacy
+}
+
+package__ubuntu_noble() {
+  _package_systemd
 }
 
 postinst__apt() {
