@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 pkgname="service-discover-agent"
-pkgver="0.2.3"
+pkgver="0.3.0"
 pkgrel="1"
 pkgdesc="Service discover agent cli"
 maintainer="Zextras <packages@zextras.com>"
