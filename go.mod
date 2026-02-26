@@ -1,6 +1,6 @@
 module github.com/zextras/service-discover
 
-go 1.25.5
+go 1.25.7
 
 require (
 	github.com/ProtonMail/go-crypto v1.3.0
@@ -9,7 +9,7 @@ require (
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/go-ldap/ldap/v3 v3.4.12
-	github.com/hashicorp/consul/api v1.33.2
+	github.com/hashicorp/consul/api v1.33.4
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.40.0
