@@ -3,7 +3,7 @@ module github.com/zextras/service-discover
 go 1.25.5
 
 require (
-	github.com/ProtonMail/go-crypto v1.3.0
+	github.com/ProtonMail/go-crypto v1.4.1
 	github.com/alecthomas/kong v1.13.0
 	github.com/coreos/go-systemd/v22 v22.6.0
 	github.com/docker/docker v28.5.2+incompatible
