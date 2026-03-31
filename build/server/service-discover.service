@@ -5,9 +5,9 @@
 [Unit]
 Description=Zextras Service Discover Server
 Documentation=https://docs.zextras.com/
-Requires=network-online.target
-After=network-online.target
-PartOf=carbonio-directory-server.target
+Requires=network-online.target carbonio-openldap.service
+After=network-online.target carbonio-openldap.service
+PartOf=service-discover.target
 
 [Service]
 Type=notify
@@ -20,5 +20,23 @@ ExecReload=/usr/bin/consul reload
 TimeoutSec=120s
 TimeoutStopSec=120s
 
+# Hardening
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/service-discover /etc/zextras/service-discover /run/carbonio /tmp
+PrivateDevices=yes
+ProtectHome=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+ProtectHostname=yes
+ProtectClock=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+
 [Install]
-WantedBy=carbonio-directory-server.target
+WantedBy=service-discover.target
