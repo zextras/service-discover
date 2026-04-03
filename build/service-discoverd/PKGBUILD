@@ -36,9 +36,9 @@ build() {
 
 package() {
   cd "${srcdir}"
-  install -Dm 755 service-discoverd \
+  install -Dm755 service-discoverd \
     "${pkgdir}/usr/bin/service-discoverd"
-  install -Dm 755 service-discoverd-docker \
+  install -Dm755 service-discoverd-docker \
     "${pkgdir}/usr/bin/service-discoverd-docker"
 
   # systemd tmpfiles.d
