@@ -24,6 +24,33 @@ type Writer struct {
 	tarballWriter *tar.Writer
 }
 
+// NewWriter initialize a new reader that automatically encrypts with OpenPGP the data passed. Additionally, the data
+// is wrapped around with a PGP armor, making the file text-based and easier to manipulate.
+// The encryption defaults are the "sane defaults" set by the openpgp package this reader is based on. Please check
+// https://pkg.go.dev/golang.org/x/crypto/openpgp#SymmetricallyEncrypt for more details about the encryption
+// configuration.
+func NewWriter(writer io.Writer, passphrase []byte) (*Writer, error) {
+	armorWriter, err := armor.Encode(writer, "PGP MESSAGE", nil)
+	if err != nil {
+		return nil, errors.Errorf("failure while encrypting the secret credentials: %s", err)
+	}
+
+	openGpgWriter, err := openpgp.SymmetricallyEncrypt(armorWriter, passphrase, nil, &packet.Config{
+		DefaultCipher: packet.CipherAES256,
+	})
+	if err != nil {
+		return nil, errors.Errorf("unable to encrypt the stream using PGP: %s", err)
+	}
+
+	tarWriter := tar.NewWriter(openGpgWriter)
+
+	return &Writer{
+		armorWriter:   armorWriter,
+		openPgpWriter: openGpgWriter,
+		tarballWriter: tarWriter,
+	}, nil
+}
+
 func (e *Writer) Write(p []byte) (int, error) {
 	return e.tarballWriter.Write(p)
 }
@@ -77,41 +104,18 @@ func (e *Writer) AddFile(reader io.Reader, stat os.FileInfo, customFilename, dir
 	header.Size = stat.Size()
 	header.Mode = int64(stat.Mode())
 	header.ModTime = stat.ModTime()
+
 	// Write the header to the tarball archive
-	if err := e.tarballWriter.WriteHeader(header); err != nil {
+	err = e.tarballWriter.WriteHeader(header)
+	if err != nil {
 		return err
 	}
+
 	// Copy the file data to the tarball
-	if _, err := io.Copy(e.tarballWriter, reader); err != nil {
+	_, err = io.Copy(e.tarballWriter, reader)
+	if err != nil {
 		return err
 	}
 
 	return nil
-}
-
-// NewWriter initialize a new reader that automatically encrypts with OpenPGP the data passed. Additionally, the data
-// is wrapped around with a PGP armor, making the file text-based and easier to manipulate.
-// The encryption defaults are the "sane defaults" set by the openpgp package this reader is based on. Please check
-// https://pkg.go.dev/golang.org/x/crypto/openpgp#SymmetricallyEncrypt for more details about the encryption
-// configuration.
-func NewWriter(writer io.Writer, passphrase []byte) (*Writer, error) {
-	armorWriter, err := armor.Encode(writer, "PGP MESSAGE", nil)
-	if err != nil {
-		return nil, errors.Errorf("failure while encrypting the secret credentials: %s", err)
-	}
-
-	openGpgWriter, err := openpgp.SymmetricallyEncrypt(armorWriter, passphrase, nil, &packet.Config{
-		DefaultCipher: packet.CipherAES256,
-	})
-	if err != nil {
-		return nil, errors.Errorf("unable to encrypt the stream using PGP: %s", err)
-	}
-
-	tarWriter := tar.NewWriter(openGpgWriter)
-
-	return &Writer{
-		armorWriter:   armorWriter,
-		openPgpWriter: openGpgWriter,
-		tarballWriter: tarWriter,
-	}, nil
 }

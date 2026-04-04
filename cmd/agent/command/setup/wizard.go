@@ -13,19 +13,19 @@ import (
 	"github.com/zextras/service-discover/pkg/term"
 )
 
+// Wizard si a wrap of the standard setup procedure that includes interactive setup.
+type Wizard struct {
+	originalSetup *Setup
+
+	Password    string `help:"Set a custom password for the encrypted secret files. If none is set, a random one will be generated and printed"` //nolint:lll
+	BindAddress string `arg:"" optional:"" help:"The binding address to bind service-discoverd daemon"`
+}
+
 // NewWizardSetup is just a wrapper over the original setup, that performs interactive UI experience.
 func NewWizardSetup(setup *Setup) Wizard {
 	return Wizard{
 		originalSetup: setup,
 	}
-}
-
-// Wizard si a wrap of the standard setup procedure that includes interactive setup.
-type Wizard struct {
-	originalSetup *Setup
-
-	Password    string `help:"Set a custom password for the encrypted secret files. If none is set, a random one will be generated and printed"`
-	BindAddress string `arg:"" optional:"" help:"The binding address to bind service-discoverd daemon"`
 }
 
 func (s *Wizard) Run(commonFlags *command.GlobalCommonFlags) error {
@@ -35,6 +35,7 @@ func (s *Wizard) Run(commonFlags *command.GlobalCommonFlags) error {
 	}
 
 	defer userInterface.Close()
+
 	dependency := realDependencies{
 		ui: &userInterface,
 	}

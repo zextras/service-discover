@@ -131,7 +131,7 @@ func TestSetup_setup(t *testing.T) {
 
 		localConfigByte := test.GenerateLocalConfig(
 			t,
-			container.Ip(),
+			container.IP(),
 			ldapUrl,
 			ldapUrl,
 			test.DefaultLdapUserDN,
@@ -430,7 +430,7 @@ func TestSetup_setup(t *testing.T) {
 		selectedInterface := net.Interface{
 			Name: "en1",
 		}
-		containerIP := testStruct.Container.Ip()
+		containerIP := testStruct.Container.IP()
 		assert.NoError(t, err)
 
 		aclTemplateData := struct {
@@ -605,7 +605,7 @@ func TestSetup_setup(t *testing.T) {
 		selectedInterface := net.Interface{
 			Name: "en1",
 		}
-		containerIP := testStruct.Container.Ip()
+		containerIP := testStruct.Container.IP()
 		assert.NoError(t, err)
 
 		aclTemplateData := struct {

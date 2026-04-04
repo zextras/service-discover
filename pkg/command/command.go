@@ -38,7 +38,7 @@ func (c *Command) Version(writer io.Writer, agentName string) Version {
 // BootstrapToken generates a BootstrapToken structure that can is ready to
 // be integrated as CLI command.
 func (c *Command) BootstrapToken(writer io.Writer, agentName string) BootstrapToken {
-	return BootstrapToken{
+	return BootstrapToken{ //nolint:gosec // G101: not credentials, just a struct field name
 		Command:                       *c,
 		writer:                        writer,
 		agentName:                     agentName,

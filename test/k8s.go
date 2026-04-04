@@ -6,6 +6,7 @@ package test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -21,10 +22,17 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+var (
+	errPodTerminal = errors.New("pod entered terminal phase")
+	errPodTimeout  = errors.New("timeout waiting for pod to be running")
+	errLdapTimeout = errors.New("timeout waiting for LDAP to be ready")
+)
+
 // IsRunningInKubernetes returns true when the process runs inside a
 // Kubernetes pod (the kubelet always injects KUBERNETES_SERVICE_HOST).
 func IsRunningInKubernetes() bool {
 	_, exists := os.LookupEnv("KUBERNETES_SERVICE_HOST")
+
 	return exists
 }
 
@@ -33,6 +41,7 @@ func currentNamespace() string {
 	if err != nil {
 		return "default"
 	}
+
 	return strings.TrimSpace(string(ns))
 }
 
@@ -44,6 +53,8 @@ func currentNamespace() string {
 //
 // Set the K8S_IMAGE_PULL_SECRET environment variable to the name of a
 // Kubernetes docker-registry secret if the image requires authentication.
+//
+//nolint:thelper // not a helper, it's a setup function
 func SpinUpCarbonioLdapK8s(t *testing.T, address, version string) (LdapContainer, context.Context) {
 	ctx := context.Background()
 
@@ -113,33 +124,50 @@ func SpinUpCarbonioLdapK8s(t *testing.T, address, version string) (LdapContainer
 
 	t.Logf("Created pod %s in namespace %s", podName, namespace)
 
-	if err := waitForPodRunning(ctx, t, clientset, namespace, podName); err != nil {
-		_ = clientset.CoreV1().Pods(namespace).Delete(ctx, podName, metav1.DeleteOptions{})
+	err = waitForPodRunning(ctx, t, clientset, namespace, podName)
+	if err != nil {
+		_ = clientset.CoreV1().Pods(namespace).Delete(
+			ctx, podName, metav1.DeleteOptions{},
+		)
+
 		t.Fatal("pod failed to start:", err)
 	}
 
-	runningPod, err := clientset.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+	runningPod, err := clientset.CoreV1().Pods(namespace).Get(
+		ctx, podName, metav1.GetOptions{},
+	)
 	if err != nil {
-		_ = clientset.CoreV1().Pods(namespace).Delete(ctx, podName, metav1.DeleteOptions{})
+		_ = clientset.CoreV1().Pods(namespace).Delete(
+			ctx, podName, metav1.DeleteOptions{},
+		)
+
 		t.Fatal("failed to get pod:", err)
 	}
 
 	podIP := runningPod.Status.PodIP
 	t.Logf("Pod %s running at IP: %s", podName, podIP)
 
-	if err := waitForLdapReady(ctx, t, clientset, namespace, podName, podIP); err != nil {
-		_ = clientset.CoreV1().Pods(namespace).Delete(ctx, podName, metav1.DeleteOptions{})
+	err = waitForLdapReady(ctx, t, clientset, namespace, podName, podIP)
+	if err != nil {
+		_ = clientset.CoreV1().Pods(namespace).Delete(
+			ctx, podName, metav1.DeleteOptions{},
+		)
+
 		t.Fatal("LDAP failed to become ready:", err)
 	}
 
 	ldap := LdapContainer{
 		Stop: func() {
-			if err := clientset.CoreV1().Pods(namespace).Delete(ctx, podName, metav1.DeleteOptions{}); err != nil {
+			err := clientset.CoreV1().Pods(namespace).Delete(
+				ctx, podName, metav1.DeleteOptions{},
+			)
+			if err != nil {
 				t.Log("failed to delete pod:", err)
 			}
+
 			t.Logf("Deleted pod %s", podName)
 		},
-		Ip: func() string {
+		IP: func() string {
 			return podIP
 		},
 		Port: func() string {
@@ -153,7 +181,13 @@ func SpinUpCarbonioLdapK8s(t *testing.T, address, version string) (LdapContainer
 	return ldap, ctx
 }
 
-func waitForPodRunning(ctx context.Context, t *testing.T, clientset *kubernetes.Clientset, namespace, podName string) error {
+//nolint:thelper // not a helper, it's an internal wait function
+func waitForPodRunning(
+	ctx context.Context,
+	t *testing.T,
+	clientset *kubernetes.Clientset,
+	namespace, podName string,
+) error {
 	timeout := 5 * time.Minute
 	interval := 2 * time.Second
 	deadline := time.Now().Add(timeout)
@@ -168,22 +202,31 @@ func waitForPodRunning(ctx context.Context, t *testing.T, clientset *kubernetes.
 		case corev1.PodRunning:
 			return nil
 		case corev1.PodFailed, corev1.PodSucceeded:
-			return fmt.Errorf("pod %s entered terminal phase: %s", podName, pod.Status.Phase)
+			return fmt.Errorf("%w: %s (%s)", errPodTerminal, podName, pod.Status.Phase)
+		case corev1.PodPending, corev1.PodUnknown:
+			// still waiting
 		}
 
 		t.Logf("Waiting for pod %s (phase: %s)", podName, pod.Status.Phase)
 		time.Sleep(interval)
 	}
 
-	return fmt.Errorf("timeout waiting for pod %s to be running", podName)
+	return fmt.Errorf("%w: %s", errPodTimeout, podName)
 }
 
-func waitForLdapReady(ctx context.Context, t *testing.T, clientset *kubernetes.Clientset, namespace, podName, podIP string) error {
+//nolint:thelper // not a helper, it's an internal wait function
+func waitForLdapReady(
+	ctx context.Context,
+	t *testing.T,
+	clientset *kubernetes.Clientset,
+	namespace, podName, podIP string,
+) error {
 	timeout := 5 * time.Minute
 	interval := 5 * time.Second
 	deadline := time.Now().Add(timeout)
 	expectedLog := `modifying entry "uid=zimbra,cn=admins,cn=zimbra"`
 	addr := net.JoinHostPort(podIP, "1389")
+	dialer := net.Dialer{Timeout: 2 * time.Second}
 
 	logSeen := false
 	consecutiveOK := 0
@@ -194,31 +237,44 @@ func waitForLdapReady(ctx context.Context, t *testing.T, clientset *kubernetes.C
 			logs, err := getPodLogs(ctx, clientset, namespace, podName)
 			if err == nil && strings.Contains(logs, expectedLog) {
 				t.Log("LDAP log marker found, waiting for port to stabilize")
+
 				logSeen = true
 			}
 		}
+
 		if logSeen {
-			conn, err := net.DialTimeout("tcp", addr, 2*time.Second)
+			conn, err := dialer.DialContext(ctx, "tcp", addr)
 			if err == nil {
 				conn.Close()
+
 				consecutiveOK++
 				if consecutiveOK >= requiredOK {
 					t.Log("LDAP container is ready")
+
 					return nil
 				}
+
 				time.Sleep(2 * time.Second)
+
 				continue
 			}
+
 			consecutiveOK = 0
 		}
+
 		time.Sleep(interval)
 	}
 
-	return fmt.Errorf("timeout waiting for LDAP to be ready in pod %s", podName)
+	return fmt.Errorf("%w: %s", errLdapTimeout, podName)
 }
 
-func getPodLogs(ctx context.Context, clientset *kubernetes.Clientset, namespace, podName string) (string, error) {
+func getPodLogs(
+	ctx context.Context,
+	clientset *kubernetes.Clientset,
+	namespace, podName string,
+) (string, error) {
 	req := clientset.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{})
+
 	stream, err := req.Stream(ctx)
 	if err != nil {
 		return "", err
@@ -226,8 +282,11 @@ func getPodLogs(ctx context.Context, clientset *kubernetes.Clientset, namespace,
 	defer stream.Close()
 
 	buf := new(strings.Builder)
-	if _, err := io.Copy(buf, stream); err != nil {
+
+	_, err = io.Copy(buf, stream)
+	if err != nil {
 		return "", err
 	}
+
 	return buf.String(), nil
 }

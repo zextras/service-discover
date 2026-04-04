@@ -10,8 +10,15 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"strings"
 
 	"github.com/zextras/service-discover/pkg/formatter"
+)
+
+var (
+	errUnableToRead  = errors.New("unable to read " + ConsulMutableConfigFile)
+	errUnableToWrite = errors.New("unable to write " + ConsulMutableConfigFile)
+	errUnknownConfig = errors.New("unknown configuration")
 )
 
 const ConsulMutableConfigFile = "/etc/zextras/service-discover/config.json"
@@ -21,7 +28,8 @@ type MutableConsulConfig struct {
 }
 
 type Config struct {
-	Command   `kong:"-"`
+	Command `kong:"-"`
+
 	writer    io.Writer `kong:"-"`
 	agentName string    `kong:"-"`
 
@@ -30,12 +38,13 @@ type Config struct {
 	List ListConfig `cmd:"" help:"List available configurations"`
 }
 
-func (v *Config) Run(_globalFlags *GlobalCommonFlags) error {
+func (v *Config) Run(_ *GlobalCommonFlags) error {
 	return nil
 }
 
 type GetConfig struct {
-	Command   `kong:"-"`
+	Command `kong:"-"`
+
 	ReadFile  func(filename string) ([]byte, error) `kong:"-"`
 	writer    io.Writer                             `kong:"-"`
 	agentName string                                `kong:"-"`
@@ -62,11 +71,13 @@ func (o *getConfigOutput) JSONRender() (string, error) {
 func (v *GetConfig) Run(globalFlags *GlobalCommonFlags) error {
 	data, err := v.ReadFile(ConsulMutableConfigFile)
 	if err != nil {
-		return errors.New("unable to read " + ConsulMutableConfigFile + ": " + err.Error())
+		return fmt.Errorf("%w: %w", errUnableToRead, err)
 	}
 
 	config := MutableConsulConfig{}
-	if err := json.Unmarshal(data, &config); err != nil {
+
+	err = json.Unmarshal(data, &config)
+	if err != nil {
 		return err
 	}
 
@@ -76,7 +87,7 @@ func (v *GetConfig) Run(globalFlags *GlobalCommonFlags) error {
 	case "bind-address":
 		output.BindAddress = config.BindAddress
 	default:
-		return errors.New("unknown configuration '" + v.Config + "'")
+		return fmt.Errorf("%w: %s", errUnknownConfig, v.Config)
 	}
 
 	out, err := formatter.Render(output, globalFlags.Format)
@@ -90,7 +101,8 @@ func (v *GetConfig) Run(globalFlags *GlobalCommonFlags) error {
 }
 
 type SetConfig struct {
-	Command   `kong:"-"`
+	Command `kong:"-"`
+
 	ReadFile  func(filename string) ([]byte, error)                      `kong:"-"`
 	WriteFile func(filename string, data []byte, perm fs.FileMode) error `kong:"-"`
 	writer    io.Writer                                                  `kong:"-"`
@@ -99,14 +111,16 @@ type SetConfig struct {
 	Value     string                                                     `arg:"" required:"" help:"Config value."`
 }
 
-func (v *SetConfig) Run(_globalFlags *GlobalCommonFlags) error {
+func (v *SetConfig) Run(_ *GlobalCommonFlags) error {
 	data, err := v.ReadFile(ConsulMutableConfigFile)
 	if err != nil {
-		return errors.New("unable to read " + ConsulMutableConfigFile + ": " + err.Error())
+		return fmt.Errorf("%w: %w", errUnableToRead, err)
 	}
 
 	config := MutableConsulConfig{}
-	if err := json.Unmarshal(data, &config); err != nil {
+
+	err = json.Unmarshal(data, &config)
+	if err != nil {
 		return err
 	}
 
@@ -114,7 +128,7 @@ func (v *SetConfig) Run(_globalFlags *GlobalCommonFlags) error {
 	case "bind-address":
 		config.BindAddress = v.Value
 	default:
-		return errors.New("unknown configuration '" + v.Config + "'")
+		return fmt.Errorf("%w: %s", errUnknownConfig, v.Config)
 	}
 
 	data, err = json.MarshalIndent(&config, "", "  ")
@@ -122,15 +136,17 @@ func (v *SetConfig) Run(_globalFlags *GlobalCommonFlags) error {
 		return err
 	}
 
-	if err = v.WriteFile(ConsulMutableConfigFile, data, 0644); err != nil {
-		return errors.New("unable to write " + ConsulMutableConfigFile + ": " + err.Error())
+	err = v.WriteFile(ConsulMutableConfigFile, data, 0644)
+	if err != nil {
+		return fmt.Errorf("%w: %w", errUnableToWrite, err)
 	}
 
 	return err
 }
 
 type ListConfig struct {
-	Command   `kong:"-"`
+	Command `kong:"-"`
+
 	writer    io.Writer `kong:"-"`
 	agentName string    `kong:"-"`
 }
@@ -141,9 +157,13 @@ type listConfigOutput struct {
 
 func (o *listConfigOutput) PlainRender() (string, error) {
 	out := ""
+
+	var outSb strings.Builder
 	for _, config := range o.configs {
-		out += config + "\n"
+		outSb.WriteString(config + "\n")
 	}
+
+	out += outSb.String()
 
 	return out, nil
 }
