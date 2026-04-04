@@ -186,11 +186,14 @@ func waitForLdapReady(ctx context.Context, t *testing.T, clientset *kubernetes.C
 	addr := net.JoinHostPort(podIP, "1389")
 
 	logSeen := false
+	consecutiveOK := 0
+	requiredOK := 3
+
 	for time.Now().Before(deadline) {
 		if !logSeen {
 			logs, err := getPodLogs(ctx, clientset, namespace, podName)
 			if err == nil && strings.Contains(logs, expectedLog) {
-				t.Log("LDAP log marker found, waiting for port")
+				t.Log("LDAP log marker found, waiting for port to stabilize")
 				logSeen = true
 			}
 		}
@@ -198,9 +201,15 @@ func waitForLdapReady(ctx context.Context, t *testing.T, clientset *kubernetes.C
 			conn, err := net.DialTimeout("tcp", addr, 2*time.Second)
 			if err == nil {
 				conn.Close()
-				t.Log("LDAP container is ready")
-				return nil
+				consecutiveOK++
+				if consecutiveOK >= requiredOK {
+					t.Log("LDAP container is ready")
+					return nil
+				}
+				time.Sleep(2 * time.Second)
+				continue
 			}
+			consecutiveOK = 0
 		}
 		time.Sleep(interval)
 	}
