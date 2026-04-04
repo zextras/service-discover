@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"strings"
 	"testing"
@@ -126,7 +127,7 @@ func SpinUpCarbonioLdapK8s(t *testing.T, address, version string) (LdapContainer
 	podIP := runningPod.Status.PodIP
 	t.Logf("Pod %s running at IP: %s", podName, podIP)
 
-	if err := waitForLdapReady(ctx, t, clientset, namespace, podName); err != nil {
+	if err := waitForLdapReady(ctx, t, clientset, namespace, podName, podIP); err != nil {
 		_ = clientset.CoreV1().Pods(namespace).Delete(ctx, podName, metav1.DeleteOptions{})
 		t.Fatal("LDAP failed to become ready:", err)
 	}
@@ -177,17 +178,29 @@ func waitForPodRunning(ctx context.Context, t *testing.T, clientset *kubernetes.
 	return fmt.Errorf("timeout waiting for pod %s to be running", podName)
 }
 
-func waitForLdapReady(ctx context.Context, t *testing.T, clientset *kubernetes.Clientset, namespace, podName string) error {
+func waitForLdapReady(ctx context.Context, t *testing.T, clientset *kubernetes.Clientset, namespace, podName, podIP string) error {
 	timeout := 5 * time.Minute
 	interval := 5 * time.Second
 	deadline := time.Now().Add(timeout)
 	expectedLog := `modifying entry "uid=zimbra,cn=admins,cn=zimbra"`
+	addr := net.JoinHostPort(podIP, "1389")
 
+	logSeen := false
 	for time.Now().Before(deadline) {
-		logs, err := getPodLogs(ctx, clientset, namespace, podName)
-		if err == nil && strings.Contains(logs, expectedLog) {
-			t.Log("LDAP container is ready")
-			return nil
+		if !logSeen {
+			logs, err := getPodLogs(ctx, clientset, namespace, podName)
+			if err == nil && strings.Contains(logs, expectedLog) {
+				t.Log("LDAP log marker found, waiting for port")
+				logSeen = true
+			}
+		}
+		if logSeen {
+			conn, err := net.DialTimeout("tcp", addr, 2*time.Second)
+			if err == nil {
+				conn.Close()
+				t.Log("LDAP container is ready")
+				return nil
+			}
 		}
 		time.Sleep(interval)
 	}
