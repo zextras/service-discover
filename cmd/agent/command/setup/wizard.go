@@ -13,7 +13,7 @@ import (
 	"github.com/zextras/service-discover/pkg/term"
 )
 
-// Wizard si a wrap of the standard setup procedure that includes interactive setup.
+// Wizard is a wrapper of the standard setup procedure that includes interactive setup.
 type Wizard struct {
 	originalSetup *Setup
 

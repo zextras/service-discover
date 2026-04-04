@@ -24,9 +24,9 @@ type Writer struct {
 	tarballWriter *tar.Writer
 }
 
-// NewWriter initialize a new reader that automatically encrypts with OpenPGP the data passed. Additionally, the data
+// NewWriter initializes a new writer that automatically encrypts with OpenPGP the data passed. Additionally, the data
 // is wrapped around with a PGP armor, making the file text-based and easier to manipulate.
-// The encryption defaults are the "sane defaults" set by the openpgp package this reader is based on. Please check
+// The encryption defaults are the "sane defaults" set by the openpgp package this writer is based on. Please check
 // https://pkg.go.dev/golang.org/x/crypto/openpgp#SymmetricallyEncrypt for more details about the encryption
 // configuration.
 func NewWriter(writer io.Writer, passphrase []byte) (*Writer, error) {

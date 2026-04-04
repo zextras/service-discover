@@ -103,7 +103,7 @@ func ReadFiles(tarReader *tar.Reader, files ...string) (map[string][]byte, error
 			missingFiles.WriteString(f)
 		}
 
-		return nil, errors.Errorf("not all files where found in the archive:%s", missingFiles.String())
+		return nil, errors.Errorf("not all files were found in the archive:%s", missingFiles.String())
 	}
 
 	return result, nil

@@ -30,7 +30,7 @@ type LdapContainer struct {
 // SpinUpCarbonioLdap launches a Carbonio LDAP instance with the desired
 // version. It returns the LDAP instance context and the container itself.
 // Note it is necessary to defer the container stop otherwise the instance
-// will be hanging forever `defer ldapContainer.Terminate()`!
+// will be hanging forever `defer ldapContainer.Stop()`!
 //
 // When running inside a Kubernetes cluster (detected via KUBERNETES_SERVICE_HOST),
 // the container is launched as a Kubernetes Pod. Otherwise, Docker via

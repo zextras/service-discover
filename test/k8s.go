@@ -145,6 +145,14 @@ func SpinUpCarbonioLdapK8s(t *testing.T, address, version string) (LdapContainer
 	}
 
 	podIP := runningPod.Status.PodIP
+	if podIP == "" {
+		_ = clientset.CoreV1().Pods(namespace).Delete(
+			ctx, podName, metav1.DeleteOptions{},
+		)
+
+		t.Fatal("pod is running but has no IP assigned")
+	}
+
 	t.Logf("Pod %s running at IP: %s", podName, podIP)
 
 	err = waitForLdapReady(ctx, t, clientset, namespace, podName, podIP)

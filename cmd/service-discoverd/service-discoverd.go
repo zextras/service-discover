@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/user"
+	"path/filepath"
 	"strconv"
 	"syscall"
 
@@ -329,7 +330,7 @@ func queryAllServiceDiscoverServers(ldapHandler carbonio.LdapHandler) ([]string,
 
 func addGrpcTLS(inputFile string) *ErrorWithExitCode {
 	// Read the input JSON file
-	inputData, err := os.ReadFile(inputFile) //nolint:gosec // inputFile is internal, not user-controlled
+	inputData, err := os.ReadFile(filepath.Clean(inputFile))
 	if err != nil {
 		return &ErrorWithExitCode{
 			Log:      "Failed to read input file:" + err.Error(),

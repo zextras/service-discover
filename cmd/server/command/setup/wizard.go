@@ -13,7 +13,7 @@ import (
 	"github.com/zextras/service-discover/pkg/term"
 )
 
-// Wizard si a wrap of the standard setup procedure that includes interactive setup.
+// Wizard is a wrapper of the standard setup procedure that includes interactive setup.
 type Wizard struct {
 	originalSetup *Setup `kong:"-"`
 	Password      string `help:"Set a custom password for the encrypted secret files. If none is set, a random one will be generated and printed"` //nolint:lll

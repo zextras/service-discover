@@ -61,7 +61,7 @@ func InPath(cmd Cmd, path string) error {
 func ErrorFromStderr(err error, reason string) error {
 	stderr := err.Error()
 
-	ee := &exec.ExitError{}
+	var ee *exec.ExitError
 	if errors.As(err, &ee) {
 		stderr = string(ee.Stderr)
 	}

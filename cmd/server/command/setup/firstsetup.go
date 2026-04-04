@@ -283,7 +283,7 @@ func (s *Setup) createACLBootstrapToken(deps businessDependencies) ([]byte, erro
 
 			aclBootstrapJSON, err := deps.CreateCommand(consulBin, "acl", "bootstrap", "-format", "json").Output()
 			if err != nil {
-				ee := &exec.ExitError{}
+				var ee *exec.ExitError
 				if errors.As(err, &ee) {
 					stderr := strings.TrimSpace(string(ee.Stderr))
 
