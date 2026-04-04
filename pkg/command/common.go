@@ -34,6 +34,7 @@ const (
 	GossipKey                  = "gossip-key"
 	ConsulHTTPToken            = "CONSUL_HTTP_TOKEN" // #nosec
 	ConsulBin                  = "/usr/bin/consul"
+	errLdapConnect             = "unable to connect to ldap"
 	ACLPolicyTemplateText      = `{
    "node":{
       "{{ .ZimbraHostname }}":{
@@ -149,7 +150,7 @@ func NonLoopbackInterfaces(d NetworkInterfaces) ([]net.Interface, error) {
 func UploadCredentialsToLDAP(ldapHandler carbonio.LdapHandler, credentials string) error {
 	err := ldapHandler.CheckServerAvailability(true)
 	if err != nil {
-		return errors.WithMessage(err, "unable to connect to ldap")
+		return errors.WithMessage(err, errLdapConnect)
 	}
 
 	file, err := os.Open(credentials) // #nosec
@@ -169,7 +170,7 @@ func UploadCredentialsToLDAP(ldapHandler carbonio.LdapHandler, credentials strin
 func DownloadCredentialsFromLDAP(ldapHandler carbonio.LdapHandler, destination string) error {
 	err := ldapHandler.CheckServerAvailability(false)
 	if err != nil {
-		return errors.WithMessage(err, "unable to connect to ldap")
+		return errors.WithMessage(err, errLdapConnect)
 	}
 
 	content, err := ldapHandler.DownloadBinary(carbonio.LdapConfigBaseDn, carbonio.AttrCarbonioCredentials)
@@ -185,7 +186,7 @@ func DownloadCredentialsFromLDAP(ldapHandler carbonio.LdapHandler, destination s
 func RetrieveZimbraHostname(localConfig carbonio.LocalConfig, ldapHandler carbonio.LdapHandler) (string, error) {
 	err := ldapHandler.CheckServerAvailability(true)
 	if err != nil {
-		return "", errors.WithMessage(err, "unable to connect to ldap")
+		return "", errors.WithMessage(err, errLdapConnect)
 	}
 
 	return localConfig.Value(carbonio.LocalConfigServerHostname), nil

@@ -97,16 +97,13 @@ func ReadFiles(tarReader *tar.Reader, files ...string) (map[string][]byte, error
 	}
 
 	if len(result) != len(files) {
-		missingFiles := ""
-
-		var missingFilesSb strings.Builder
+		var missingFiles strings.Builder
 		for _, f := range remainingFiles {
-			missingFilesSb.WriteString(" " + f)
+			missingFiles.WriteByte(' ')
+			missingFiles.WriteString(f)
 		}
 
-		missingFiles += missingFilesSb.String()
-
-		return nil, errors.Errorf("not all files where found in the archive:%s", missingFiles)
+		return nil, errors.Errorf("not all files where found in the archive:%s", missingFiles.String())
 	}
 
 	return result, nil

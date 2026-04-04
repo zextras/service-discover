@@ -156,16 +156,13 @@ type listConfigOutput struct {
 }
 
 func (o *listConfigOutput) PlainRender() (string, error) {
-	out := ""
-
-	var outSb strings.Builder
+	var builder strings.Builder
 	for _, config := range o.configs {
-		outSb.WriteString(config + "\n")
+		builder.WriteString(config)
+		builder.WriteByte('\n')
 	}
 
-	out += outSb.String()
-
-	return out, nil
+	return builder.String(), nil
 }
 
 func (o *listConfigOutput) JSONRender() (string, error) {
