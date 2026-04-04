@@ -352,7 +352,7 @@ func TestSetup_setup(t *testing.T) {
 		assert.EqualError(
 			t,
 			err,
-			fmt.Sprintf("not all files where found in the archive:%s", missingFiles),
+			fmt.Sprintf("not all files were found in the archive:%s", missingFiles),
 		)
 	})
 
