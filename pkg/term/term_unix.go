@@ -88,7 +88,7 @@ func (t *terminal) Close() error {
 
 // New returns a new terminal with the given reader and writer functions.
 func New(reader *os.File, writer io.Writer, prompt string) (Terminal, error) {
-	stdIn := int(reader.Fd())
+	stdIn := int(reader.Fd()) //nolint:gosec // fd is always small, no overflow risk
 	res := &terminal{
 		stdIn: stdIn,
 	}
@@ -117,7 +117,7 @@ type UIProvider interface {
 	Get(writer io.Writer) (Terminal, error)
 }
 
-type TermUIProvider struct {
+type TermUIProvider struct { //nolint:revive // renaming would break external consumers
 }
 
 func (c *TermUIProvider) Get(writer io.Writer) (Terminal, error) {

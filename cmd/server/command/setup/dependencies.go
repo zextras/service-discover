@@ -25,7 +25,7 @@ type interactiveDependencies interface {
 	LookupIP(s string) ([]net.IP, error)
 }
 
-type businessDependencies interface {
+type businessDependencies interface { //nolint:interfacebloat // setup requires many system deps
 	NetInterfaces() ([]net.Interface, error)
 	AddrResolver(n net.Interface) ([]net.Addr, error)
 	LookupIP(s string) ([]net.IP, error)
@@ -65,7 +65,7 @@ func (r realDependencies) AddrResolver(n net.Interface) ([]net.Addr, error) {
 }
 
 func (r realDependencies) LookupIP(s string) ([]net.IP, error) {
-	return net.LookupIP(s)
+	return net.LookupIP(s) //nolint:noctx // changing interface signature is too invasive
 }
 
 func (r realDependencies) LdapHandler(config carbonio.LocalConfig) carbonio.LdapHandler {

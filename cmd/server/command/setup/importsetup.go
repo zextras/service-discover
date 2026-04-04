@@ -23,14 +23,15 @@ import (
 // importSetup refers to the run performed on a non-first cluster instance in a non-interactive way.
 // The output returned is always empty
 //
-//nolint:misspell
+//nolint:misspell,gocognit,gocyclo,cyclop // complex setup flow is inherently sequential
 func (s *Setup) importSetup(deps businessDependencies) (formatter.Formatter, error) {
 	networks, err := command.NonLoopbackInterfaces(deps)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := command.CheckValidBindingAddress(deps, networks, s.BindAddress); err != nil {
+	err = command.CheckValidBindingAddress(deps, networks, s.BindAddress)
+	if err != nil {
 		return nil, err
 	}
 
@@ -51,7 +52,8 @@ func (s *Setup) importSetup(deps businessDependencies) (formatter.Formatter, err
 		return nil, err
 	}
 
-	if err := command.DownloadCredentialsFromLDAP(ldapHandler, s.ClusterCredential); err != nil {
+	err = command.DownloadCredentialsFromLDAP(ldapHandler, s.ClusterCredential)
+	if err != nil {
 		return nil, errors.WithMessage(err, "unable to download credentials from LDAP")
 	}
 
@@ -97,7 +99,8 @@ func (s *Setup) importSetup(deps businessDependencies) (formatter.Formatter, err
 		return nil, err
 	}
 
-	if err := os.WriteFile("/"+localCaFullPath, extractedFiles[tarballCaFullPath], os.FileMode(0600)); err != nil {
+	err = os.WriteFile("/"+localCaFullPath, extractedFiles[tarballCaFullPath], os.FileMode(0600))
+	if err != nil {
 		return nil, err
 	}
 
@@ -106,7 +109,8 @@ func (s *Setup) importSetup(deps businessDependencies) (formatter.Formatter, err
 		return nil, err
 	}
 
-	if err := os.WriteFile("/"+localCaKeyFullPath, extractedFiles[tarballCaKeyFullPath], os.FileMode(0600)); err != nil {
+	err = os.WriteFile("/"+localCaKeyFullPath, extractedFiles[tarballCaKeyFullPath], os.FileMode(0600))
+	if err != nil {
 		return nil, err
 	}
 	defer os.Remove("/" + localCaKeyFullPath)
@@ -123,7 +127,8 @@ func (s *Setup) importSetup(deps businessDependencies) (formatter.Formatter, err
 		return nil, err
 	}
 
-	if err := os.WriteFile(s.ConsulFileConfig, consulFileBytes, os.FileMode(0600)); err != nil {
+	err = os.WriteFile(s.ConsulFileConfig, consulFileBytes, os.FileMode(0600))
+	if err != nil {
 		return nil, errors.Errorf("unable to save generated configuration file in %s: %s", s.ConsulHome, err)
 	}
 
@@ -132,7 +137,8 @@ func (s *Setup) importSetup(deps businessDependencies) (formatter.Formatter, err
 		return nil, err
 	}
 
-	if err := command.SaveBindAddressConfiguration(s.MutableConfigFile, s.BindAddress); err != nil {
+	err = command.SaveBindAddressConfiguration(s.MutableConfigFile, s.BindAddress)
+	if err != nil {
 		return nil, err
 	}
 
@@ -141,27 +147,31 @@ func (s *Setup) importSetup(deps businessDependencies) (formatter.Formatter, err
 		return nil, err
 	}
 
-	if err := command.AddServiceInLDAP(ldapHandler, zimbraHostname); err != nil {
+	err = command.AddServiceInLDAP(ldapHandler, zimbraHostname)
+	if err != nil {
 		return nil, err
 	}
 
 	isContainer := command.CheckDockerContainer()
 
 	if isContainer && !testingMode {
-		cmd := exec.Command("service-discoverd-docker", "server")
+		cmd := exec.Command("service-discoverd-docker", "server") //nolint:noctx // no context available here
 
 		err = cmd.Run()
 		if err != nil {
 			return nil, errors.WithMessage(err, "unable to start service-discoverd server")
 		}
 	} else {
-		if err := systemd.StartSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit); err != nil {
+		err := systemd.StartSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
+		if err != nil {
 			return nil, errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
 		}
 	}
 
 	aclBootstrapToken := command.ACLTokenCreation{}
-	if err := json.Unmarshal(extractedFiles[command.ConsulACLBootstrap], &aclBootstrapToken); err != nil {
+
+	err = json.Unmarshal(extractedFiles[command.ConsulACLBootstrap], &aclBootstrapToken)
+	if err != nil {
 		return nil, errors.WithMessagef(err, "unable to decode ACL Bootstrap token")
 	}
 
@@ -180,7 +190,8 @@ func (s *Setup) importSetup(deps businessDependencies) (formatter.Formatter, err
 		return nil, err
 	}
 
-	if err := os.WriteFile(s.ConsulHome+"/password", []byte(s.Password), 0400); err != nil {
+	err = os.WriteFile(s.ConsulHome+"/password", []byte(s.Password), 0400)
+	if err != nil {
 		return nil, err
 	}
 

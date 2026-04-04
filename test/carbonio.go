@@ -52,7 +52,7 @@ type localConfigFields struct {
 	LdapPassword  string
 }
 
-func GenerateLocalConfig(
+func GenerateLocalConfig( //nolint:thelper // not a helper, it's a fixture generator
 	t *testing.T,
 	hostname string,
 	ldapMasterURL string,

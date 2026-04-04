@@ -16,6 +16,7 @@ import (
 // since it is program specific.
 type AgentFlags struct {
 	command.GlobalCommonFlags
+
 	Version versionFlag `help:"Show the version of this program" type:"bool"`
 }
 

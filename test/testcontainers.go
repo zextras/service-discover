@@ -23,15 +23,29 @@ const (
 type LdapContainer struct {
 	Stop func()
 	URL  func() string
-	Ip   func() string
+	IP   func() string
 	Port func() string
 }
 
 // SpinUpCarbonioLdap launches a Carbonio LDAP instance with the desired
 // version. It returns the LDAP instance context and the container itself.
 // Note it is necessary to defer the container stop otherwise the instance
-// will be hanging forever `defer ldapContainer.Terminate()`!
+// will be hanging forever `defer ldapContainer.Stop()`!
+//
+// When running inside a Kubernetes cluster (detected via KUBERNETES_SERVICE_HOST),
+// the container is launched as a Kubernetes Pod. Otherwise, Docker via
+// testcontainers is used.
+//
+//nolint:thelper // not a helper, it's a setup function
 func SpinUpCarbonioLdap(t *testing.T, address, version string) (LdapContainer, context.Context) {
+	if IsRunningInKubernetes() {
+		t.Log("Kubernetes environment detected, using K8s pod for LDAP container")
+
+		return SpinUpCarbonioLdapK8s(t, address, version)
+	}
+
+	t.Log("Using Docker via testcontainers for LDAP container")
+
 	ctx := context.Background()
 
 	t.Log("Networks that are going to be attached to the container")
@@ -55,7 +69,6 @@ func SpinUpCarbonioLdap(t *testing.T, address, version string) (LdapContainer, c
 		ContainerRequest: req,
 		Started:          true,
 	})
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,16 +91,18 @@ func SpinUpCarbonioLdap(t *testing.T, address, version string) (LdapContainer, c
 				t.Log(err)
 			}
 		},
-		Ip: func() string {
+		IP: func() string {
 			return "localhost"
 		},
 		Port: func() string {
 			port, _ := ldapContainer.MappedPort(ctx, "1389")
+
 			return port.Port()
 		},
 	}
 	containerWithPort.URL = func() string {
 		return "ldap://localhost:" + containerWithPort.Port()
 	}
+
 	return containerWithPort, ctx
 }
