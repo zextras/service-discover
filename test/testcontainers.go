@@ -31,7 +31,17 @@ type LdapContainer struct {
 // version. It returns the LDAP instance context and the container itself.
 // Note it is necessary to defer the container stop otherwise the instance
 // will be hanging forever `defer ldapContainer.Terminate()`!
+//
+// When running inside a Kubernetes cluster (detected via KUBERNETES_SERVICE_HOST),
+// the container is launched as a Kubernetes Pod. Otherwise, Docker via
+// testcontainers is used.
 func SpinUpCarbonioLdap(t *testing.T, address, version string) (LdapContainer, context.Context) {
+	if IsRunningInKubernetes() {
+		t.Log("Kubernetes environment detected, using K8s pod for LDAP container")
+		return SpinUpCarbonioLdapK8s(t, address, version)
+	}
+
+	t.Log("Using Docker via testcontainers for LDAP container")
 	ctx := context.Background()
 
 	t.Log("Networks that are going to be attached to the container")
