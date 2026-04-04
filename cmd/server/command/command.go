@@ -17,6 +17,7 @@ import (
 // specific.
 type ServerFlags struct {
 	command.GlobalCommonFlags
+
 	Version versionFlag `help:"Show the version of this program" type:"bool"`
 }
 

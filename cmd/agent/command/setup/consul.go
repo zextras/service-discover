@@ -6,7 +6,7 @@ package setup
 
 import "github.com/hashicorp/consul/api"
 
-type Client interface {
+type Client interface { //nolint:interfacebloat // mirrors consul API client
 	Health() *api.Health
 	Namespaces() *api.Namespaces
 	Snapshot() *api.Snapshot

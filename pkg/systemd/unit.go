@@ -10,7 +10,7 @@ import (
 	"github.com/coreos/go-systemd/v22/dbus"
 )
 
-type UnitManager interface {
+type UnitManager interface { //nolint:interfacebloat // mirrors systemd dbus API
 	StartUnit(name string, mode string, ch chan<- string) (int, error)
 	StopUnit(name string, mode string, ch chan<- string) (int, error)
 	ReloadUnit(name string, mode string, ch chan<- string) (int, error)

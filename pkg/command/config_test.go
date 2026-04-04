@@ -103,7 +103,7 @@ func TestGetConfig(t *testing.T) {
 		}
 		err := cmd.Run(&flags)
 		assert.NotNil(t, err)
-		assert.Equal(t, "unknown configuration 'random-name'", err.Error())
+		assert.Equal(t, "unknown configuration: random-name", err.Error())
 		assert.Equal(t, "", buffer.String())
 	})
 
@@ -177,7 +177,7 @@ func TestSetConfig(t *testing.T) {
 		}
 		err := cmd.Run(&flags)
 		assert.NotNil(t, err)
-		assert.Equal(t, "unknown configuration 'random-name'", err.Error())
+		assert.Equal(t, "unknown configuration: random-name", err.Error())
 		assert.Equal(t, "", consoleOutput.String())
 	})
 

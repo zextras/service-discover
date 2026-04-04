@@ -131,7 +131,7 @@ func TestSetup_setup(t *testing.T) {
 
 		localConfigByte := test.GenerateLocalConfig(
 			t,
-			container.Ip(),
+			container.IP(),
 			ldapUrl,
 			ldapUrl,
 			test.DefaultLdapUserDN,
@@ -352,7 +352,7 @@ func TestSetup_setup(t *testing.T) {
 		assert.EqualError(
 			t,
 			err,
-			fmt.Sprintf("not all files where found in the archive:%s", missingFiles),
+			fmt.Sprintf("not all files were found in the archive:%s", missingFiles),
 		)
 	})
 
@@ -430,7 +430,7 @@ func TestSetup_setup(t *testing.T) {
 		selectedInterface := net.Interface{
 			Name: "en1",
 		}
-		containerIP := testStruct.Container.Ip()
+		containerIP := testStruct.Container.IP()
 		assert.NoError(t, err)
 
 		aclTemplateData := struct {
@@ -605,7 +605,7 @@ func TestSetup_setup(t *testing.T) {
 		selectedInterface := net.Interface{
 			Name: "en1",
 		}
-		containerIP := testStruct.Container.Ip()
+		containerIP := testStruct.Container.IP()
 		assert.NoError(t, err)
 
 		aclTemplateData := struct {

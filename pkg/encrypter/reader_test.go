@@ -251,6 +251,6 @@ func TestReadFiles(t *testing.T) {
 		assert.NoError(t, err)
 
 		_, err = ReadFiles(reader, "test", "test2", "iDontExists")
-		assert.EqualError(t, err, "not all files where found in the archive: iDontExists")
+		assert.EqualError(t, err, "not all files were found in the archive: iDontExists")
 	})
 }
