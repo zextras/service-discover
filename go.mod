@@ -12,7 +12,7 @@ require (
 	github.com/hashicorp/consul/api v1.33.2
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.11.1
-	github.com/testcontainers/testcontainers-go v0.41.0
+	github.com/testcontainers/testcontainers-go v0.42.0
 	golang.org/x/term v0.40.0
 	k8s.io/api v0.35.3
 	k8s.io/apimachinery v0.35.3
