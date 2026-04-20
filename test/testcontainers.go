@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/api/types/container"
 	"github.com/docker/go-units"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -80,7 +80,7 @@ func SpinUpCarbonioLdap(t *testing.T, address, version string) (LdapContainer, c
 
 	for port, bindings := range ports {
 		for _, binding := range bindings {
-			t.Log("Port: " + port.Port() + " host bind: " + binding.HostPort + " ip bind: " + binding.HostIP)
+			t.Log("Port: " + port.Port() + " host bind: " + binding.HostPort + " ip bind: " + binding.HostIP.String())
 		}
 	}
 
