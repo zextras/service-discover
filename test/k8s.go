@@ -84,6 +84,9 @@ func SpinUpCarbonioLdapK8s(t *testing.T, address, version string) (LdapContainer
 			},
 		},
 		Spec: corev1.PodSpec{
+			NodeSelector: map[string]string{
+				"node-role.kubernetes.io/worker": "true",
+			},
 			Containers: []corev1.Container{
 				{
 					Name:  "ldap",
