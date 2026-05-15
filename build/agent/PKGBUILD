@@ -8,7 +8,7 @@ pkgrel="1"
 pkgdesc="Service discover agent cli"
 maintainer="Zextras <packages@zextras.com>"
 copyright=('2022, Zextras <https://www.zextras.com>')
-arch=('x86_64')
+arch=('aarch64' 'x86_64')
 license=("AGPL-3.0-only")
 section="admin"
 priority="optional"
@@ -51,7 +51,7 @@ _package_systemd() {
 }
 
 build() {
-  cd "$(dirname "$(find /project -name "yap.json" -print -quit)")/.."
+  cd "${repodir}"
   CGO_ENABLED=0 go build \
     -o "${srcdir}/agent" \
     cmd/agent/agent.go
