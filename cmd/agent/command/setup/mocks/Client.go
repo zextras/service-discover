@@ -3,7 +3,7 @@
 package mocks
 
 import (
-	api "github.com/hashicorp/consul/api"
+	api "github.com/hashicorp/consul/api/v2"
 	mock "github.com/stretchr/testify/mock"
 )
 

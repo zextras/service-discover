@@ -4,7 +4,7 @@
 
 package setup
 
-import "github.com/hashicorp/consul/api"
+import "github.com/hashicorp/consul/api/v2"
 
 type Client interface { //nolint:interfacebloat // mirrors consul API client
 	Health() *api.Health
