@@ -14,6 +14,7 @@ linters:
     - forcetypeassert
     - funlen
     - gochecknoglobals
+    - gomodguard
     - gochecknoinits
     - godox
     - ireturn
@@ -24,6 +25,7 @@ linters:
     - wrapcheck
     - wsl
   enable:
+    - gomodguard_v2
     - wsl_v5
   settings:
     wsl_v5:

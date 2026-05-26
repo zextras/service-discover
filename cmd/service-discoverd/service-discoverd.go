@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	consulBinPath = "/usr/bin/consul"
+	consulBinPath  = "/usr/bin/consul"
+	consulAgentCmd = "agent"
 	// ExitCodeWrongArgs and the following codes start from 1000
 	// to avoid conflicts with consul exit codes.
 	ExitCodeWrongArgs  = 1001
@@ -26,6 +27,8 @@ const (
 	ParsePortsMainJSON = 1008
 	MarshallMainJSON   = 1009
 	WriteMainJSON      = 1010
+	MarshallTLSJSON    = 1011
+	WriteTLSJSON       = 1012
 )
 
 type realDependencies struct{}
@@ -95,7 +98,7 @@ func main() {
 }
 
 func runServiceDiscoverDaemon(deps deps, args []string) {
-	if len(args) < 2 || (args[1] != "server" && args[1] != "agent") {
+	if len(args) < 2 || (args[1] != "server" && args[1] != consulAgentCmd) {
 		deps.Log("one parameter: server or agent")
 		deps.Exit(ExitCodeWrongArgs)
 
@@ -148,6 +151,14 @@ func runServiceDiscoverDaemon(deps deps, args []string) {
 	if errTLS != nil {
 		deps.Log(errTLS.Log)
 		deps.Exit(errTLS.ExitCode)
+
+		return
+	}
+
+	errMig := migrateDeprecatedTLSFields(mainJSONPath)
+	if errMig != nil {
+		deps.Log(errMig.Log)
+		deps.Exit(errMig.ExitCode)
 
 		return
 	}
@@ -225,7 +236,7 @@ func startConsul(deps deps, isServer bool, servers []string, localServer string)
 	if isServer {
 		args = []string{
 			consulBinPath,
-			"agent",
+			consulAgentCmd,
 			"-bootstrap-expect",
 			strconv.Itoa(len(servers)/2 + 1),
 			"-config-dir",
@@ -235,7 +246,7 @@ func startConsul(deps deps, isServer bool, servers []string, localServer string)
 	} else {
 		args = []string{
 			consulBinPath,
-			"agent",
+			consulAgentCmd,
 			"-config-dir",
 			"/etc/zextras/service-discover/",
 		}
@@ -382,6 +393,116 @@ func addGrpcTLS(inputFile string) *ErrorWithExitCode {
 		}
 	} else {
 		fmt.Println("'grpc_tls' port already exists")
+	}
+
+	return nil
+}
+
+// deprecatedTLSDefaultsFields lists Consul TLS fields whose flat top-level form
+// is deprecated in favor of nesting under tls.defaults.
+var deprecatedTLSDefaultsFields = []string{ //nolint:gochecknoglobals // table-style constant
+	"ca_file", "cert_file", "key_file",
+	"verify_incoming", "verify_outgoing",
+}
+
+// deprecatedTLSInternalRPCFields lists Consul TLS fields whose flat top-level
+// form is deprecated in favor of nesting under tls.internal_rpc.
+var deprecatedTLSInternalRPCFields = []string{ //nolint:gochecknoglobals // table-style constant
+	"verify_server_hostname",
+}
+
+func hasAnyKey(jsonData map[string]any, keys []string) bool {
+	for _, key := range keys {
+		if _, ok := jsonData[key]; ok {
+			return true
+		}
+	}
+
+	return false
+}
+
+func moveFields(src, dst map[string]any, keys []string) bool {
+	changed := false
+
+	for _, key := range keys {
+		value, ok := src[key]
+		if !ok {
+			continue
+		}
+
+		if _, present := dst[key]; !present {
+			dst[key] = value
+		}
+
+		delete(src, key)
+
+		changed = true
+	}
+
+	return changed
+}
+
+func ensureMap(parent map[string]any, key string) map[string]any {
+	if existing, ok := parent[key].(map[string]any); ok && existing != nil {
+		return existing
+	}
+
+	return map[string]any{}
+}
+
+func migrateDeprecatedTLSFields(inputFile string) *ErrorWithExitCode {
+	inputData, err := os.ReadFile(filepath.Clean(inputFile))
+	if err != nil {
+		return &ErrorWithExitCode{
+			Log:      "Failed to read input file:" + err.Error(),
+			ExitCode: ReadMainJSON,
+		}
+	}
+
+	var jsonData map[string]any
+
+	err = json.Unmarshal(inputData, &jsonData)
+	if err != nil {
+		return &ErrorWithExitCode{
+			Log:      "Failed to parse JSON data:" + err.Error(),
+			ExitCode: ParseMainJSON,
+		}
+	}
+
+	if !hasAnyKey(jsonData, deprecatedTLSDefaultsFields) &&
+		!hasAnyKey(jsonData, deprecatedTLSInternalRPCFields) {
+		return nil
+	}
+
+	tls := ensureMap(jsonData, "tls")
+	defaults := ensureMap(tls, "defaults")
+	internalRPC := ensureMap(tls, "internal_rpc")
+
+	changed := moveFields(jsonData, defaults, deprecatedTLSDefaultsFields)
+	changed = moveFields(jsonData, internalRPC, deprecatedTLSInternalRPCFields) || changed
+
+	if !changed {
+		return nil
+	}
+
+	tls["defaults"] = defaults
+	tls["internal_rpc"] = internalRPC
+	jsonData["tls"] = tls
+
+	modifiedData, err := json.MarshalIndent(jsonData, "", "  ")
+	if err != nil {
+		return &ErrorWithExitCode{
+			Log:      "Failed to marshal migrated TLS JSON data:" + err.Error(),
+			ExitCode: MarshallTLSJSON,
+		}
+	}
+
+	err = os.WriteFile(inputFile, modifiedData, 0644) //nolint:gosec // consul config needs to be readable
+	if err != nil {
+		return &ErrorWithExitCode{
+			Log:      "Failed to write migrated TLS JSON data:" + err.Error(),
+			ExitCode: WriteTLSJSON,
+		}
 	}
 
 	return nil

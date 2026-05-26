@@ -21,7 +21,10 @@ var (
 	errUnknownConfig = errors.New("unknown configuration")
 )
 
-const ConsulMutableConfigFile = "/etc/zextras/service-discover/config.json"
+const (
+	ConsulMutableConfigFile = "/etc/zextras/service-discover/config.json"
+	configBindAddress       = "bind-address"
+)
 
 type MutableConsulConfig struct {
 	BindAddress string `json:"bind_addr"`
@@ -84,7 +87,7 @@ func (v *GetConfig) Run(globalFlags *GlobalCommonFlags) error {
 	output := &getConfigOutput{}
 
 	switch v.Config {
-	case "bind-address":
+	case configBindAddress:
 		output.BindAddress = config.BindAddress
 	default:
 		return fmt.Errorf("%w: %s", errUnknownConfig, v.Config)
@@ -125,7 +128,7 @@ func (v *SetConfig) Run(_ *GlobalCommonFlags) error {
 	}
 
 	switch v.Config {
-	case "bind-address":
+	case configBindAddress:
 		config.BindAddress = v.Value
 	default:
 		return fmt.Errorf("%w: %s", errUnknownConfig, v.Config)
@@ -173,7 +176,7 @@ func (o *listConfigOutput) JSONRender() (string, error) {
 
 func (v *ListConfig) Run(globalFlags *GlobalCommonFlags) error {
 	output := listConfigOutput{
-		configs: []string{"bind-address"},
+		configs: []string{configBindAddress},
 	}
 
 	out, err := formatter.Render(&output, globalFlags.Format)

@@ -88,7 +88,7 @@ func (t *terminal) Close() error {
 
 // New returns a new terminal with the given reader and writer functions.
 func New(reader *os.File, writer io.Writer, prompt string) (Terminal, error) {
-	stdIn := int(reader.Fd()) //nolint:gosec // fd is always small, no overflow risk
+	stdIn := int(reader.Fd())
 	res := &terminal{
 		stdIn: stdIn,
 	}
