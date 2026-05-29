@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 library(
-    identifier: 'jenkins-lib-common@v2.8.3',
+    identifier: 'jenkins-lib-common@v2.9.2',
     retriever: modernSCM([
         $class: 'GitSCMSource',
         credentialsId: 'jenkins-integration-with-github-account',
@@ -136,12 +136,12 @@ pipeline {
             }
             steps {
                 uploadStage(
-                    packages: yapHelper.resolvePackageNames('build/yap.json')
+                    yapPath: 'build/yap.json',
                 )
                 uploadStage(
                     architecture: 'aarch64',
                     distros: ['ubuntu-jammy'],
-                    packages: yapHelper.resolvePackageNames('build/yap.json')
+                    yapPath: 'build/yap.json',
                 )
             }
         }
