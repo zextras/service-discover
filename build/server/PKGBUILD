@@ -79,7 +79,9 @@ package__ubuntu_noble() {
 postinst__apt() {
   if [ -d /run/systemd/system ]; then
     systemctl daemon-reload &>/dev/null || :
-    if [ "$1" = "configure" ] && [ -z "$2" ]; then
+    # Enable on both fresh install and upgrade so the [Install] WantedBy=
+    # symlink is always reconciled against the current unit (self-healing).
+    if [ "$1" = "configure" ]; then
       systemctl enable service-discover.service &>/dev/null || :
     fi
   fi
@@ -90,7 +92,9 @@ postinst__apt() {
 postinst__yum() {
   if [ -d /run/systemd/system ]; then
     systemctl daemon-reload &>/dev/null || :
-    if [ $1 -eq 1 ]; then
+    # Enable on both fresh install ($1 -eq 1) and upgrade ($1 -eq 2) so the
+    # [Install] WantedBy= symlink is always reconciled (self-healing).
+    if [ $1 -ge 1 ]; then
       systemctl enable service-discover.service &>/dev/null || :
     fi
   fi
