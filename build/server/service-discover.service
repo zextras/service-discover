@@ -5,8 +5,8 @@
 [Unit]
 Description=Zextras Service Discover Server
 Documentation=https://docs.zextras.com/
-Requires=network-online.target carbonio-openldap.service
-After=network-online.target carbonio-openldap.service
+Requires=network-online.target
+After=network-online.target
 PartOf=service-discover.target
 
 [Service]
