@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 pkgname="service-discover-server"
-pkgver="0.7.1"
+pkgver="0.7.2"
 pkgrel="1"
 pkgdesc="Service discover server cli"
 maintainer="Zextras <packages@zextras.com>"
