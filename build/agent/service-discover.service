@@ -22,8 +22,12 @@ TimeoutStopSec=120s
 
 # Hardening
 PrivateTmp=yes
-ProtectSystem=strict
-ReadWritePaths=/var/lib/service-discover /etc/zextras/service-discover /run/carbonio /tmp
+#ProtectSystem=strict
+#ReadWritePaths=/var/lib/service-discover /etc/zextras/service-discover /run/carbonio /tmp
+ProtectSystem=yes
+ReadOnlyPaths=/usr
+ReadOnlyPaths=/boot
+ReadOnlyPaths=/efi
 PrivateDevices=yes
 ProtectHome=yes
 ProtectKernelModules=yes
