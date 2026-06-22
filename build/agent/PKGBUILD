@@ -30,7 +30,7 @@ source=(
   "service-discover-legacy.service"
 )
 sha256sums=(
-  '3c26a0a04ebec4047a80915c988cddf9a356ed2da71e19b1ae59b905c60a5d0d'
+  '36dd9a30d7ec5d604409e9930935a47bda82c42fe0882782b1aad1c974d7fb28'
   'e0e17bae0bfb978dd52718a03079eaf30c2bf5dba080ca98c2964eb42e02bf14'
 )
 
