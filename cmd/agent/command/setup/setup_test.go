@@ -166,29 +166,29 @@ func TestSetup_setup(t *testing.T) {
 		clusterCredentialDownloadFile := test.GenerateRandomFile(testName)
 
 		return &testDependencies{
-				file,
-				clusterCredentialDownloadFile,
-				container,
-				ctxContainer,
-			}, func() {
-				defer func(container test.LdapContainer, ctx context.Context) {
-					container.Stop()
-				}(container, ctxContainer)
+			file,
+			clusterCredentialDownloadFile,
+			container,
+			ctxContainer,
+		}, func() {
+			defer func(container test.LdapContainer, ctx context.Context) {
+				container.Stop()
+			}(container, ctxContainer)
 
-				defer func(name string) {
-					err := os.Remove(name)
-					if err != nil {
-						t.Error(err)
-					}
-				}(file.Name())
+			defer func(name string) {
+				err := os.Remove(name)
+				if err != nil {
+					t.Error(err)
+				}
+			}(file.Name())
 
-				defer func(name string) {
-					err := os.Remove(name)
-					if err != nil {
-						t.Error(err)
-					}
-				}(clusterCredentialDownloadFile.Name())
-			}
+			defer func(name string) {
+				err := os.Remove(name)
+				if err != nil {
+					t.Error(err)
+				}
+			}(clusterCredentialDownloadFile.Name())
+		}
 	}
 
 	t.Run("Should fail when invalid binding address is selected", func(t *testing.T) {
@@ -198,7 +198,7 @@ func TestSetup_setup(t *testing.T) {
 		mockDep := new(mocks.BusinessDependencies)
 		mockDep.On("NetInterfaces").Return([]net.Interface{
 			selectedInterface,
-			net.Interface{
+			{
 				Name: "lo",
 			},
 		}, nil).
@@ -229,7 +229,7 @@ func TestSetup_setup(t *testing.T) {
 		mockDep := new(mocks.BusinessDependencies)
 		mockDep.On("NetInterfaces").Return([]net.Interface{
 			selectedInterface,
-			net.Interface{
+			{
 				Name: "lo",
 			},
 		}, nil).
@@ -280,7 +280,7 @@ func TestSetup_setup(t *testing.T) {
 		mockDep := new(mocks.BusinessDependencies)
 		mockDep.On("NetInterfaces").Return([]net.Interface{
 			selectedInterface,
-			net.Interface{
+			{
 				Name: "lo",
 			},
 		}, nil).
@@ -330,7 +330,7 @@ func TestSetup_setup(t *testing.T) {
 		mockDep := new(mocks.BusinessDependencies)
 		mockDep.On("NetInterfaces").Return([]net.Interface{
 			selectedInterface,
-			net.Interface{
+			{
 				Name: "lo",
 			},
 		}, nil).
@@ -486,7 +486,7 @@ func TestSetup_setup(t *testing.T) {
 			).Return(setTokenCmd).
 			On("NetInterfaces").Return([]net.Interface{
 			selectedInterface,
-			net.Interface{
+			{
 				Name: "lo",
 			},
 		}, nil).
@@ -661,7 +661,7 @@ func TestSetup_setup(t *testing.T) {
 			).Return(setTokenCmd).
 			On("NetInterfaces").Return([]net.Interface{
 			selectedInterface,
-			net.Interface{
+			{
 				Name: "lo",
 			},
 		}, nil).

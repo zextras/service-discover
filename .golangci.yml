@@ -10,12 +10,14 @@ linters:
   disable:
     - depguard
     - exhaustruct
+    - exhaustruct_v5
     - forbidigo
     - forcetypeassert
     - funlen
     - gochecknoglobals
     - gochecknoinits
     - godox
+    - gomodguard
     - ireturn
     - misspell
     - mnd

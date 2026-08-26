@@ -9,8 +9,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	mocks3 "github.com/zextras/service-discover/pkg/exec/mocks"
-	mocks4 "github.com/zextras/service-discover/pkg/systemd/mocks"
 	"io/fs"
 	"net"
 	"os"
@@ -26,6 +24,8 @@ import (
 	"github.com/zextras/service-discover/pkg/command"
 	mocks2 "github.com/zextras/service-discover/pkg/command/setup/mocks"
 	"github.com/zextras/service-discover/pkg/encrypter"
+	mocks3 "github.com/zextras/service-discover/pkg/exec/mocks"
+	mocks4 "github.com/zextras/service-discover/pkg/systemd/mocks"
 	"github.com/zextras/service-discover/test"
 )
 
@@ -309,63 +309,63 @@ func TestSetup_importSetup(t *testing.T) {
 
 		// Cleanup function
 		return &setupOutput{
-				file,
-				clusterCredentialDownloadFile,
-				container,
-				ctxContainer,
-				consulConfigDir,
-				consulHome,
-				consulData,
-				clusterFile.Name(),
-				consulAclBootstrap.Name(),
-				consulCertificate.Name(),
-				consulCAKeyFile.Name(),
-				mutableConfigFile.Name(),
-			}, func() {
-				if err := os.RemoveAll(consulConfigDir); err != nil {
+			file,
+			clusterCredentialDownloadFile,
+			container,
+			ctxContainer,
+			consulConfigDir,
+			consulHome,
+			consulData,
+			clusterFile.Name(),
+			consulAclBootstrap.Name(),
+			consulCertificate.Name(),
+			consulCAKeyFile.Name(),
+			mutableConfigFile.Name(),
+		}, func() {
+			if err := os.RemoveAll(consulConfigDir); err != nil {
+				t.Error(err)
+			}
+
+			if err := os.RemoveAll(consulHome); err != nil {
+				t.Error(err)
+			}
+
+			if err := os.RemoveAll(consulData); err != nil {
+				t.Error(err)
+			}
+
+			if err := os.RemoveAll(clusterFile.Name()); err != nil {
+				t.Error(err)
+			}
+
+			if err := os.RemoveAll(consulAclBootstrap.Name()); err != nil {
+				t.Error(err)
+			}
+
+			if err := os.RemoveAll(consulCertificate.Name()); err != nil {
+				t.Error(err)
+			}
+
+			if err := os.RemoveAll(consulCAKeyFile.Name()); err != nil {
+				t.Error(err)
+			}
+
+			if err := os.RemoveAll(mutableConfigFile.Name()); err != nil {
+				t.Error(err)
+			}
+
+			container.Stop()
+
+			if err := os.Remove(file.Name()); err != nil {
+				t.Error(err)
+			}
+
+			if err := os.Remove(clusterCredentialDownloadFile.Name()); err != nil {
+				if !os.IsNotExist(err) {
 					t.Error(err)
-				}
-
-				if err := os.RemoveAll(consulHome); err != nil {
-					t.Error(err)
-				}
-
-				if err := os.RemoveAll(consulData); err != nil {
-					t.Error(err)
-				}
-
-				if err := os.RemoveAll(clusterFile.Name()); err != nil {
-					t.Error(err)
-				}
-
-				if err := os.RemoveAll(consulAclBootstrap.Name()); err != nil {
-					t.Error(err)
-				}
-
-				if err := os.RemoveAll(consulCertificate.Name()); err != nil {
-					t.Error(err)
-				}
-
-				if err := os.RemoveAll(consulCAKeyFile.Name()); err != nil {
-					t.Error(err)
-				}
-
-				if err := os.RemoveAll(mutableConfigFile.Name()); err != nil {
-					t.Error(err)
-				}
-
-				container.Stop()
-
-				if err := os.Remove(file.Name()); err != nil {
-					t.Error(err)
-				}
-
-				if err := os.Remove(clusterCredentialDownloadFile.Name()); err != nil {
-					if !os.IsNotExist(err) {
-						t.Error(err)
-					}
 				}
 			}
+		}
 	}
 
 	t.Run("should fail if cluster credentials are missing", func(t *testing.T) {
