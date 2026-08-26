@@ -14,6 +14,11 @@ import (
 
 const (
 	consulBinPath = "/usr/bin/consul"
+	// consulAgentCommand is the consul subcommand used for both server and
+	// agent instances.
+	consulAgentCommand = "agent"
+	serverMode         = "server"
+	agentMode          = "agent"
 	// ExitCodeWrongArgs and the following codes start from 1000
 	// to avoid conflicts with consul exit codes.
 	ExitCodeWrongArgs  = 1001
@@ -95,14 +100,14 @@ func main() {
 }
 
 func runServiceDiscoverDaemon(deps deps, args []string) {
-	if len(args) < 2 || (args[1] != "server" && args[1] != "agent") {
+	if len(args) < 2 || (args[1] != serverMode && args[1] != agentMode) {
 		deps.Log("one parameter: server or agent")
 		deps.Exit(ExitCodeWrongArgs)
 
 		return
 	}
 
-	isServer := args[1] == "server"
+	isServer := args[1] == serverMode
 
 	// root privileges only serves to read the localconfig, once we have the
 	// necessary credentials we can drop privileges to reduce the attack surface
@@ -225,7 +230,7 @@ func startConsul(deps deps, isServer bool, servers []string, localServer string)
 	if isServer {
 		args = []string{
 			consulBinPath,
-			"agent",
+			consulAgentCommand,
 			"-bootstrap-expect",
 			strconv.Itoa(len(servers)/2 + 1),
 			"-config-dir",
@@ -235,7 +240,7 @@ func startConsul(deps deps, isServer bool, servers []string, localServer string)
 	} else {
 		args = []string{
 			consulBinPath,
-			"agent",
+			consulAgentCommand,
 			"-config-dir",
 			"/etc/zextras/service-discover/",
 		}

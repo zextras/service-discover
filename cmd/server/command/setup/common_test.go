@@ -5,7 +5,6 @@
 package setup
 
 import (
-	mocks22 "github.com/zextras/service-discover/pkg/exec/mocks"
 	"os"
 	"os/user"
 	"testing"
@@ -15,6 +14,7 @@ import (
 	"github.com/zextras/service-discover/pkg/carbonio"
 	mocks2 "github.com/zextras/service-discover/pkg/carbonio/mocks"
 	"github.com/zextras/service-discover/pkg/command/setup/mocks"
+	mocks22 "github.com/zextras/service-discover/pkg/exec/mocks"
 	"github.com/zextras/service-discover/test"
 )
 
@@ -43,19 +43,19 @@ func TestSetup_isFirstInstance(t *testing.T) {
 		))
 
 		return &testData{
-				localConfigPath:        localConfig.Name(),
-				clusterCredentialsPath: clusterCredentials.Name(),
-			}, func() {
-				err := os.Remove(localConfig.Name())
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				err = os.Remove(clusterCredentials.Name())
-				if err != nil {
-					t.Fatal(err)
-				}
+			localConfigPath:        localConfig.Name(),
+			clusterCredentialsPath: clusterCredentials.Name(),
+		}, func() {
+			err := os.Remove(localConfig.Name())
+			if err != nil {
+				t.Fatal(err)
 			}
+
+			err = os.Remove(clusterCredentials.Name())
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
 	}
 
 	t.Run("Should give first instance", func(t *testing.T) {

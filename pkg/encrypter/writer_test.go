@@ -63,11 +63,11 @@ func TestWriter(t *testing.T) {
 		file2 := bytes.NewBuffer([]byte("test2"))
 
 		return &outputsetup{
-				encOutput: encOutput,
-				file1:     *file1,
-				file2:     *file2,
-			}, func() {
-			}
+			encOutput: encOutput,
+			file1:     *file1,
+			file2:     *file2,
+		}, func() {
+		}
 	}
 
 	type fields struct {
