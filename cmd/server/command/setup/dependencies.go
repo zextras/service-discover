@@ -12,6 +12,7 @@ import (
 	"os/user"
 
 	"github.com/coreos/go-systemd/v22/dbus"
+	"github.com/hashicorp/consul/api/v2"
 	"github.com/zextras/service-discover/pkg/carbonio"
 	"github.com/zextras/service-discover/pkg/exec"
 	"github.com/zextras/service-discover/pkg/systemd"
@@ -38,6 +39,7 @@ type businessDependencies interface { //nolint:interfacebloat // setup requires 
 	LookupGroup(name string) (*user.Group, error)
 	Chown(path string, userUID int, groupUID int) error
 	Chmod(path string, mode os.FileMode) error
+	ConsulLeader() (string, error)
 }
 
 type realDependencies struct {
@@ -102,4 +104,15 @@ func (r realDependencies) Chown(path string, userUID, groupUID int) error {
 
 func (r realDependencies) Chmod(path string, mode os.FileMode) error {
 	return os.Chmod(path, mode)
+}
+
+// ConsulLeader returns the address of the current Raft leader as reported by the local Consul agent, or an empty
+// string if no leader has been elected yet.
+func (r realDependencies) ConsulLeader() (string, error) {
+	client, err := api.NewClient(api.DefaultConfig())
+	if err != nil {
+		return "", err
+	}
+
+	return client.Status().Leader()
 }
