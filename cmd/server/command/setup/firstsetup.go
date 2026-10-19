@@ -304,6 +304,9 @@ func waitForConsulLeader(deps businessDependencies) error {
 	}
 }
 
+// noClusterLeaderErr is the error Consul returns for requests that need a Raft leader while none is elected yet.
+const noClusterLeaderErr = "No cluster leader"
+
 func (s *Setup) createACLBootstrapToken(deps businessDependencies) ([]byte, error) {
 	type returnResult struct {
 		data []byte
@@ -321,11 +324,10 @@ func (s *Setup) createACLBootstrapToken(deps businessDependencies) ([]byte, erro
 			if err != nil {
 				var ee *exec.ExitError
 				if errors.As(err, &ee) {
+					// Consul keeps answering "No cluster leader" until the Raft leader election completes: keep
+					// polling in that case, any other error is fatal.
 					stderr := strings.TrimSpace(string(ee.Stderr))
-
-					expectedErr := "Failed ACL bootstrapping: Unexpected response code: " +
-						"500 (The ACL system is currently in legacy mode.)"
-					if stderr != expectedErr {
+					if !strings.Contains(stderr, noClusterLeaderErr) {
 						res := returnResult{err: exec2.ErrorFromStderr(err, "unable to create ACL bootstrap token")}
 						result <- res
 
