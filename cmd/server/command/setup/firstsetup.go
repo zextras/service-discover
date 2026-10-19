@@ -25,6 +25,13 @@ import (
 
 var testingMode bool
 
+// consulLeaderPollInterval and consulLeaderTimeout drive waitForConsulLeader. With the default raft_multiplier Consul
+// randomizes the election timeout between 5 and 10 seconds, so the timeout leaves plenty of margin.
+var (
+	consulLeaderPollInterval = 250 * time.Millisecond
+	consulLeaderTimeout      = 60 * time.Second
+)
+
 // firstSetup specifically handles the command sent by the final user in a non-interactive way. This will print
 // as less as possible and it is intended to be used in with power users or from other programs.
 func (s *Setup) firstSetup(deps businessDependencies) (formatter.Formatter, error) {
@@ -58,7 +65,7 @@ func (s *Setup) firstSetup(deps businessDependencies) (formatter.Formatter, erro
 // keys for the service discover to work in a secure way to finally write all the configuration in a PGP signed tarball
 // archive
 //
-//nolint:misspell,gocognit,cyclop // complex setup flow is inherently sequential
+//nolint:misspell,gocognit,cyclop,gocyclo // complex setup flow is inherently sequential
 func (s *Setup) performSetup(deps businessDependencies, inputs *setupConfiguration) error {
 	zimbraLocalConfig, err := carbonio.LoadLocalConfig(s.LocalConfigPath)
 	if err != nil {
@@ -136,6 +143,11 @@ func (s *Setup) performSetup(deps businessDependencies, inputs *setupConfigurati
 		if err != nil {
 			return errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
 		}
+	}
+
+	err = waitForConsulLeader(deps)
+	if err != nil {
+		return err
 	}
 
 	aclBootstrapJSON, err := s.createACLBootstrapToken(deps)
@@ -266,6 +278,30 @@ func (s *Setup) createEncryptedSecret(filesToCompress map[string]string, passwor
 	}
 
 	return encWriter.Flush()
+}
+
+// waitForConsulLeader blocks until the local Consul agent reports a Raft leader. systemd considers the
+// service-discover unit ready as soon as Consul joins the LAN gossip pool, which happens before the leader election:
+// running the ACL bootstrap before a leader exists makes it fail with "No cluster leader".
+func waitForConsulLeader(deps businessDependencies) error {
+	deadline := time.Now().Add(consulLeaderTimeout)
+
+	for {
+		leader, err := deps.ConsulLeader()
+		if err == nil && leader != "" {
+			return nil
+		}
+
+		if time.Now().After(deadline) {
+			if err != nil {
+				return errors.WithMessage(err, "timeout reached while waiting for consul leader election")
+			}
+
+			return errors.New("timeout reached while waiting for consul leader election")
+		}
+
+		time.Sleep(consulLeaderPollInterval)
+	}
 }
 
 func (s *Setup) createACLBootstrapToken(deps businessDependencies) ([]byte, error) {
