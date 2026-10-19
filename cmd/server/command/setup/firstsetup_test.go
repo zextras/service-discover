@@ -7,6 +7,7 @@ package setup
 import (
 	"bytes"
 	"crypto/rand"
+	"errors"
 	"io"
 	"net"
 	"os"
@@ -208,6 +209,46 @@ func TestFirstSetup_business(t *testing.T) {
 	})
 }
 
+func Test_waitForConsulLeader(t *testing.T) {
+	previousInterval, previousTimeout := consulLeaderPollInterval, consulLeaderTimeout
+	consulLeaderPollInterval = time.Millisecond
+	consulLeaderTimeout = 50 * time.Millisecond
+
+	t.Cleanup(func() {
+		consulLeaderPollInterval, consulLeaderTimeout = previousInterval, previousTimeout
+	})
+
+	t.Run("Returns once a leader is elected", func(t *testing.T) {
+		mockDependencies := new(mocks2.BusinessDependencies)
+		mockDependencies.On("ConsulLeader").Return("", errors.New("connection refused")).Once().
+			On("ConsulLeader").Return("", nil).Twice().
+			On("ConsulLeader").Return("10.0.0.1:8300", nil).Once()
+
+		err := waitForConsulLeader(mockDependencies)
+
+		assert.NoError(t, err)
+		mockDependencies.AssertNumberOfCalls(t, "ConsulLeader", 4)
+	})
+
+	t.Run("Fails when no leader is elected before the timeout", func(t *testing.T) {
+		mockDependencies := new(mocks2.BusinessDependencies)
+		mockDependencies.On("ConsulLeader").Return("", nil)
+
+		err := waitForConsulLeader(mockDependencies)
+
+		assert.EqualError(t, err, "timeout reached while waiting for consul leader election")
+	})
+
+	t.Run("Reports the last error when the agent is unreachable until the timeout", func(t *testing.T) {
+		mockDependencies := new(mocks2.BusinessDependencies)
+		mockDependencies.On("ConsulLeader").Return("", errors.New("connection refused"))
+
+		err := waitForConsulLeader(mockDependencies)
+
+		assert.EqualError(t, err, "timeout reached while waiting for consul leader election: connection refused")
+	})
+}
+
 func mockBusinessDependencies(
 	setup *Setup,
 	mockDependencies *mocks2.BusinessDependencies,
@@ -336,6 +377,7 @@ func mockBusinessDependencies(
 	).On("Chmod", mock.AnythingOfType("string"), os.FileMode(0600)).Return(
 		nil,
 	).On("SystemdUnitHandler").Return(mockSystemdUnit, nil).
+		On("ConsulLeader").Return("127.0.0.1:8300", nil).
 		On("LocalConfigLoader", setup.LocalConfigPath).Return(mockLocalConfig).
 		On("LdapHandler", mock.Anything).Return(mockLdapHandler)
 
