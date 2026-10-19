@@ -249,6 +249,46 @@ func Test_waitForConsulLeader(t *testing.T) {
 	})
 }
 
+func Test_createACLBootstrapToken(t *testing.T) {
+	aclBootstrapArgs := []any{"/usr/bin/consul", "acl", "bootstrap", "-format", "json"}
+
+	t.Run("Retries while there is no cluster leader", func(t *testing.T) {
+		noLeaderCmd := new(mocks4.Cmd)
+		noLeaderCmd.On("Output").Return(nil, &nexec.ExitError{
+			Stderr: []byte("Failed ACL bootstrapping: Unexpected response code: 500 (No cluster leader)\n"),
+		})
+
+		bootstrapCmd := new(mocks4.Cmd)
+		bootstrapCmd.On("Output").Return([]byte(`{"SecretID": "secret-token"}`), nil)
+
+		mockDependencies := new(mocks2.BusinessDependencies)
+		mockDependencies.On("CreateCommand", aclBootstrapArgs...).Return(noLeaderCmd).Twice().
+			On("CreateCommand", aclBootstrapArgs...).Return(bootstrapCmd).Once()
+
+		out, err := (&Setup{}).createACLBootstrapToken(mockDependencies)
+
+		assert.NoError(t, err)
+		assert.JSONEq(t, `{"SecretID": "secret-token"}`, string(out))
+		mockDependencies.AssertNumberOfCalls(t, "CreateCommand", 3)
+	})
+
+	t.Run("Fails on any other error", func(t *testing.T) {
+		deniedCmd := new(mocks4.Cmd)
+		deniedCmd.On("Output").Return(nil, &nexec.ExitError{
+			Stderr: []byte("Failed ACL bootstrapping: Unexpected response code: 403 (Permission denied)"),
+		})
+
+		mockDependencies := new(mocks2.BusinessDependencies)
+		mockDependencies.On("CreateCommand", aclBootstrapArgs...).Return(deniedCmd).Once()
+
+		_, err := (&Setup{}).createACLBootstrapToken(mockDependencies)
+
+		assert.EqualError(t, err, "unable to create ACL bootstrap token: "+
+			"Failed ACL bootstrapping: Unexpected response code: 403 (Permission denied)")
+		mockDependencies.AssertNumberOfCalls(t, "CreateCommand", 1)
+	})
+}
+
 func mockBusinessDependencies(
 	setup *Setup,
 	mockDependencies *mocks2.BusinessDependencies,
