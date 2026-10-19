@@ -8,8 +8,10 @@ import (
 	"context"
 	"io"
 	"net"
+	"net/http"
 	"os"
 	"os/user"
+	"time"
 
 	"github.com/coreos/go-systemd/v22/dbus"
 	"github.com/hashicorp/consul/api/v2"
@@ -106,10 +108,17 @@ func (r realDependencies) Chmod(path string, mode os.FileMode) error {
 	return os.Chmod(path, mode)
 }
 
+// consulLeaderRequestTimeout bounds a single leader lookup, so a hung request cannot outlive the overall wait.
+const consulLeaderRequestTimeout = 5 * time.Second
+
 // ConsulLeader returns the address of the current Raft leader as reported by the local Consul agent, or an empty
-// string if no leader has been elected yet.
+// string if no leader has been elected yet. It is called in a polling loop, so it uses a non-pooled client that does
+// not keep idle connections around between calls.
 func (r realDependencies) ConsulLeader() (string, error) {
-	client, err := api.NewClient(api.DefaultConfig())
+	config := api.DefaultNonPooledConfig()
+	config.HttpClient = &http.Client{Transport: config.Transport, Timeout: consulLeaderRequestTimeout}
+
+	client, err := api.NewClient(config)
 	if err != nil {
 		return "", err
 	}
