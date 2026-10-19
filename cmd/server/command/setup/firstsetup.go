@@ -65,7 +65,7 @@ func (s *Setup) firstSetup(deps businessDependencies) (formatter.Formatter, erro
 // keys for the service discover to work in a secure way to finally write all the configuration in a PGP signed tarball
 // archive
 //
-//nolint:misspell,gocognit,cyclop,gocyclo // complex setup flow is inherently sequential
+//nolint:misspell,cyclop // complex setup flow is inherently sequential
 func (s *Setup) performSetup(deps businessDependencies, inputs *setupConfiguration) error {
 	zimbraLocalConfig, err := carbonio.LoadLocalConfig(s.LocalConfigPath)
 	if err != nil {
@@ -129,23 +129,7 @@ func (s *Setup) performSetup(deps businessDependencies, inputs *setupConfigurati
 		return err
 	}
 
-	isContainer := command.CheckDockerContainer()
-
-	if isContainer && !testingMode {
-		cmd := exec.Command("service-discoverd-docker", "server") //nolint:noctx // no context available here
-
-		err = cmd.Run()
-		if err != nil {
-			return errors.WithMessage(err, "unable to start service-discoverd server")
-		}
-	} else {
-		err := systemd.StartSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
-		if err != nil {
-			return errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
-		}
-	}
-
-	err = waitForConsulLeader(deps)
+	isContainer, err := startServiceDiscover(deps)
 	if err != nil {
 		return err
 	}
@@ -278,6 +262,28 @@ func (s *Setup) createEncryptedSecret(filesToCompress map[string]string, passwor
 	}
 
 	return encWriter.Flush()
+}
+
+// startServiceDiscover starts the service-discover server, either as a container daemon or as a systemd unit, then
+// waits for Consul to elect a Raft leader. It reports whether the setup is running inside a container.
+func startServiceDiscover(deps businessDependencies) (bool, error) {
+	isContainer := command.CheckDockerContainer()
+
+	if isContainer && !testingMode {
+		cmd := exec.Command("service-discoverd-docker", "server") //nolint:noctx // no context available here
+
+		err := cmd.Run()
+		if err != nil {
+			return isContainer, errors.WithMessage(err, "unable to start service-discoverd server")
+		}
+	} else {
+		err := systemd.StartSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
+		if err != nil {
+			return isContainer, errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
+		}
+	}
+
+	return isContainer, waitForConsulLeader(deps)
 }
 
 // waitForConsulLeader blocks until the local Consul agent reports a Raft leader. systemd considers the
