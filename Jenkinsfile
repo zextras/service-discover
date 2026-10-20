@@ -66,7 +66,7 @@ pipeline {
                             modules.each { key, value ->
                                 builds[key] = {
                                     dir(value) {
-                                        sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml'
+                                        sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml -- -coverprofile=coverage.out ./...'
                                         junit allowEmptyResults: false, checksName: "Test for " + key, testResults: 'tests.xml'
                                     }
                                 }
@@ -74,15 +74,15 @@ pipeline {
 
                             parallel builds
                             dir('pkg/command') {
-                                sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml'
+                                sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml -- -coverprofile=coverage.out ./...'
                                 junit allowEmptyResults: false, checksName: 'Test for command', testResults: 'tests.xml'
                             }
                             dir('cmd/agent') {
-                                sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml'
+                                sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml -- -coverprofile=coverage.out ./...'
                                 junit allowEmptyResults: false, checksName: 'Test for agent', testResults: 'tests.xml'
                             }
                             dir('cmd/server') {
-                                sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml'
+                                sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml -- -coverprofile=coverage.out ./...'
                                 junit allowEmptyResults: false, checksName: 'Test for server', testResults: 'tests.xml'
                             }
                         }
