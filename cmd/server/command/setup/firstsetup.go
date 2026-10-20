@@ -25,6 +25,13 @@ import (
 
 var testingMode bool
 
+// consulLeaderPollInterval and consulLeaderTimeout drive waitForConsulLeader. With the default raft_multiplier Consul
+// randomizes the election timeout between 5 and 10 seconds, so the timeout leaves plenty of margin.
+var (
+	consulLeaderPollInterval = 250 * time.Millisecond
+	consulLeaderTimeout      = 60 * time.Second
+)
+
 // firstSetup specifically handles the command sent by the final user in a non-interactive way. This will print
 // as less as possible and it is intended to be used in with power users or from other programs.
 func (s *Setup) firstSetup(deps businessDependencies) (formatter.Formatter, error) {
@@ -58,7 +65,7 @@ func (s *Setup) firstSetup(deps businessDependencies) (formatter.Formatter, erro
 // keys for the service discover to work in a secure way to finally write all the configuration in a PGP signed tarball
 // archive
 //
-//nolint:misspell,gocognit,cyclop // complex setup flow is inherently sequential
+//nolint:misspell,cyclop // complex setup flow is inherently sequential
 func (s *Setup) performSetup(deps businessDependencies, inputs *setupConfiguration) error {
 	zimbraLocalConfig, err := carbonio.LoadLocalConfig(s.LocalConfigPath)
 	if err != nil {
@@ -122,20 +129,9 @@ func (s *Setup) performSetup(deps businessDependencies, inputs *setupConfigurati
 		return err
 	}
 
-	isContainer := command.CheckDockerContainer()
-
-	if isContainer && !testingMode {
-		cmd := exec.Command("service-discoverd-docker", "server") //nolint:noctx // no context available here
-
-		err = cmd.Run()
-		if err != nil {
-			return errors.WithMessage(err, "unable to start service-discoverd server")
-		}
-	} else {
-		err := systemd.StartSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
-		if err != nil {
-			return errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
-		}
+	isContainer, err := startServiceDiscover(deps)
+	if err != nil {
+		return err
 	}
 
 	aclBootstrapJSON, err := s.createACLBootstrapToken(deps)
@@ -268,6 +264,55 @@ func (s *Setup) createEncryptedSecret(filesToCompress map[string]string, passwor
 	return encWriter.Flush()
 }
 
+// startServiceDiscover starts the service-discover server, either as a container daemon or as a systemd unit, then
+// waits for Consul to elect a Raft leader. It reports whether the setup is running inside a container.
+func startServiceDiscover(deps businessDependencies) (bool, error) {
+	isContainer := command.CheckDockerContainer()
+
+	if isContainer && !testingMode {
+		cmd := exec.Command("service-discoverd-docker", "server") //nolint:noctx // no context available here
+
+		err := cmd.Run()
+		if err != nil {
+			return isContainer, errors.WithMessage(err, "unable to start service-discoverd server")
+		}
+	} else {
+		err := systemd.StartSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
+		if err != nil {
+			return isContainer, errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
+		}
+	}
+
+	return isContainer, waitForConsulLeader(deps)
+}
+
+// waitForConsulLeader blocks until the local Consul agent reports a Raft leader. systemd considers the
+// service-discover unit ready as soon as Consul joins the LAN gossip pool, which happens before the leader election:
+// running the ACL bootstrap before a leader exists makes it fail with "No cluster leader".
+func waitForConsulLeader(deps businessDependencies) error {
+	deadline := time.Now().Add(consulLeaderTimeout)
+
+	for {
+		leader, err := deps.ConsulLeader()
+		if err == nil && leader != "" {
+			return nil
+		}
+
+		if time.Now().After(deadline) {
+			if err != nil {
+				return errors.WithMessage(err, "timeout reached while waiting for consul leader election")
+			}
+
+			return errors.New("timeout reached while waiting for consul leader election")
+		}
+
+		time.Sleep(consulLeaderPollInterval)
+	}
+}
+
+// noClusterLeaderErr is the error Consul returns for requests that need a Raft leader while none is elected yet.
+const noClusterLeaderErr = "No cluster leader"
+
 func (s *Setup) createACLBootstrapToken(deps businessDependencies) ([]byte, error) {
 	type returnResult struct {
 		data []byte
@@ -285,11 +330,10 @@ func (s *Setup) createACLBootstrapToken(deps businessDependencies) ([]byte, erro
 			if err != nil {
 				var ee *exec.ExitError
 				if errors.As(err, &ee) {
+					// Consul keeps answering "No cluster leader" until the Raft leader election completes: keep
+					// polling in that case, any other error is fatal.
 					stderr := strings.TrimSpace(string(ee.Stderr))
-
-					expectedErr := "Failed ACL bootstrapping: Unexpected response code: " +
-						"500 (The ACL system is currently in legacy mode.)"
-					if stderr != expectedErr {
+					if !strings.Contains(stderr, noClusterLeaderErr) {
 						res := returnResult{err: exec2.ErrorFromStderr(err, "unable to create ACL bootstrap token")}
 						result <- res
 

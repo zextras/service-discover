@@ -7,6 +7,7 @@ package setup
 import (
 	"bytes"
 	"crypto/rand"
+	"errors"
 	"io"
 	"net"
 	"os"
@@ -208,6 +209,86 @@ func TestFirstSetup_business(t *testing.T) {
 	})
 }
 
+func Test_waitForConsulLeader(t *testing.T) {
+	previousInterval, previousTimeout := consulLeaderPollInterval, consulLeaderTimeout
+	consulLeaderPollInterval = time.Millisecond
+	consulLeaderTimeout = 50 * time.Millisecond
+
+	t.Cleanup(func() {
+		consulLeaderPollInterval, consulLeaderTimeout = previousInterval, previousTimeout
+	})
+
+	t.Run("Returns once a leader is elected", func(t *testing.T) {
+		mockDependencies := new(mocks2.BusinessDependencies)
+		mockDependencies.On("ConsulLeader").Return("", errors.New("connection refused")).Once().
+			On("ConsulLeader").Return("", nil).Twice().
+			On("ConsulLeader").Return("10.0.0.1:8300", nil).Once()
+
+		err := waitForConsulLeader(mockDependencies)
+
+		assert.NoError(t, err)
+		mockDependencies.AssertNumberOfCalls(t, "ConsulLeader", 4)
+	})
+
+	t.Run("Fails when no leader is elected before the timeout", func(t *testing.T) {
+		mockDependencies := new(mocks2.BusinessDependencies)
+		mockDependencies.On("ConsulLeader").Return("", nil)
+
+		err := waitForConsulLeader(mockDependencies)
+
+		assert.EqualError(t, err, "timeout reached while waiting for consul leader election")
+	})
+
+	t.Run("Reports the last error when the agent is unreachable until the timeout", func(t *testing.T) {
+		mockDependencies := new(mocks2.BusinessDependencies)
+		mockDependencies.On("ConsulLeader").Return("", errors.New("connection refused"))
+
+		err := waitForConsulLeader(mockDependencies)
+
+		assert.EqualError(t, err, "timeout reached while waiting for consul leader election: connection refused")
+	})
+}
+
+func Test_createACLBootstrapToken(t *testing.T) {
+	aclBootstrapArgs := []any{"/usr/bin/consul", "acl", "bootstrap", "-format", "json"}
+
+	t.Run("Retries while there is no cluster leader", func(t *testing.T) {
+		noLeaderCmd := new(mocks4.Cmd)
+		noLeaderCmd.On("Output").Return(nil, &nexec.ExitError{
+			Stderr: []byte("Failed ACL bootstrapping: Unexpected response code: 500 (No cluster leader)\n"),
+		})
+
+		bootstrapCmd := new(mocks4.Cmd)
+		bootstrapCmd.On("Output").Return([]byte(`{"SecretID": "secret-token"}`), nil)
+
+		mockDependencies := new(mocks2.BusinessDependencies)
+		mockDependencies.On("CreateCommand", aclBootstrapArgs...).Return(noLeaderCmd).Twice().
+			On("CreateCommand", aclBootstrapArgs...).Return(bootstrapCmd).Once()
+
+		out, err := (&Setup{}).createACLBootstrapToken(mockDependencies)
+
+		assert.NoError(t, err)
+		assert.JSONEq(t, `{"SecretID": "secret-token"}`, string(out))
+		mockDependencies.AssertNumberOfCalls(t, "CreateCommand", 3)
+	})
+
+	t.Run("Fails on any other error", func(t *testing.T) {
+		deniedCmd := new(mocks4.Cmd)
+		deniedCmd.On("Output").Return(nil, &nexec.ExitError{
+			Stderr: []byte("Failed ACL bootstrapping: Unexpected response code: 403 (Permission denied)"),
+		})
+
+		mockDependencies := new(mocks2.BusinessDependencies)
+		mockDependencies.On("CreateCommand", aclBootstrapArgs...).Return(deniedCmd).Once()
+
+		_, err := (&Setup{}).createACLBootstrapToken(mockDependencies)
+
+		assert.EqualError(t, err, "unable to create ACL bootstrap token: "+
+			"Failed ACL bootstrapping: Unexpected response code: 403 (Permission denied)")
+		mockDependencies.AssertNumberOfCalls(t, "CreateCommand", 1)
+	})
+}
+
 func mockBusinessDependencies(
 	setup *Setup,
 	mockDependencies *mocks2.BusinessDependencies,
@@ -336,6 +417,7 @@ func mockBusinessDependencies(
 	).On("Chmod", mock.AnythingOfType("string"), os.FileMode(0600)).Return(
 		nil,
 	).On("SystemdUnitHandler").Return(mockSystemdUnit, nil).
+		On("ConsulLeader").Return("127.0.0.1:8300", nil).
 		On("LocalConfigLoader", setup.LocalConfigPath).Return(mockLocalConfig).
 		On("LdapHandler", mock.Anything).Return(mockLdapHandler)
 
