@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -31,8 +32,9 @@ var serviceTokenNamespace = uuid.MustParse("e6dffb05-3483-451c-af44-cf73dbc22c18
 const legacyTokenDescriptionPrefix = "Token for "
 
 var (
-	errServiceTokenNotFound = errors.New("service token not found")
-	errRedactedSecretID     = errors.New("SecretID is redacted: CONSUL_HTTP_TOKEN needs acl:write")
+	errServiceTokenNotFound   = errors.New("service token not found")
+	errServiceTokenNotEnsured = errors.New("does not exist: run 'service-token ensure' before 'prune-legacy'")
+	errRedactedSecretID       = errors.New("SecretID is redacted: CONSUL_HTTP_TOKEN needs acl:write")
 )
 
 // ServiceTokenAccessorID returns the AccessorID of the ACL token owned by
@@ -90,10 +92,17 @@ func (p *PruneLegacyServiceTokens) Run(_ *GlobalCommonFlags) error {
 	}
 
 	services := append([]string{p.Service}, p.LegacyService...)
+	hostnames := localHostnames()
+	fmt.Printf("Matching legacy tokens of %s against host names: %s\n", strings.Join(services, ", "),
+		strings.Join(hostnames, " "))
 
-	deleted, err := pruneLegacyServiceTokens(acl, p.Service, services, p.Policy, localHostnames())
+	deleted, err := pruneLegacyServiceTokens(acl, p.Service, services, p.Policy, hostnames)
 	for _, accessor := range deleted {
 		fmt.Printf("Deleted legacy token %s of %s\n", accessor, p.Service)
+	}
+
+	if err == nil && len(deleted) == 0 {
+		fmt.Printf("No legacy tokens of %s found\n", p.Service)
 	}
 
 	return err
@@ -121,16 +130,20 @@ func ensureServiceToken(acl serviceTokenACL, service, policy string) (string, er
 
 	token, err := acl.TokenRead(accessorID)
 	if errors.Is(err, errServiceTokenNotFound) {
-		created, err := acl.TokenCreate(&api.ACLToken{
+		created, createErr := acl.TokenCreate(&api.ACLToken{
 			AccessorID:  accessorID,
 			Description: ServiceTokenDescription(service, nodeName),
 			Policies:    []*api.ACLTokenPolicyLink{{Name: policy}},
 		})
-		if err != nil {
-			return "", fmt.Errorf("unable to create token %s of %s: %w", accessorID, service, err)
+		if createErr == nil {
+			return created.SecretID, nil
 		}
 
-		return created.SecretID, nil
+		// A concurrent ensure may have created it in the meantime: adopt it.
+		token, err = acl.TokenRead(accessorID)
+		if err != nil {
+			return "", fmt.Errorf("unable to create token %s of %s: %w", accessorID, service, createErr)
+		}
 	}
 
 	if err != nil {
@@ -159,7 +172,8 @@ func ensureServiceToken(acl serviceTokenACL, service, policy string) (string, er
 // (description "Token for <name>/<hostname -A>" or "<name>/<fqdn>", where name
 // is one of legacyNames). A token is deleted only when its description names
 // exactly one of legacyNames and at least one of hostnames, so tokens of other
-// nodes are never touched.
+// nodes are never touched. It refuses to run until the deterministic token
+// exists, so a service still using a legacy token never loses it.
 func pruneLegacyServiceTokens(
 	acl serviceTokenACL,
 	service string,
@@ -173,6 +187,15 @@ func pruneLegacyServiceTokens(
 	}
 
 	current := ServiceTokenAccessorID(service, nodeName)
+
+	_, err = acl.TokenRead(current)
+	if errors.Is(err, errServiceTokenNotFound) {
+		return nil, fmt.Errorf("token %s of %s: %w", current, service, errServiceTokenNotEnsured)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("unable to read token %s of %s: %w", current, service, err)
+	}
 
 	tokens, err := acl.TokenListByPolicy(policy)
 	if err != nil {
@@ -316,8 +339,12 @@ func newConsulServiceTokenACL() (*consulServiceTokenACL, error) {
 	// "not found" always refers to the service token.
 	_, _, err = client.ACL().TokenReadSelf(nil)
 	if err != nil {
-		if _, ok := errors.AsType[api.StatusError](err); ok {
-			return nil, fmt.Errorf("CONSUL_HTTP_TOKEN is not a valid Consul token: %w", err)
+		if statusErr, ok := errors.AsType[api.StatusError](err); ok {
+			if statusErr.Code == http.StatusUnauthorized || statusErr.Code == http.StatusForbidden {
+				return nil, fmt.Errorf("CONSUL_HTTP_TOKEN is not a valid Consul token: %w", err)
+			}
+
+			return nil, fmt.Errorf("unexpected response from Consul: %w", err)
 		}
 
 		return nil, fmt.Errorf("unable to reach Consul: %w", err)

@@ -17,6 +17,9 @@ type fakeServiceTokenACL struct {
 	node    string
 	tokens  map[string]*api.ACLToken
 	readErr error
+	// racer, when set, simulates a concurrent ensure that creates this token
+	// between our read and our create, making our create fail.
+	racer   *api.ACLToken
 	created []*api.ACLToken
 	updated []*api.ACLToken
 	deleted []string
@@ -38,6 +41,12 @@ func (f *fakeServiceTokenACL) TokenRead(id string) (*api.ACLToken, error) {
 }
 
 func (f *fakeServiceTokenACL) TokenCreate(t *api.ACLToken) (*api.ACLToken, error) {
+	if f.racer != nil {
+		f.tokens = map[string]*api.ACLToken{f.racer.AccessorID: f.racer}
+
+		return nil, api.StatusError{Code: 500, Body: "AccessorID is already in use"}
+	}
+
 	f.created = append(f.created, t)
 	out := *t
 	out.SecretID = "8b1f0c7e-1d1a-4a59-9a2e-6f3c0b7e2d11"
@@ -172,4 +181,30 @@ func TestIsTokenNotFound(t *testing.T) {
 	assert.False(t, isTokenNotFound(api.StatusError{Code: 403, Body: "Permission denied"}))
 	assert.False(t, isTokenNotFound(api.StatusError{Code: 500, Body: "rpc error"}))
 	assert.False(t, isTokenNotFound(errors.New("dial tcp: connection refused")))
+}
+
+func TestEnsureServiceTokenAdoptsTokenCreatedConcurrently(t *testing.T) {
+	id := ServiceTokenAccessorID(testService, testNode)
+	acl := &fakeServiceTokenACL{node: testNode, racer: &api.ACLToken{
+		AccessorID: id,
+		SecretID:   "3c9a7f52-0d5e-4b8e-a7f1-2b6d9e0c4a13",
+		Policies:   []*api.ACLTokenPolicyLink{{Name: testPolicy}},
+	}}
+
+	secret, err := ensureServiceToken(acl, testService, testPolicy)
+
+	require.NoError(t, err)
+	assert.Equal(t, "3c9a7f52-0d5e-4b8e-a7f1-2b6d9e0c4a13", secret)
+}
+
+func TestPruneLegacyServiceTokensRefusesBeforeEnsure(t *testing.T) {
+	acl := &fakeServiceTokenACL{node: testNode, tokens: map[string]*api.ACLToken{
+		"bash-this-host": {AccessorID: "bash-this-host", Description: "Token for carbonio-files/mail1"},
+	}}
+
+	deleted, err := pruneLegacyServiceTokens(acl, testService, []string{testService}, testPolicy, []string{"mail1"})
+
+	require.ErrorIs(t, err, errServiceTokenNotEnsured)
+	assert.Empty(t, deleted)
+	assert.Empty(t, acl.deleted)
 }

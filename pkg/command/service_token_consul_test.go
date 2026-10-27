@@ -32,6 +32,7 @@ type fakeConsul struct {
 	mu        sync.Mutex
 	tokens    map[string]*api.ACLToken
 	failReads bool
+	noLeader  bool
 	creates   int
 }
 
@@ -69,6 +70,12 @@ func (f *fakeConsul) serve(w http.ResponseWriter, r *http.Request) {
 
 	switch {
 	case r.Method == http.MethodGet && path == "/v1/acl/token/self":
+		if f.noLeader {
+			http.Error(w, "No cluster leader", http.StatusInternalServerError)
+
+			return
+		}
+
 		writeJSON(w, api.ACLToken{AccessorID: "bootstrap", SecretID: fakeBootstrapToken})
 	case r.Method == http.MethodGet && path == "/v1/agent/self":
 		writeJSON(w, map[string]map[string]any{"Config": {"NodeName": fakeNodeName}})
@@ -259,10 +266,40 @@ func TestPruneLegacyRunDeletesOnlyThisHostLegacyTokens(t *testing.T) {
 
 func TestPruneLegacyRunWithUnknownPolicyDeletesNothing(t *testing.T) {
 	fake, _ := newFakeConsul(t)
+	current := ServiceTokenAccessorID(testService, fakeNodeName)
+	fake.add(&api.ACLToken{AccessorID: current})
 	fake.add(&api.ACLToken{AccessorID: "legacy", Description: "Token for carbonio-files/anything"})
 
 	cmd := &PruneLegacyServiceTokens{Service: testService, Policy: "missing-policy"}
 
 	require.NoError(t, cmd.Run(nil))
 	assert.Contains(t, fake.tokens, "legacy")
+}
+
+func TestPruneLegacyRunRefusesBeforeEnsure(t *testing.T) {
+	fake, _ := newFakeConsul(t)
+
+	hostname, err := os.Hostname()
+	require.NoError(t, err)
+
+	fake.add(&api.ACLToken{AccessorID: "legacy-local", Description: "Token for carbonio-files/" + hostname})
+
+	err = (&PruneLegacyServiceTokens{Service: testService, Policy: testPolicy}).Run(nil)
+
+	require.ErrorIs(t, err, errServiceTokenNotEnsured)
+	assert.Contains(t, fake.tokens, "legacy-local")
+}
+
+func TestEnsureRunReportsUnhealthyConsulAsSuch(t *testing.T) {
+	fake, _ := newFakeConsul(t)
+	fake.noLeader = true
+
+	err := (&EnsureServiceToken{
+		Service:   testService,
+		Policy:    testPolicy,
+		TokenFile: filepath.Join(t.TempDir(), "token"),
+	}).Run(nil)
+
+	require.ErrorContains(t, err, "unexpected response from Consul")
+	assert.NotContains(t, err.Error(), "not a valid Consul token")
 }
