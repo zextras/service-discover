@@ -155,13 +155,15 @@ func TestPruneLegacyServiceTokensDeletesOnlyThisNodeLegacyTokens(t *testing.T) {
 		"bash-mail10":    {AccessorID: "bash-mail10", Description: "Token for\n    carbonio-files/mail10.example.com "},
 		"other-service":  {AccessorID: "other-service", Description: "Token for carbonio-files-db/mail1.example.com"},
 		"unrelated":      {AccessorID: "unrelated", Description: "admin token for mail1.example.com"},
+		"typo-alias":     {AccessorID: "typo-alias", Description: "Token for\n    carobonio-files/mail1.example.com "},
 	}
 	acl := &fakeServiceTokenACL{node: testNode, tokens: tokens}
 
-	deleted, err := pruneLegacyServiceTokens(acl, testService, testPolicy, []string{"mail1", "mail1.example.com"})
+	deleted, err := pruneLegacyServiceTokens(acl, testService, []string{testService, "carobonio-files"}, testPolicy,
+		[]string{"mail1", "mail1.example.com"})
 
 	require.NoError(t, err)
-	assert.ElementsMatch(t, []string{"bash-this-host", "java-this-host"}, deleted)
+	assert.ElementsMatch(t, []string{"bash-this-host", "java-this-host", "typo-alias"}, deleted)
 }
 
 func TestIsTokenNotFound(t *testing.T) {

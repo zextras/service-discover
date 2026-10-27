@@ -64,8 +64,9 @@ type EnsureServiceToken struct {
 }
 
 type PruneLegacyServiceTokens struct {
-	Service string `required:"" help:"Service name, e.g. carbonio-files"`
-	Policy  string `required:"" help:"Name of the ACL policy linked to the tokens"`
+	Service       string   `required:"" help:"Service name, e.g. carbonio-files"`
+	Policy        string   `required:"" help:"Name of the ACL policy linked to the tokens"`
+	LegacyService []string `optional:"" name:"legacy-service" help:"Other service name used in legacy token descriptions (repeatable)"` //nolint:lll
 }
 
 func (e *EnsureServiceToken) Run(_ *GlobalCommonFlags) error {
@@ -88,7 +89,9 @@ func (p *PruneLegacyServiceTokens) Run(_ *GlobalCommonFlags) error {
 		return err
 	}
 
-	deleted, err := pruneLegacyServiceTokens(acl, p.Service, p.Policy, localHostnames())
+	services := append([]string{p.Service}, p.LegacyService...)
+
+	deleted, err := pruneLegacyServiceTokens(acl, p.Service, services, p.Policy, localHostnames())
 	for _, accessor := range deleted {
 		fmt.Printf("Deleted legacy token %s of %s\n", accessor, p.Service)
 	}
@@ -153,12 +156,15 @@ func ensureServiceToken(acl serviceTokenACL, service, policy string) (string, er
 
 // pruneLegacyServiceTokens deletes the tokens linked to policy that were
 // created for service on this node by the pre-deterministic setup scripts
-// (description "Token for <service>/<hostname -A>" or "<service>/<fqdn>").
-// A token is deleted only when its description names exactly this service and
-// at least one of hostnames, so tokens of other nodes are never touched.
+// (description "Token for <name>/<hostname -A>" or "<name>/<fqdn>", where name
+// is one of legacyNames). A token is deleted only when its description names
+// exactly one of legacyNames and at least one of hostnames, so tokens of other
+// nodes are never touched.
 func pruneLegacyServiceTokens(
 	acl serviceTokenACL,
-	service, policy string,
+	service string,
+	legacyNames []string,
+	policy string,
 	hostnames []string,
 ) ([]string, error) {
 	nodeName, err := acl.NodeName()
@@ -176,7 +182,7 @@ func pruneLegacyServiceTokens(
 	var deleted []string
 
 	for _, entry := range tokens {
-		if entry.AccessorID == current || !isLegacyServiceToken(entry.Description, service, hostnames) {
+		if entry.AccessorID == current || !isLegacyServiceToken(entry.Description, legacyNames, hostnames) {
 			continue
 		}
 
@@ -191,12 +197,12 @@ func pruneLegacyServiceTokens(
 	return deleted, nil
 }
 
-func isLegacyServiceToken(description, service string, hostnames []string) bool {
+func isLegacyServiceToken(description string, legacyNames, hostnames []string) bool {
 	normalized := strings.Join(strings.Fields(description), " ")
 	normalized = strings.TrimPrefix(normalized, legacyTokenDescriptionPrefix)
 
-	names, found := strings.CutPrefix(normalized, service+"/")
-	if !found {
+	service, names, found := strings.Cut(normalized, "/")
+	if !found || !slices.Contains(legacyNames, service) {
 		return false
 	}
 
