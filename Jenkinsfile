@@ -146,6 +146,19 @@ pipeline {
             }
         }
 
+        stage('Build and Publish Docker images') {
+            steps {
+                dockerStage([
+                    dockerfile: 'docker/sidecar/Dockerfile',
+                    imageName: 'carbonio-sidecar',
+                    platforms: ['linux/amd64', 'linux/arm64'] as Set,
+                    ocLabels: [
+                        title: 'Carbonio Sidecar Container Base image',
+                    ]
+                ])
+            }
+        }
+
         stage('Bump version') {
             steps {
                 script {
