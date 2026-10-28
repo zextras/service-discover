@@ -8,6 +8,7 @@ require (
 	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/docker/go-units v0.5.0
 	github.com/go-ldap/ldap/v3 v3.4.15
+	github.com/google/uuid v1.6.0
 	github.com/hashicorp/consul/api/v2 v2.0.0
 	github.com/moby/moby/api v1.56.1
 	github.com/pkg/errors v0.9.1
@@ -62,7 +63,6 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/google/gnostic-models v0.7.1 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-hclog v1.6.3 // indirect
