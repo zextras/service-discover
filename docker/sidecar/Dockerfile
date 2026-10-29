@@ -14,7 +14,7 @@ COPY pkg ./pkg
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /out/service-discover ./cmd/agent
 
 FROM docker.io/envoyproxy/envoy:v1.32-latest
-COPY --from=docker.io/hashicorp/consul:1.21 /bin/consul /usr/local/bin/consul
+COPY --from=docker.io/hashicorp/consul:2.1 /bin/consul /usr/local/bin/consul
 COPY --from=builder /out/jq /usr/local/bin/jq
 COPY --from=builder /out/service-discover /usr/local/bin/service-discover
 
