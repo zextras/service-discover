@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/ProtonMail/go-crypto v1.5.2
-	github.com/alecthomas/kong v1.16.1
+	github.com/alecthomas/kong v1.17.0
 	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/docker/go-units v0.5.0
 	github.com/go-ldap/ldap/v3 v3.4.15
