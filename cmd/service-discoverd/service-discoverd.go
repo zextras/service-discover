@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/zextras/service-discover/pkg/carbonio"
 )
@@ -19,18 +20,27 @@ const (
 	consulAgentCommand = "agent"
 	serverMode         = "server"
 	agentMode          = "agent"
-	// ExitCodeWrongArgs and the following codes start from 1000
-	// to avoid conflicts with consul exit codes.
-	ExitCodeWrongArgs  = 1001
-	ExitCodeUserStuff  = 1002
-	ExitCodeLocalCfg   = 1003
-	ExitCodeLdapError  = 1004
-	ExitCodeExecError  = 1005
-	ReadMainJSON       = 1006
-	ParseMainJSON      = 1007
-	ParsePortsMainJSON = 1008
-	MarshallMainJSON   = 1009
-	WriteMainJSON      = 1010
+	// ExitCodeWrongArgs and the following codes start from 64: a process exit
+	// status is truncated to 8 bits, so codes must stay below 256, and they
+	// must avoid the range 200-243 that systemd reserves for its own
+	// exit statuses (e.g. 236 is shown as SMACK_PROCESS_LABEL).
+	ExitCodeWrongArgs  = 64
+	ExitCodeUserStuff  = 65
+	ExitCodeLocalCfg   = 66
+	ExitCodeLdapError  = 67
+	ExitCodeExecError  = 68
+	ReadMainJSON       = 69
+	ParseMainJSON      = 70
+	ParsePortsMainJSON = 71
+	MarshallMainJSON   = 72
+	WriteMainJSON      = 73
+
+	// The LDAP server may be restarting together with service-discoverd
+	// (e.g. systemctl restart carbonio.target): retry the startup query with
+	// an exponential backoff for a bounded window before giving up.
+	ldapRetryWindow       = 60 * time.Second
+	ldapRetryInitialDelay = 1 * time.Second
+	ldapRetryMaxDelay     = 5 * time.Second
 )
 
 type realDependencies struct{}
@@ -77,8 +87,18 @@ func (r realDependencies) CreateNewHandler(localConfig carbonio.LocalConfig) car
 	return carbonio.CreateNewHandler(localConfig)
 }
 
+func (r realDependencies) Now() time.Time {
+	return time.Now()
+}
+
+func (r realDependencies) Sleep(d time.Duration) {
+	time.Sleep(d)
+}
+
 type deps interface {
 	Exit(code int)
+	Now() time.Time
+	Sleep(d time.Duration)
 	Log(a ...any)
 	Getenv(key string) (env string)
 	Getuid() (uid int)
@@ -136,7 +156,7 @@ func runServiceDiscoverDaemon(deps deps, args []string) {
 		return
 	}
 
-	servers, err := queryAllServiceDiscoverServers(ldapHandler)
+	servers, err := queryAllServiceDiscoverServers(deps, ldapHandler)
 	if err != nil {
 		deps.Log(err.Log)
 		deps.Exit(err.ExitCode)
@@ -321,16 +341,34 @@ func readLocalConfig(deps deps) (carbonio.LdapHandler, string, *ErrorWithExitCod
 	return handler, localConfig.Value(carbonio.LocalConfigServerHostname), nil
 }
 
-func queryAllServiceDiscoverServers(ldapHandler carbonio.LdapHandler) ([]string, *ErrorWithExitCode) {
-	servers, err := ldapHandler.QueryAllServersWithService(carbonio.ServiceDiscoverServiceName)
-	if err != nil {
-		return nil, &ErrorWithExitCode{
-			Log:      "unable to query ldap: " + err.Error(),
-			ExitCode: ExitCodeLdapError,
-		}
-	}
+// queryAllServiceDiscoverServers queries ldap for the service-discover servers,
+// retrying failures with an exponential backoff (ldapRetryInitialDelay doubling,
+// capped at ldapRetryMaxDelay) until ldapRetryWindow has elapsed.
+func queryAllServiceDiscoverServers(deps deps, ldapHandler carbonio.LdapHandler) ([]string, *ErrorWithExitCode) {
+	deadline := deps.Now().Add(ldapRetryWindow)
+	delay := ldapRetryInitialDelay
 
-	return servers, nil
+	for attempt := 1; ; attempt++ {
+		servers, err := ldapHandler.QueryAllServersWithService(carbonio.ServiceDiscoverServiceName)
+		if err == nil {
+			return servers, nil
+		}
+
+		remaining := deadline.Sub(deps.Now())
+		if remaining <= 0 {
+			return nil, &ErrorWithExitCode{
+				Log:      "unable to query ldap: " + err.Error(),
+				ExitCode: ExitCodeLdapError,
+			}
+		}
+
+		wait := min(delay, remaining)
+
+		deps.Log(fmt.Sprintf("ldap query attempt %d failed: %s; retrying in %s\n", attempt, err, wait))
+		deps.Sleep(wait)
+
+		delay = min(delay*2, ldapRetryMaxDelay)
+	}
 }
 
 func addGrpcTLS(inputFile string) *ErrorWithExitCode {
