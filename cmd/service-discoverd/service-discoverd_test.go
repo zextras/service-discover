@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/user"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -19,6 +20,18 @@ const (
 
 type mockDependencies struct {
 	mock.Mock
+	// fake clock: Sleep advances it, so retries never really wait.
+	elapsed time.Duration
+	sleeps  []time.Duration
+}
+
+func (m *mockDependencies) Now() time.Time {
+	return time.Unix(0, 0).Add(m.elapsed)
+}
+
+func (m *mockDependencies) Sleep(d time.Duration) {
+	m.sleeps = append(m.sleeps, d)
+	m.elapsed += d
 }
 
 func (m *mockDependencies) Exit(code int) {
@@ -244,6 +257,54 @@ func Test_runServiceDiscoverDaemon(t *testing.T) {
 		mockDependencies.AssertCalled(t, "Exit", ExitCodeLdapError)
 	})
 
+	t.Run("ldap query succeeds after retries", func(t *testing.T) {
+		mockDependencies := new(mockDependencies)
+		mockDependencies.On("QueryAllServersWithService", "service-discover").Return(
+			nil,
+			errors.New("dial tcp 127.0.0.1:389: connect: connection refused"),
+		).Twice()
+		setupMock(mockDependencies, true)
+
+		runServiceDiscoverDaemon(
+			mockDependencies,
+			[]string{discoverdBinPath, "server", "test.json"},
+		)
+		mockDependencies.AssertNumberOfCalls(t, "QueryAllServersWithService", 3)
+		assert.Equal(t, []time.Duration{time.Second, 2 * time.Second}, mockDependencies.sleeps)
+		mockDependencies.AssertCalled(t, "Log", []any{
+			"ldap query attempt 1 failed: dial tcp 127.0.0.1:389: connect: connection refused; retrying in 1s\n",
+		})
+		mockDependencies.AssertNotCalled(t, "Exit", ExitCodeLdapError)
+		mockDependencies.AssertCalled(t, "Exec", "/usr/bin/consul", mock.Anything, mock.Anything)
+	})
+
+	t.Run("ldap query keeps failing until the retry window ends", func(t *testing.T) {
+		mockDependencies := new(mockDependencies)
+		mockDependencies.On("QueryAllServersWithService", "service-discover").Return(
+			nil,
+			errors.New("fake error"),
+		)
+		setupMock(mockDependencies, true)
+
+		runServiceDiscoverDaemon(
+			mockDependencies,
+			[]string{discoverdBinPath, "server", "test.json"},
+		)
+		assert.Equal(t, ldapRetryWindow, mockDependencies.elapsed)
+		assert.Equal(t, []time.Duration{
+			1 * time.Second, 2 * time.Second, 4 * time.Second,
+		}, mockDependencies.sleeps[:3], "backoff doubles")
+
+		for _, d := range mockDependencies.sleeps {
+			assert.LessOrEqual(t, d, ldapRetryMaxDelay, "backoff is capped")
+		}
+
+		mockDependencies.AssertNumberOfCalls(t, "QueryAllServersWithService", len(mockDependencies.sleeps)+1)
+		mockDependencies.AssertCalled(t, "Log", []any{"unable to query ldap: fake error"})
+		mockDependencies.AssertCalled(t, "Exit", ExitCodeLdapError)
+		mockDependencies.AssertNotCalled(t, "Exec", mock.Anything, mock.Anything, mock.Anything)
+	})
+
 	t.Run("server missing in ldap", func(t *testing.T) {
 		mockDependencies := new(mockDependencies)
 		mockDependencies.On("QueryAllServersWithService", "service-discover").Return(
@@ -313,19 +374,19 @@ func Test_runAddGrpcTLS(t *testing.T) {
 	t.Run("addGprcTLS file not found", func(t *testing.T) {
 		errTLS := addGrpcTLS("abc")
 		assert.NotNil(t, errTLS)
-		assert.Equal(t, errTLS.ExitCode, 1006, "file not found")
+		assert.Equal(t, errTLS.ExitCode, ReadMainJSON, "file not found")
 	})
 
 	t.Run("addGprcTLS file has non valid json", func(t *testing.T) {
 		errTLS := addGrpcTLS("test_invalid.json")
 		assert.NotNil(t, errTLS)
-		assert.Equal(t, errTLS.ExitCode, 1007, "not valid json")
+		assert.Equal(t, errTLS.ExitCode, ParseMainJSON, "not valid json")
 	})
 
 	t.Run("addGprcTLS file has no ports", func(t *testing.T) {
 		errTLS := addGrpcTLS("test_no_ports.json")
 		assert.NotNil(t, errTLS)
-		assert.Equal(t, errTLS.ExitCode, 1008, "no ports")
+		assert.Equal(t, errTLS.ExitCode, ParsePortsMainJSON, "no ports")
 	})
 	t.Run("addGprcTLS port_tls is not exits", func(t *testing.T) {
 		os.WriteFile("test_without_tls.json", []byte("{\"ports\": {\"abc\":5}}"), 0644)
