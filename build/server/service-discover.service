@@ -15,6 +15,10 @@ Type=notify
 ExecStart=/usr/bin/service-discoverd server
 Restart=on-failure
 RestartSec=15s
+# consul exits 1 when stopped without leaving the cluster; a requested stop is
+# never restarted, so a crash with exit 1 is still restarted
+SuccessExitStatus=1
+RestartForceExitStatus=1
 KillMode=process
 LimitNOFILE=65536
 ExecReload=/usr/bin/consul reload
