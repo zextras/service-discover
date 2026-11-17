@@ -29,8 +29,8 @@ source=(
   "service-discover-legacy.service"
 )
 sha256sums=(
-  'dce7d8ee7acee08c801ca63e41b8bfe8c871afcb850d057a757a7c3523a91fc9'
-  '5780163ac614276da1c812580686eb8adfdbfe9eebe62397d6a354ca461db1a9'
+  'e8583f4829b7b3525a42b2803386df786f28c80b5e9156410b5ef98c2b7106f5'
+  'f018ae09fb074da2bb38729f1864e19da5a5fa51785dec6cac3d7c516402cfad'
 )
 
 _package_legacy() {
