@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM docker.io/library/golang:1.26-alpine AS builder
+FROM --platform=$BUILDPLATFORM docker.io/library/golang:1.27-alpine AS builder
 ARG TARGETOS
 ARG TARGETARCH
 ARG JQ_VERSION=1.7.1
