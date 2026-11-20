@@ -79,9 +79,8 @@ func (s *ServerCLI) GenerateJoinToken(spiffeID string, ttl time.Duration) (strin
 	return token.Value, nil
 }
 
-// EnsureEntry creates the registration entry binding spiffeID to the given selectors under parentID, unless an
-// entry with the same parent and SPIFFE ID already exists. It reports whether the entry has been created.
-func (s *ServerCLI) EnsureEntry(parentID, spiffeID string, selectors ...string) (bool, error) {
+// HasEntry reports whether a registration entry binding spiffeID under parentID exists.
+func (s *ServerCLI) HasEntry(parentID, spiffeID string) (bool, error) {
 	out, err := s.run("unable to list the SPIRE entries", "entry", "show",
 		"-parentID", parentID, spiffeIDFlag, spiffeID, "-output", "json")
 	if err != nil {
@@ -97,7 +96,18 @@ func (s *ServerCLI) EnsureEntry(parentID, spiffeID string, selectors ...string) 
 		return false, fmt.Errorf("unable to decode the SPIRE entries: %w", err)
 	}
 
-	if len(existing.Entries) > 0 {
+	return len(existing.Entries) > 0, nil
+}
+
+// EnsureEntry creates the registration entry binding spiffeID to the given selectors under parentID, unless an
+// entry with the same parent and SPIFFE ID already exists. It reports whether the entry has been created.
+func (s *ServerCLI) EnsureEntry(parentID, spiffeID string, selectors ...string) (bool, error) {
+	exists, err := s.HasEntry(parentID, spiffeID)
+	if err != nil {
+		return false, err
+	}
+
+	if exists {
 		return false, nil
 	}
 
