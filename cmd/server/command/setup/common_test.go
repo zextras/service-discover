@@ -167,7 +167,7 @@ func TestSetup_generateCertificateAndConfig_TLS(t *testing.T) {
 		nil,
 	)
 
-	config, err := setup.generateCertificateAndConfig(mockDep, "localhost", "gossipKey")
+	config, err := setup.generateCertificateAndConfig(mockDep, "localhost", "gossipKey", "")
 	assert.NoError(t, err)
 	assert.Equal(t, consulHome+"/consul-agent-ca.pem", config.TLS.Defaults.CaFile)
 	assert.Equal(t, consulHome+"/dc1-server-consul-0-key.pem", config.TLS.Defaults.KeyFile)

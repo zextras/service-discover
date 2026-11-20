@@ -54,3 +54,33 @@ func SetStrictPermissions(deps PermissionInterface, path string) error {
 
 	return nil
 }
+
+// SetOwnership gives the path to the given user and to its primary group, then it sets the given mode.
+func SetOwnership(deps PermissionInterface, path, username string, mode os.FileMode) error {
+	owner, err := deps.LookupUser(username)
+	if err != nil {
+		return errors.New("cannot find user " + username + ": " + err.Error())
+	}
+
+	uid, err := strconv.Atoi(owner.Uid)
+	if err != nil {
+		return errors.New("cannot parse user id for " + username + ": " + err.Error())
+	}
+
+	gid, err := strconv.Atoi(owner.Gid)
+	if err != nil {
+		return errors.New("cannot parse group id for " + username + ": " + err.Error())
+	}
+
+	err = deps.Chown(path, uid, gid)
+	if err != nil {
+		return errors.New("cannot change ownership of '" + path + "': " + err.Error())
+	}
+
+	err = deps.Chmod(path, mode)
+	if err != nil {
+		return errors.New("cannot change permissions of '" + path + "': " + err.Error())
+	}
+
+	return nil
+}

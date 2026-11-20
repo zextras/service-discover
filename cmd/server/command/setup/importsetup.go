@@ -7,23 +7,23 @@ package setup
 import (
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/zextras/service-discover/cmd/server/config"
-	"github.com/zextras/service-discover/pkg/carbonio"
 	"github.com/zextras/service-discover/pkg/command"
 	"github.com/zextras/service-discover/pkg/encrypter"
 	"github.com/zextras/service-discover/pkg/formatter"
 	"github.com/zextras/service-discover/pkg/permissions"
+	"github.com/zextras/service-discover/pkg/spire"
 	"github.com/zextras/service-discover/pkg/systemd"
 )
 
 // importSetup refers to the run performed on a non-first cluster instance in a non-interactive way.
 // The output returned is always empty
 //
-//nolint:misspell,gocognit,gocyclo,cyclop // complex setup flow is inherently sequential
+//nolint:misspell // Zimbra is the name of the product the localconfig belongs to
 func (s *Setup) importSetup(deps businessDependencies) (formatter.Formatter, error) {
 	networks, err := command.NonLoopbackInterfaces(deps)
 	if err != nil {
@@ -35,19 +35,7 @@ func (s *Setup) importSetup(deps businessDependencies) (formatter.Formatter, err
 		return nil, err
 	}
 
-	zimbraLocalConfig, err := carbonio.LoadLocalConfig(s.LocalConfigPath)
-	if err != nil {
-		return nil, err
-	}
-
-	ldapHandler := deps.LdapHandler(zimbraLocalConfig)
-
-	zimbraHostname, err := command.RetrieveZimbraHostname(zimbraLocalConfig, ldapHandler)
-	if err != nil {
-		return nil, err
-	}
-
-	err = command.CheckHostnameAddress(deps, zimbraHostname)
+	ldapHandler, zimbraHostname, err := s.resolveServerIdentity(deps)
 	if err != nil {
 		return nil, err
 	}
@@ -57,92 +45,21 @@ func (s *Setup) importSetup(deps businessDependencies) (formatter.Formatter, err
 		return nil, errors.WithMessage(err, "unable to download credentials from LDAP")
 	}
 
-	clusterCredential, err := command.OpenClusterCredential(s.ClusterCredential)
+	extractedFiles, caKeyPath, err := s.extractClusterCredentials(deps)
 	if err != nil {
 		return nil, err
 	}
 
-	credReader, err := encrypter.NewReader(clusterCredential, []byte(s.Password))
-	if err != nil {
-		return nil, errors.Errorf("unable to open %s: %s", clusterCredential.Name(), err)
-	}
-	// We calculate the path relative to the root (i.e. without the "/" at the beginning) since this should not be
-	// included in standard tarballs
-	tarballCaFullPath, err := filepath.Rel("/", filepath.Join(config.ConsulHome, command.ConsulCA))
+	defer os.Remove(caKeyPath)
+
+	oidcURL, err := s.clusterOIDCURL()
 	if err != nil {
 		return nil, err
 	}
 
-	localCaFullPath, err := filepath.Rel("/", filepath.Join(s.ConsulHome, command.ConsulCA))
-	if err != nil {
-		return nil, err
-	}
-
-	tarballCaKeyFullPath, err := filepath.Rel("/", filepath.Join(config.ConsulHome, command.ConsulCAKey))
-	if err != nil {
-		return nil, err
-	}
-
-	localCaKeyFullPath, err := filepath.Rel("/", filepath.Join(s.ConsulHome, command.ConsulCAKey))
-	if err != nil {
-		return nil, err
-	}
-
-	extractedFiles, err := encrypter.ReadFiles(
-		credReader,
-		tarballCaFullPath,
-		tarballCaKeyFullPath,
-		command.ConsulACLBootstrap,
-		command.GossipKey,
+	err = s.writeConsulConfiguration(
+		deps, zimbraHostname, string(extractedFiles[command.GossipKey]), oidcURL, s.BindAddress,
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	err = os.WriteFile("/"+localCaFullPath, extractedFiles[tarballCaFullPath], os.FileMode(0600))
-	if err != nil {
-		return nil, err
-	}
-
-	err = permissions.SetStrictPermissions(deps, "/"+localCaFullPath)
-	if err != nil {
-		return nil, err
-	}
-
-	err = os.WriteFile("/"+localCaKeyFullPath, extractedFiles[tarballCaKeyFullPath], os.FileMode(0600))
-	if err != nil {
-		return nil, err
-	}
-	defer os.Remove("/" + localCaKeyFullPath)
-
-	gossipKey := string(extractedFiles[command.GossipKey])
-
-	consulConfigFile, err := s.generateCertificateAndConfig(deps, zimbraHostname, gossipKey)
-	if err != nil {
-		return nil, err
-	}
-
-	consulFileBytes, err := json.MarshalIndent(consulConfigFile, "", "  ")
-	if err != nil {
-		return nil, err
-	}
-
-	err = os.WriteFile(s.ConsulFileConfig, consulFileBytes, os.FileMode(0600))
-	if err != nil {
-		return nil, errors.Errorf("unable to save generated configuration file in %s: %s", s.ConsulHome, err)
-	}
-
-	err = permissions.SetStrictPermissions(deps, s.ConsulFileConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	err = command.SaveBindAddressConfiguration(s.MutableConfigFile, s.BindAddress)
-	if err != nil {
-		return nil, err
-	}
-
-	err = permissions.SetStrictPermissions(deps, s.MutableConfigFile)
 	if err != nil {
 		return nil, err
 	}
@@ -152,40 +69,12 @@ func (s *Setup) importSetup(deps businessDependencies) (formatter.Formatter, err
 		return nil, err
 	}
 
-	isContainer := command.CheckDockerContainer()
-
-	if isContainer && !testingMode {
-		cmd := exec.Command("service-discoverd-docker", "server") //nolint:noctx // no context available here
-
-		err = cmd.Run()
-		if err != nil {
-			return nil, errors.WithMessage(err, "unable to start service-discoverd server")
-		}
-	} else {
-		err := systemd.StartSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
-		if err != nil {
-			return nil, errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
-		}
-	}
-
-	aclBootstrapToken := command.ACLTokenCreation{}
-
-	err = json.Unmarshal(extractedFiles[command.ConsulACLBootstrap], &aclBootstrapToken)
+	isContainer, err := startServiceDiscoverDaemon(deps)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "unable to decode ACL Bootstrap token")
+		return nil, err
 	}
 
-	token, err := command.CreateACLToken(
-		deps.CreateCommand,
-		command.Server,
-		zimbraHostname,
-		aclBootstrapToken.SecretID,
-	)
-	if err != nil {
-		return nil, errors.WithMessage(err, "unable to create ACL policy for this server")
-	}
-
-	err = command.SetACLToken(deps.CreateCommand, token, aclBootstrapToken.SecretID)
+	err = s.createServerToken(deps, zimbraHostname, extractedFiles[command.ConsulACLBootstrap])
 	if err != nil {
 		return nil, err
 	}
@@ -203,4 +92,109 @@ func (s *Setup) importSetup(deps businessDependencies) (formatter.Formatter, err
 	}
 
 	return &formatter.EmptyFormatter{}, nil
+}
+
+// extractClusterCredentials reads the cluster credentials downloaded from LDAP and installs the cluster CA and its key
+// in the Consul home. It returns the files read from the credentials, and the path of the CA key, that the caller
+// must remove once the server certificates have been generated.
+func (s *Setup) extractClusterCredentials(deps businessDependencies) (map[string][]byte, string, error) {
+	clusterCredential, err := command.OpenClusterCredential(s.ClusterCredential)
+	if err != nil {
+		return nil, "", err
+	}
+
+	credReader, err := encrypter.NewReader(clusterCredential, []byte(s.Password))
+	if err != nil {
+		return nil, "", errors.Errorf("unable to open %s: %s", clusterCredential.Name(), err)
+	}
+	// We calculate the path relative to the root (i.e. without the "/" at the beginning) since this should not be
+	// included in standard tarballs
+	tarballCaFullPath, err := filepath.Rel("/", filepath.Join(config.ConsulHome, command.ConsulCA))
+	if err != nil {
+		return nil, "", err
+	}
+
+	localCaFullPath, err := filepath.Rel("/", filepath.Join(s.ConsulHome, command.ConsulCA))
+	if err != nil {
+		return nil, "", err
+	}
+
+	tarballCaKeyFullPath, err := filepath.Rel("/", filepath.Join(config.ConsulHome, command.ConsulCAKey))
+	if err != nil {
+		return nil, "", err
+	}
+
+	localCaKeyFullPath, err := filepath.Rel("/", filepath.Join(s.ConsulHome, command.ConsulCAKey))
+	if err != nil {
+		return nil, "", err
+	}
+
+	extractedFiles, err := encrypter.ReadFiles(
+		credReader,
+		tarballCaFullPath,
+		tarballCaKeyFullPath,
+		command.ConsulACLBootstrap,
+		command.GossipKey,
+	)
+	if err != nil {
+		return nil, "", err
+	}
+
+	err = os.WriteFile("/"+localCaFullPath, extractedFiles[tarballCaFullPath], os.FileMode(0600))
+	if err != nil {
+		return nil, "", err
+	}
+
+	err = permissions.SetStrictPermissions(deps, "/"+localCaFullPath)
+	if err != nil {
+		return nil, "", err
+	}
+
+	err = os.WriteFile("/"+localCaKeyFullPath, extractedFiles[tarballCaKeyFullPath], os.FileMode(0600))
+	if err != nil {
+		return nil, "", err
+	}
+
+	return extractedFiles, "/" + localCaKeyFullPath, nil
+}
+
+// createServerToken creates the ACL token of this server using the bootstrap token shared by the first server.
+func (s *Setup) createServerToken(deps businessDependencies, hostname string, aclBootstrapJSON []byte) error {
+	aclBootstrapToken := command.ACLTokenCreation{}
+
+	err := json.Unmarshal(aclBootstrapJSON, &aclBootstrapToken)
+	if err != nil {
+		return errors.WithMessagef(err, "unable to decode ACL Bootstrap token")
+	}
+
+	token, err := command.CreateACLToken(deps.CreateCommand, command.Server, hostname, aclBootstrapToken.SecretID)
+	if err != nil {
+		return errors.WithMessage(err, "unable to create ACL policy for this server")
+	}
+
+	return command.SetACLToken(deps.CreateCommand, token, aclBootstrapToken.SecretID)
+}
+
+// clusterOIDCURL returns the OIDC discovery URL of the SPIRE server of the cluster, as recorded in the cluster
+// credentials by the first server. It is empty for clusters set up before SPIRE was introduced: their servers keep
+// working, but cannot authorize agents joining with a SPIRE join bundle.
+func (s *Setup) clusterOIDCURL() (string, error) {
+	clusterCredential, err := command.OpenClusterCredential(s.ClusterCredential)
+	if err != nil {
+		return "", err
+	}
+
+	defer clusterCredential.Close()
+
+	credReader, err := encrypter.NewReader(clusterCredential, []byte(s.Password))
+	if err != nil {
+		return "", errors.Errorf("unable to open %s: %s", clusterCredential.Name(), err)
+	}
+
+	files, err := encrypter.ReadOptionalFiles(credReader, spire.ClusterOIDCURLFile)
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSpace(string(files[spire.ClusterOIDCURLFile])), nil
 }

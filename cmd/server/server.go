@@ -10,6 +10,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	internalCommand "github.com/zextras/service-discover/cmd/server/command"
+	"github.com/zextras/service-discover/cmd/server/command/jointoken"
 	"github.com/zextras/service-discover/cmd/server/command/setup"
 	"github.com/zextras/service-discover/cmd/server/config"
 	"github.com/zextras/service-discover/pkg/command"
@@ -24,7 +25,8 @@ type CLI struct {
 	WizardSetup    setup.Wizard           `cmd:"" help:"Perform first time setup of the server installation in an interactive way" name:"setup-wizard"` //nolint:lll
 	Config         command.Config         `cmd:"" help:"Manage service-discover configuration"`
 	BootstrapToken command.BootstrapToken `cmd:"" help:"Print the bootstrap-token" name:"bootstrap-token"`
-	ServiceToken   command.ServiceToken   `cmd:"" help:"Manage the Consul ACL token of a mesh service" name:"service-token"` //nolint:lll
+	ServiceToken   command.ServiceToken   `cmd:"" help:"Manage the Consul ACL token of a mesh service" name:"service-token"`                                                  //nolint:lll
+	JoinToken      jointoken.JoinToken    `cmd:"" help:"Generate the bundle to let a node join the cluster through SPIRE, without the cluster credentials" name:"join-token"` //nolint:lll
 
 	Version command.Version `cmd:"" help:"Show the version of this CLI and of the agent running in the host"`
 	Help    command.Help    `cmd:"" help:"Print the program help"`
@@ -51,7 +53,8 @@ func main() {
 			os.Stdout,
 			config.AgentName,
 		),
-		Help: cmd.Help(),
+		JoinToken: jointoken.New(os.Stdout),
+		Help:      cmd.Help(),
 	}
 	ctx := parser.Parse(cli,
 		kong.Name(config.ApplicationName),

@@ -8,6 +8,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"io"
+	"slices"
 	"strings"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
@@ -107,4 +108,32 @@ func ReadFiles(tarReader *tar.Reader, files ...string) (map[string][]byte, error
 	}
 
 	return result, nil
+}
+
+// ReadOptionalFiles reads the given files from the tarReader like ReadFiles, but the files missing from the archive
+// are not an error: they are just absent from the result.
+func ReadOptionalFiles(tarReader *tar.Reader, files ...string) (map[string][]byte, error) {
+	result := make(map[string][]byte)
+
+	for {
+		header, err := tarReader.Next()
+		if errors.Is(err, io.EOF) {
+			return result, nil
+		}
+
+		if err != nil {
+			return nil, err
+		}
+
+		if !slices.Contains(files, header.Name) {
+			continue
+		}
+
+		content, err := ReadFile(tarReader)
+		if err != nil {
+			return nil, err
+		}
+
+		result[header.Name] = content
+	}
 }
