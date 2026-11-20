@@ -1,0 +1,10 @@
+{
+  "Kind": "service-intentions",
+  "Name": "carbonio-preview-db",
+  "Sources": [
+    {
+      "Name": "carbonio-preview",
+      "Action": "allow"
+    }
+  ]
+}

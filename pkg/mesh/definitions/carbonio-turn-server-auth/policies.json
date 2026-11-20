@@ -1,0 +1,26 @@
+{
+  "key_prefix": [
+    {
+      "carbonio-turn-server-auth/": {
+        "policy": "read"
+      }
+    }
+  ],
+  "node_prefix": [
+    {
+      "": {
+        "policy": "read"
+      }
+    }
+  ],
+  "service": [
+    {
+      "carbonio-turn-server-auth": {
+        "policy": "write"
+      },
+      "carbonio-turn-server-auth-sidecar-proxy": {
+        "policy": "write"
+      }
+    }
+  ]
+}

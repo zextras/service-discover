@@ -1,0 +1,10 @@
+{
+  "Kind": "service-intentions",
+  "Name": "carbonio-turn-server-auth",
+  "Sources": [
+    {
+      "Name": "carbonio-ws-collaboration",
+      "Action": "allow"
+    }
+  ]
+}

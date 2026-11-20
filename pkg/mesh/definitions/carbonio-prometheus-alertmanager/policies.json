@@ -1,0 +1,23 @@
+{
+  "node_prefix": [
+    {
+      "": {
+        "policy": "read"
+      }
+    }
+  ],
+  "service": [
+    {
+      "carbonio-prometheus-alertmanager": {
+        "policy": "write"
+      }
+    }
+  ],
+  "key": [
+    {
+      "carbonio-alertmanager/config": {
+        "policy": "write"
+      }
+    }
+  ]
+}

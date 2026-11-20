@@ -1,0 +1,10 @@
+{
+  "Kind": "service-intentions",
+  "Name": "carbonio-message-dispatcher-auth",
+  "Sources": [
+    {
+      "Name": "carbonio-message-dispatcher-http",
+      "Action": "allow"
+    }
+  ]
+}

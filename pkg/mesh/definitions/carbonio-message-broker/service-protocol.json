@@ -1,0 +1,5 @@
+{
+  "Kind": "service-defaults",
+  "Name": "carbonio-message-broker",
+  "Protocol": "tcp"
+}

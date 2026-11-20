@@ -1,0 +1,34 @@
+{
+  "Kind": "service-intentions",
+  "Name": "carbonio-files",
+  "Sources": [
+    {
+      "Name": "carbonio-proxy",
+      "Permissions": [
+        {
+          "Action": "deny",
+          "HTTP": {
+            "PathPrefix": "/internal"
+          }
+        },
+        {
+          "Action": "allow",
+          "HTTP": {
+            "PathPrefix": "/"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "*",
+      "Permissions": [
+        {
+          "Action": "allow",
+          "HTTP": {
+            "PathPrefix": "/internal"
+          }
+        }
+      ]
+    }
+  ]
+}

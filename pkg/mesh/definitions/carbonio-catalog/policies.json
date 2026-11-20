@@ -1,0 +1,33 @@
+{
+  "key_prefix": [
+    {
+      "carbonio-catalog/": {
+        "policy": "read"
+      }
+    }
+  ],
+  "node_prefix": [
+    {
+      "": {
+        "policy": "read"
+      }
+    }
+  ],
+  "service_prefix": [
+    {
+      "": {
+        "policy": "read"
+      }
+    }
+  ],
+  "service": [
+    {
+      "carbonio-catalog": {
+        "policy": "write"
+      },
+      "carbonio-catalog-sidecar-proxy": {
+        "policy": "write"
+      }
+    }
+  ]
+}

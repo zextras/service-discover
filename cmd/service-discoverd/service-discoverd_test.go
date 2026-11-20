@@ -23,6 +23,13 @@ type mockDependencies struct {
 	// fake clock: Sleep advances it, so retries never really wait.
 	elapsed time.Duration
 	sleeps  []time.Duration
+	// configArgs and configErr are what ConsulConfigArgs returns: a node not using SPIRE has none.
+	configArgs []string
+	configErr  error
+}
+
+func (m *mockDependencies) ConsulConfigArgs() ([]string, error) {
+	return m.configArgs, m.configErr
 }
 
 func (m *mockDependencies) Now() time.Time {
@@ -545,6 +552,48 @@ func Test_runServiceDiscoverDaemon_autoConfig(t *testing.T) {
 
 		mockDependencies.AssertCalled(t, "LoadLocalConfig")
 		mockDependencies.AssertNumberOfCalls(t, "Exec", 1)
+	})
+}
+
+func Test_runServiceDiscoverDaemon_meshConfig(t *testing.T) {
+	const autoConfigAgent = `{"ports": {"grpc_tls": 8503}, "auto_config": {"enabled": true, "server_addresses": ["10.0.0.1:8300"]}}`
+
+	configArgs := []string{
+		"-config-file", "/etc/zextras/service-discover/main.json",
+		"-config-dir", "/var/lib/service-discover/services.d",
+	}
+
+	t.Run("a SPIRE node loads the rendered definitions instead of the configuration directory", func(t *testing.T) {
+		mockDependencies := new(mockDependencies)
+		mockDependencies.configArgs = configArgs
+		setupAutoConfigMock(mockDependencies)
+		mockDependencies.On(
+			"Exec",
+			"/usr/bin/consul",
+			append([]string{"/usr/bin/consul", "agent"}, configArgs...),
+			[]string{"SHELL=/bin/custom-shell", "NOTIFY_SOCKET=/run/dbus/systemd-socket"},
+		).Return(nil)
+
+		runServiceDiscoverDaemon(mockDependencies, []string{discoverdBinPath, "agent", writeMainJSON(t, autoConfigAgent)})
+
+		mockDependencies.AssertNumberOfCalls(t, "Exec", 1)
+	})
+
+	t.Run("a failure preparing the definitions does not prevent Consul from starting", func(t *testing.T) {
+		mockDependencies := new(mockDependencies)
+		mockDependencies.configErr = errors.New("no luck")
+		setupAutoConfigMock(mockDependencies)
+		mockDependencies.On(
+			"Exec",
+			"/usr/bin/consul",
+			[]string{"/usr/bin/consul", "agent", "-config-dir", "/etc/zextras/service-discover/"},
+			[]string{"SHELL=/bin/custom-shell", "NOTIFY_SOCKET=/run/dbus/systemd-socket"},
+		).Return(nil)
+
+		runServiceDiscoverDaemon(mockDependencies, []string{discoverdBinPath, "agent", writeMainJSON(t, autoConfigAgent)})
+
+		mockDependencies.AssertNumberOfCalls(t, "Exec", 1)
+		mockDependencies.AssertCalled(t, "Log", []any{"unable to prepare the service definitions: no luck\n"})
 	})
 }
 

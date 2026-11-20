@@ -1,0 +1,14 @@
+{
+  "Kind": "service-intentions",
+  "Name": "carbonio-ws-collaboration-db",
+  "Sources": [
+    {
+      "Name": "carbonio-ws-collaboration",
+      "Action": "allow"
+    },
+    {
+      "Name": "carbonio-push-connector",
+      "Action": "allow"
+    }
+  ]
+}

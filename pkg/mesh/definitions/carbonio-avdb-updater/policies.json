@@ -1,0 +1,19 @@
+{
+  "node_prefix": [
+    {
+      "": {
+        "policy": "read"
+      }
+    }
+  ],
+  "service": [
+    {
+      "carbonio-avdb-updater": {
+        "policy": "write"
+      },
+      "carbonio-avdb-updater-sidecar-proxy": {
+        "policy": "write"
+      }
+    }
+  ]
+}

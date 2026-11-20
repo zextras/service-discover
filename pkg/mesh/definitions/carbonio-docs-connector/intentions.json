@@ -1,0 +1,29 @@
+{
+  "Kind": "service-intentions",
+  "Name": "carbonio-docs-connector",
+  "Sources":
+  [
+    {
+      "Name": "carbonio-proxy",
+      "Action": "allow"
+    },
+    {
+      "Name": "carbonio-docs-editor",
+      "Action": "allow"
+    },
+    {
+      "Name": "carbonio-files",
+      "Permissions": [
+        {
+          "Action": "allow",
+          "HTTP": {
+            "PathPrefix": "/q/health/live",
+            "Methods": [
+              "GET"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

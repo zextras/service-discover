@@ -1,0 +1,29 @@
+{
+  "key_prefix": [
+    {
+      "carbonio-notification-push-db/": {
+        "policy": "write"
+      },
+      "carbonio-notification-push/": {
+        "policy": "read"
+      }
+    }
+  ],
+  "node_prefix": [
+    {
+      "": {
+        "policy": "read"
+      }
+    }
+  ],
+  "service": [
+    {
+      "carbonio-notification-push-db": {
+        "policy": "write"
+      },
+      "carbonio-notification-push-db-sidecar-proxy": {
+        "policy": "write"
+      }
+    }
+  ]
+}

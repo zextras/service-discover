@@ -1,0 +1,34 @@
+{
+  "key_prefix": [
+    {
+      "carbonio-docs-connector/": {
+        "policy": "read"
+      },
+      "featureFlags/": {
+        "policy": "read"
+      }
+    },
+    {
+      "carbonio-docs-connector/max-file-size-in-mb": {
+        "policy": "write"
+      }
+    }
+  ],
+  "node_prefix": [
+    {
+      "": {
+        "policy": "read"
+      }
+    }
+  ],
+  "service": [
+    {
+      "carbonio-docs-connector": {
+        "policy": "write"
+      },
+      "carbonio-docs-connector-sidecar-proxy": {
+        "policy": "write"
+      }
+    }
+  ]
+}

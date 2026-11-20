@@ -1,0 +1,41 @@
+{
+  "key_prefix": [
+    {
+      "carbonio-message-dispatcher/": {
+        "policy": "write"
+      },
+      "carbonio-message-dispatcher-db/": {
+        "policy": "read"
+      }
+    }
+  ],
+  "node_prefix": [
+    {
+      "": {
+        "policy": "read"
+      }
+    }
+  ],
+  "service": [
+    {
+      "carbonio-message-dispatcher-xmpp": {
+        "policy": "write"
+      },
+      "carbonio-message-dispatcher-http": {
+        "policy": "write"
+      },
+      "carbonio-message-dispatcher-auth": {
+        "policy": "write"
+      },
+      "carbonio-message-dispatcher-http-sidecar-proxy": {
+        "policy": "write"
+      },
+      "carbonio-message-dispatcher-xmpp-sidecar-proxy": {
+        "policy": "write"
+      },
+      "carbonio-message-dispatcher-auth-sidecar-proxy": {
+        "policy": "write"
+      }
+    }
+  ]
+}

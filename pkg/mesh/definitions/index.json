@@ -1,0 +1,2027 @@
+{
+  "services": [
+    {
+      "name": "carbonio-address-book",
+      "dir": "address-book",
+      "user": "zextras",
+      "hcl": [
+        "carbonio-address-book.hcl"
+      ],
+      "sidecars": [
+        "carbonio-address-book-sidecar.service"
+      ],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-advanced",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "carbonio-advanced/packages/carbonio/extension/carbonio-address-book-intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "carbonio-advanced/packages/carbonio/extension/carbonio-address-book-policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "carbonio-advanced/packages/carbonio/extension/carbonio-address-book-service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-advanced",
+      "dir": "advanced",
+      "user": "carbonio-advanced",
+      "hcl": [
+        "carbonio-advanced.hcl"
+      ],
+      "sidecars": [
+        "carbonio-advanced-sidecar.service"
+      ],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-advanced",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "carbonio-advanced/packages/carbonio/extension/carbonio-advanced-intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "carbonio-advanced/packages/carbonio/extension/carbonio-advanced-policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "carbonio-advanced/packages/carbonio/extension/carbonio-advanced-service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-auth",
+      "dir": "auth",
+      "user": "carbonio-auth",
+      "hcl": [
+        "carbonio-auth.hcl"
+      ],
+      "sidecars": [
+        "carbonio-auth-sidecar.service"
+      ],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-advanced",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "carbonio-advanced/packages/carbonio/extension/carbonio-auth-intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "carbonio-advanced/packages/carbonio/extension/carbonio-auth-policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "carbonio-advanced/packages/carbonio/extension/carbonio-auth-service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-authz",
+      "dir": "authz",
+      "user": "carbonio-mailbox",
+      "hcl": [
+        "carbonio-authz.hcl"
+      ],
+      "sidecars": [
+        "carbonio-authz-sidecar.service"
+      ],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-mailbox",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "packages/appserver-service/carbonio-authz-intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "packages/appserver-service/carbonio-authz-policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "packages/appserver-service/carbonio-authz-service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-avdb-updater",
+      "dir": "avdb-updater",
+      "user": "zextras",
+      "hcl": [
+        "carbonio-avdb-updater.hcl"
+      ],
+      "sidecars": [
+        "carbonio-avdb-updater-sidecar.service"
+      ],
+      "restart": [
+        "carbonio-avdb-updater.service"
+      ],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-avdb-updater",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "package/intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-catalog",
+      "dir": "catalog",
+      "user": "carbonio-catalog",
+      "hcl": [
+        "carbonio-catalog.hcl"
+      ],
+      "sidecars": [
+        "carbonio-catalog-sidecar.service"
+      ],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-catalog-service",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "package/carbonio-catalog-intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/carbonio-catalog-policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/carbonio-catalog-service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-certificate-manager",
+      "dir": "certificate-manager",
+      "user": "carbonio-certificate-manager",
+      "hcl": [
+        "carbonio-certificate-manager.hcl"
+      ],
+      "sidecars": [
+        "carbonio-certificate-manager-sidecar.service"
+      ],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-certificate-manager",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "package/carbonio-certificate-manager-intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/carbonio-certificate-manager-policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/carbonio-certificate-manager-service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-clamav",
+      "dir": "clamav",
+      "user": "carbonio-clamav",
+      "hcl": [
+        "carbonio-clamav.hcl"
+      ],
+      "sidecars": [
+        "carbonio-clamav-sidecar.service"
+      ],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-thirds-clamav",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "clamav/intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "clamav/policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "clamav/service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-docs-connector",
+      "dir": "docs-connector",
+      "user": "carbonio-docs-connector",
+      "hcl": [
+        "carbonio-docs-connector.hcl"
+      ],
+      "sidecars": [
+        "carbonio-docs-connector-sidecar.service"
+      ],
+      "restart": [
+        "carbonio-docs-connector.service"
+      ],
+      "token_env": [
+        {
+          "unit": "carbonio-docs-connector.service",
+          "var": "CONSUL_HTTP_TOKEN"
+        }
+      ],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-docs-connector",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "package/intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/service-protocol.json"
+        }
+      ],
+      "alt_repos": [
+        "zextras/carbonio-docs-connector-ce"
+      ],
+      "migrations": {
+        "kv": [
+          {
+            "old": "carbonio-docs-connector/db-name",
+            "new": "carbonio-docs-connector/database/credentials/db-name"
+          },
+          {
+            "old": "carbonio-docs-connector/db-username",
+            "new": "carbonio-docs-connector/database/credentials/db-username"
+          },
+          {
+            "old": "carbonio-docs-connector/db-password",
+            "new": "carbonio-docs-connector/database/credentials/db-password"
+          },
+          {
+            "old": "carbonio-docs-connector/hikari-max-pool-size",
+            "new": "carbonio-docs-connector/database/db-pool-max-size"
+          },
+          {
+            "old": "carbonio-docs-connector/hikari-min-idle-connections",
+            "new": "carbonio-docs-connector/database/db-pool-min-size"
+          },
+          {
+            "old": "carbonio-docs-connector/hikari-idle-timeout",
+            "new": "carbonio-docs-connector/database/db-pool-idle-timeout"
+          },
+          {
+            "old": "carbonio-docs-connector/hikari-leak-detection-threshold",
+            "new": "carbonio-docs-connector/database/db-pool-leak-detection"
+          },
+          {
+            "old": "carbonio-docs-connector/hikari-max-lifetime",
+            "new": "carbonio-docs-connector/database/db-pool-max-lifetime"
+          }
+        ],
+        "properties": [
+          {
+            "old": "carbonio.postgres.host",
+            "new": "carbonio.postgresql.host"
+          },
+          {
+            "old": "carbonio.postgres.port",
+            "new": "carbonio.postgresql.port"
+          }
+        ]
+      }
+    },
+    {
+      "name": "carbonio-docs-connector-db",
+      "dir": "docs-connector-db",
+      "user": "carbonio-docs-connector-db",
+      "hcl": [
+        "carbonio-docs-connector-db.hcl"
+      ],
+      "sidecars": [
+        "carbonio-docs-connector-db-sidecar.service"
+      ],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-docs-connector-db",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "package/intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-docs-editor",
+      "dir": "docs-editor",
+      "user": "carbonio-docs-editor",
+      "hcl": [
+        "carbonio-docs-editor.hcl"
+      ],
+      "sidecars": [
+        "carbonio-docs-editor-sidecar.service"
+      ],
+      "restart": [
+        "carbonio-docs-editor.service"
+      ],
+      "token_env": [
+        {
+          "unit": "carbonio-docs-editor.service",
+          "var": "CONSUL_HTTP_TOKEN"
+        }
+      ],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-docs-editor",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "package/intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/service-protocol.json"
+        }
+      ],
+      "generated": true,
+      "setup": "docs-editor",
+      "comment": "The HCL is generated from the template of the package by the setup step docs-editor, with the identifier of this node in its metadata, and the router and resolver are written once the service is registered."
+    },
+    {
+      "name": "carbonio-files",
+      "dir": "files",
+      "user": "carbonio-files",
+      "hcl": [
+        "carbonio-files.hcl"
+      ],
+      "sidecars": [
+        "carbonio-files-sidecar.service"
+      ],
+      "restart": [
+        "carbonio-files.service",
+        "carbonio-files-watches.service"
+      ],
+      "token_env": [
+        {
+          "unit": "carbonio-files.service",
+          "var": "CONSUL_HTTP_TOKEN"
+        }
+      ],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-files",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "package/intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/service-protocol.json"
+        },
+        {
+          "name": "service-router.json",
+          "path": "package/service-router.json"
+        }
+      ],
+      "alt_repos": [
+        "zextras/carbonio-files-ce"
+      ],
+      "migrations": {
+        "kv": [
+          {
+            "old": "carbonio-files/db-name",
+            "new": "carbonio-files/database/credentials/db-name"
+          },
+          {
+            "old": "carbonio-files/db-username",
+            "new": "carbonio-files/database/credentials/db-username"
+          },
+          {
+            "old": "carbonio-files/db-password",
+            "new": "carbonio-files/database/credentials/db-password"
+          },
+          {
+            "old": "carbonio-files/hikari-max-pool-size",
+            "new": "carbonio-files/database/db-pool-max-size"
+          },
+          {
+            "old": "carbonio-files/hikari-min-idle-connections",
+            "new": "carbonio-files/database/db-pool-min-size"
+          },
+          {
+            "old": "carbonio-files/hikari-idle-timeout",
+            "new": "carbonio-files/database/db-pool-idle-timeout"
+          },
+          {
+            "old": "carbonio-files/hikari-leak-detection-threshold",
+            "new": "carbonio-files/database/db-pool-leak-detection"
+          },
+          {
+            "old": "carbonio-files/hikari-max-lifetime",
+            "new": "carbonio-files/database/db-pool-max-lifetime"
+          }
+        ],
+        "properties": []
+      }
+    },
+    {
+      "name": "carbonio-files-db",
+      "dir": "files-db",
+      "user": "carbonio-files-db",
+      "hcl": [
+        "carbonio-files-db.hcl"
+      ],
+      "sidecars": [
+        "carbonio-files-db-sidecar.service"
+      ],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-files-db",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "package/intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-license",
+      "dir": "license",
+      "user": "carbonio-advanced",
+      "hcl": [
+        "carbonio-license.hcl"
+      ],
+      "sidecars": [
+        "carbonio-license-sidecar.service"
+      ],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-advanced",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "carbonio-advanced/packages/carbonio/extension/carbonio-license-intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "carbonio-advanced/packages/carbonio/extension/carbonio-license-policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "carbonio-advanced/packages/carbonio/extension/carbonio-license-service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-license-service",
+      "dir": "license-service",
+      "user": "carbonio-license-service",
+      "hcl": [
+        "carbonio-license-service.hcl"
+      ],
+      "sidecars": [
+        "carbonio-license-service-sidecar.service"
+      ],
+      "restart": [
+        "carbonio-license-service.service"
+      ],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-license-service",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "package/carbonio-license-service-intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/carbonio-license-service-policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/carbonio-license-service-service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-mailbox",
+      "dir": "mailbox",
+      "user": "carbonio-mailbox",
+      "hcl": [
+        "carbonio-mailbox.hcl"
+      ],
+      "sidecars": [
+        "carbonio-mailbox-sidecar.service"
+      ],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-mailbox",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "packages/appserver-service/carbonio-mailbox-intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "packages/appserver-service/carbonio-mailbox-policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "packages/appserver-service/carbonio-mailbox-service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-mailbox-admin",
+      "dir": "mailbox-admin",
+      "user": "carbonio-mailbox",
+      "hcl": [
+        "carbonio-mailbox-admin.hcl"
+      ],
+      "sidecars": [
+        "carbonio-mailbox-admin-sidecar.service"
+      ],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-mailbox",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "packages/appserver-service/carbonio-mailbox-admin-intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "packages/appserver-service/carbonio-mailbox-admin-policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "packages/appserver-service/carbonio-mailbox-admin-service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-mailbox-db",
+      "dir": "mailbox-db",
+      "user": "carbonio-mailbox-db",
+      "hcl": [
+        "carbonio-mailbox-db.hcl"
+      ],
+      "sidecars": [
+        "carbonio-mailbox-db-sidecar.service"
+      ],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-mailbox-db",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "package/intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-mailbox-internal-api",
+      "dir": "mailbox-internal-api",
+      "user": "carbonio-mailbox",
+      "hcl": [
+        "carbonio-mailbox-internal-api.hcl"
+      ],
+      "sidecars": [
+        "carbonio-mailbox-internal-api-sidecar.service"
+      ],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-mailbox",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "packages/appserver-service/carbonio-mailbox-internal-api-intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "packages/appserver-service/carbonio-mailbox-internal-api-policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "packages/appserver-service/carbonio-mailbox-internal-api-service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-mailbox-nslookup",
+      "dir": "mailbox-nslookup",
+      "user": "carbonio-mailbox",
+      "hcl": [
+        "carbonio-mailbox-nslookup.hcl"
+      ],
+      "sidecars": [
+        "carbonio-mailbox-nslookup-sidecar.service"
+      ],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-mailbox",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "packages/appserver-service/carbonio-mailbox-nslookup-intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "packages/appserver-service/carbonio-mailbox-nslookup-policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "packages/appserver-service/carbonio-mailbox-nslookup-service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-memcached",
+      "dir": "memcached",
+      "user": "zextras",
+      "hcl": [
+        "carbonio-memcached.hcl"
+      ],
+      "sidecars": [
+        "carbonio-memcached-sidecar.service"
+      ],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-thirds",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "memcached/carbonio-memcached-intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "memcached/carbonio-memcached-policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "memcached/carbonio-memcached-service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-message-broker",
+      "dir": "message-broker",
+      "user": "carbonio-message-broker",
+      "hcl": [
+        "carbonio-message-broker.hcl",
+        "carbonio-prometheus-rabbit-exporter.hcl"
+      ],
+      "sidecars": [
+        "carbonio-message-broker-sidecar.service"
+      ],
+      "restart": [
+        "carbonio-message-broker.service"
+      ],
+      "token_env": [
+        {
+          "unit": "carbonio-message-broker.service",
+          "var": "CONSUL_ACL_TOKEN"
+        }
+      ],
+      "post_setup": [
+        "carbonio-message-broker-setup-users"
+      ],
+      "extra_rules": {
+        "key_prefix": [
+          {
+            "rabbitmq/": {
+              "policy": "write"
+            }
+          }
+        ]
+      },
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-message-broker",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "package/intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-message-dispatcher",
+      "dir": "message-dispatcher",
+      "user": "carbonio-message-dispatcher",
+      "hcl": [
+        "carbonio-message-dispatcher-auth.hcl",
+        "carbonio-message-dispatcher-http.hcl",
+        "carbonio-message-dispatcher-xmpp.hcl"
+      ],
+      "sidecars": [
+        "carbonio-message-dispatcher-auth-sidecar.service",
+        "carbonio-message-dispatcher-http-sidecar.service",
+        "carbonio-message-dispatcher-xmpp-sidecar.service"
+      ],
+      "restart": [
+        "carbonio-message-dispatcher-auth.service",
+        "carbonio-message-dispatcher.service"
+      ],
+      "token_env": [
+        {
+          "unit": "carbonio-message-dispatcher.service",
+          "var": "CONSUL_HTTP_TOKEN"
+        }
+      ],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-message-dispatcher",
+      "files": [
+        {
+          "name": "intentions-auth.json",
+          "path": "package/intentions-auth.json"
+        },
+        {
+          "name": "intentions-http.json",
+          "path": "package/intentions-http.json"
+        },
+        {
+          "name": "intentions-xmpp.json",
+          "path": "package/intentions-xmpp.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/policies.json"
+        },
+        {
+          "name": "service-protocol-auth.json",
+          "path": "package/service-protocol-auth.json"
+        },
+        {
+          "name": "service-protocol-http.json",
+          "path": "package/service-protocol-http.json"
+        },
+        {
+          "name": "service-protocol-xmpp.json",
+          "path": "package/service-protocol-xmpp.json"
+        }
+      ],
+      "alt_repos": [
+        "zextras/carbonio-message-dispatcher-ce"
+      ]
+    },
+    {
+      "name": "carbonio-message-dispatcher-db",
+      "dir": "message-dispatcher-db",
+      "user": "carbonio-message-dispatcher-db",
+      "hcl": [
+        "carbonio-message-dispatcher-db.hcl"
+      ],
+      "sidecars": [
+        "carbonio-message-dispatcher-db-sidecar.service"
+      ],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-message-dispatcher-db",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "package/intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-mta",
+      "dir": "mta",
+      "user": "carbonio-mta",
+      "hcl": [
+        "carbonio-mta.hcl"
+      ],
+      "sidecars": [
+        "carbonio-mta-sidecar.service"
+      ],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-mta",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "mta/intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "mta/policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "mta/service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-notification-push",
+      "dir": "notification-push",
+      "user": "carbonio-notification-push",
+      "hcl": [
+        "carbonio-notification-push.hcl"
+      ],
+      "sidecars": [
+        "carbonio-notification-push-sidecar.service"
+      ],
+      "restart": [
+        "carbonio-notification-push.service"
+      ],
+      "token_env": [
+        {
+          "unit": "carbonio-notification-push.service",
+          "var": "CONSUL_HTTP_TOKEN"
+        }
+      ],
+      "post_setup": [
+        "carbonio-notification-push-configs"
+      ],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-notification-push",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "package/intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-notification-push-db",
+      "dir": "notification-push-db",
+      "user": "carbonio-notification-push-db",
+      "hcl": [
+        "carbonio-notification-push-db.hcl"
+      ],
+      "sidecars": [
+        "carbonio-notification-push-db-sidecar.service"
+      ],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-notification-push-db",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "package/intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-preview",
+      "dir": "preview",
+      "user": "carbonio-preview",
+      "hcl": [
+        "carbonio-preview.hcl"
+      ],
+      "sidecars": [
+        "carbonio-preview-sidecar.service"
+      ],
+      "restart": [
+        "carbonio-preview.service"
+      ],
+      "token_env": [
+        {
+          "unit": "carbonio-preview.service",
+          "var": "CONSUL_HTTP_TOKEN"
+        }
+      ],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-preview",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "package/intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/service-protocol.json"
+        }
+      ],
+      "alt_repos": [
+        "zextras/carbonio-preview-ce"
+      ],
+      "configure": [
+        "/usr/bin/carbonio-preview-bin --setup http://127.0.0.1:8500"
+      ],
+      "extra_rules": {
+        "key": [
+          {
+            "carbonio-preview/database/pool/max-connections": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/database/db-pool-max-size": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/database/pool/min-connections": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/database/db-pool-min-size": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/database/pool/connection-max-lifetime-seconds": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/database/db-pool-max-lifetime": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/storage/fetch-timeout-seconds": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/image-document/fetch-timeout-seconds": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/render/cache-max-mb": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/cache-max-mb": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/render/max-concurrent-operations": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/image-document/max-concurrent-operations": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/render/pdf-subprocess-pool-size": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/document/subprocess-pool-size": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/document/enable-preview": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/document/enable-thumbnail": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/document/conversion-timeout-seconds": {
+              "policy": "write"
+            }
+          }
+        ]
+      },
+      "comment": "The configuration migration is the --setup of carbonio-preview-bin, run with the token of the service in SETUP_CONSUL_TOKEN; the extra rules are the keys it moves."
+    },
+    {
+      "name": "carbonio-preview-db",
+      "dir": "preview-db",
+      "user": "carbonio-preview-db",
+      "hcl": [
+        "carbonio-preview-db.hcl"
+      ],
+      "sidecars": [
+        "carbonio-preview-db-sidecar.service"
+      ],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-preview-db",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "package/intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-prometheus",
+      "dir": "carbonio-prometheus",
+      "user": "carbonio-prometheus",
+      "hcl": [
+        "carbonio-prometheus.hcl"
+      ],
+      "sidecars": [],
+      "restart": [
+        "carbonio-prometheus.service"
+      ],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-prometheus",
+      "files": [
+        {
+          "name": "policies.json",
+          "path": "packages/prometheus/policies.json"
+        }
+      ],
+      "substitute_files": [
+        "carbonio-prometheus/prometheus.yml",
+        "carbonio-prometheus/scrape_config.d/scrape-exporters.yml",
+        "carbonio-prometheus/scrape_config.d/scrape-services.yml",
+        "carbonio-prometheus/scrape_config.d/scrape-blackbox.yml"
+      ],
+      "extra_rules": {
+        "service": [
+          {
+            "carbonio-prometheus": {
+              "policy": "write"
+            }
+          }
+        ]
+      },
+      "comment": "Besides reading the catalog to find what to scrape, prometheus registers itself: that is the extra rule. Its configuration files carry its token, so they are updated when the token is renewed."
+    },
+    {
+      "name": "carbonio-prometheus-alertmanager",
+      "dir": "carbonio-prometheus-alertmanager",
+      "user": "carbonio-prometheus",
+      "hcl": [
+        "carbonio-prometheus-alertmanager.hcl"
+      ],
+      "sidecars": [],
+      "restart": [
+        "carbonio-prometheus-alertmanager.service"
+      ],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-prometheus",
+      "setup": "alertmanager",
+      "comment": "The setup stores the configuration of the package in carbonio-alertmanager/config and renders alertmanager.yml from it: that is the key rule."
+    },
+    {
+      "name": "carbonio-prometheus-blackbox-exporter",
+      "dir": "carbonio-prometheus-blackbox-exporter",
+      "user": "carbonio-prometheus",
+      "hcl": [
+        "carbonio-prometheus-blackbox-exporter.hcl"
+      ],
+      "sidecars": [],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-prometheus",
+      "comment": "Exporter run as the user carbonio-prometheus, shared by all the prometheus packages: an identity of its own limits what its token can do in Consul (it registers this service only), not what the process can do on the machine."
+    },
+    {
+      "name": "carbonio-prometheus-clamav-exporter",
+      "dir": "carbonio-prometheus-clamav-exporter",
+      "user": "carbonio-prometheus",
+      "hcl": [
+        "carbonio-prometheus-clamav-exporter.hcl"
+      ],
+      "sidecars": [],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-prometheus",
+      "comment": "Exporter run as the user carbonio-prometheus, shared by all the prometheus packages: an identity of its own limits what its token can do in Consul (it registers this service only), not what the process can do on the machine."
+    },
+    {
+      "name": "carbonio-prometheus-consul-exporter",
+      "dir": "carbonio-prometheus-consul-exporter",
+      "user": "carbonio-prometheus",
+      "hcl": [
+        "carbonio-prometheus-consul-exporter.hcl"
+      ],
+      "sidecars": [],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-prometheus",
+      "comment": "Exporter run as the user carbonio-prometheus, shared by all the prometheus packages: an identity of its own limits what its token can do in Consul (it registers this service only), not what the process can do on the machine."
+    },
+    {
+      "name": "carbonio-prometheus-haproxy-exporter",
+      "dir": "carbonio-prometheus-haproxy-exporter",
+      "user": "carbonio-prometheus",
+      "hcl": [
+        "carbonio-prometheus-haproxy-exporter.hcl"
+      ],
+      "sidecars": [],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-prometheus",
+      "comment": "Exporter run as the user carbonio-prometheus, shared by all the prometheus packages: an identity of its own limits what its token can do in Consul (it registers this service only), not what the process can do on the machine."
+    },
+    {
+      "name": "carbonio-prometheus-mysqld-exporter",
+      "dir": "carbonio-prometheus-mysqld-exporter",
+      "user": "carbonio-prometheus",
+      "hcl": [
+        "carbonio-prometheus-mysqld-exporter.hcl"
+      ],
+      "sidecars": [],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-prometheus",
+      "comment": "Exporter run as the user carbonio-prometheus, shared by all the prometheus packages: an identity of its own limits what its token can do in Consul (it registers this service only), not what the process can do on the machine."
+    },
+    {
+      "name": "carbonio-prometheus-nginx-exporter",
+      "dir": "carbonio-prometheus-nginx-exporter",
+      "user": "carbonio-prometheus",
+      "hcl": [
+        "carbonio-prometheus-nginx-exporter.hcl"
+      ],
+      "sidecars": [],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-prometheus",
+      "comment": "Exporter run as the user carbonio-prometheus, shared by all the prometheus packages: an identity of its own limits what its token can do in Consul (it registers this service only), not what the process can do on the machine."
+    },
+    {
+      "name": "carbonio-prometheus-node-exporter",
+      "dir": "carbonio-prometheus-node-exporter",
+      "user": "carbonio-prometheus",
+      "hcl": [
+        "carbonio-prometheus-node-exporter.hcl"
+      ],
+      "sidecars": [],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-prometheus",
+      "comment": "Exporter run as the user carbonio-prometheus, shared by all the prometheus packages: an identity of its own limits what its token can do in Consul (it registers this service only), not what the process can do on the machine."
+    },
+    {
+      "name": "carbonio-prometheus-openldap-exporter",
+      "dir": "carbonio-prometheus-openldap-exporter",
+      "user": "carbonio-prometheus",
+      "hcl": [
+        "carbonio-prometheus-openldap-exporter.hcl"
+      ],
+      "sidecars": [],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-prometheus",
+      "comment": "Exporter run as the user carbonio-prometheus, shared by all the prometheus packages: an identity of its own limits what its token can do in Consul (it registers this service only), not what the process can do on the machine."
+    },
+    {
+      "name": "carbonio-prometheus-postfix-exporter",
+      "dir": "carbonio-prometheus-postfix-exporter",
+      "user": "carbonio-prometheus",
+      "hcl": [
+        "carbonio-prometheus-postfix-exporter.hcl"
+      ],
+      "sidecars": [],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-prometheus",
+      "comment": "Exporter run as the user carbonio-prometheus, shared by all the prometheus packages: an identity of its own limits what its token can do in Consul (it registers this service only), not what the process can do on the machine."
+    },
+    {
+      "name": "carbonio-prometheus-postgres-exporter",
+      "dir": "carbonio-prometheus-postgres-exporter",
+      "user": "carbonio-prometheus",
+      "hcl": [
+        "carbonio-prometheus-postgres-exporter.hcl"
+      ],
+      "sidecars": [],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-prometheus",
+      "comment": "Exporter run as the user carbonio-prometheus, shared by all the prometheus packages: an identity of its own limits what its token can do in Consul (it registers this service only), not what the process can do on the machine."
+    },
+    {
+      "name": "carbonio-prometheus-process-exporter",
+      "dir": "carbonio-prometheus-process-exporter",
+      "user": "carbonio-prometheus",
+      "hcl": [
+        "carbonio-prometheus-process-exporter.hcl"
+      ],
+      "sidecars": [],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-prometheus",
+      "comment": "Exporter run as the user carbonio-prometheus, shared by all the prometheus packages: an identity of its own limits what its token can do in Consul (it registers this service only), not what the process can do on the machine."
+    },
+    {
+      "name": "carbonio-proxy",
+      "dir": "proxy",
+      "user": "carbonio-proxy",
+      "hcl": [
+        "carbonio-proxy.hcl"
+      ],
+      "sidecars": [
+        "carbonio-proxy-sidecar.service"
+      ],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-proxy",
+      "files": [
+        {
+          "name": "policies.json",
+          "path": "proxy/policies-proxy.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "proxy/service-protocol-proxy.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-push-connector",
+      "dir": "push-connector",
+      "user": "carbonio-push-connector",
+      "hcl": [
+        "carbonio-push-connector.hcl"
+      ],
+      "sidecars": [
+        "carbonio-push-connector-sidecar.service"
+      ],
+      "restart": [
+        "carbonio-push-connector.service"
+      ],
+      "token_env": [
+        {
+          "unit": "carbonio-push-connector.service",
+          "var": "CONSUL_HTTP_TOKEN"
+        }
+      ],
+      "post_setup": [
+        "carbonio-push-connector-configs"
+      ],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-push-connector",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "package/intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-storages",
+      "dir": "storages",
+      "user": "carbonio-storages",
+      "hcl": [
+        "carbonio-storages.hcl"
+      ],
+      "sidecars": [
+        "carbonio-storages-sidecar.service"
+      ],
+      "restart": [
+        "carbonio-storages.service"
+      ],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-storages-service",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "package/carbonio-storages-intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/carbonio-storages-policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/carbonio-storages-service-protocol.json"
+        }
+      ],
+      "alt_repos": [
+        "zextras/carbonio-storages-ce"
+      ]
+    },
+    {
+      "name": "carbonio-tasks",
+      "dir": "tasks",
+      "user": "carbonio-tasks",
+      "hcl": [
+        "carbonio-tasks.hcl"
+      ],
+      "sidecars": [
+        "carbonio-tasks-sidecar.service"
+      ],
+      "restart": [
+        "carbonio-tasks.service"
+      ],
+      "token_env": [
+        {
+          "unit": "carbonio-tasks.service",
+          "var": "CONSUL_HTTP_TOKEN"
+        }
+      ],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-tasks",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "package/intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/service-protocol.json"
+        }
+      ],
+      "alt_repos": [
+        "zextras/carbonio-tasks-ce"
+      ],
+      "migrations": {
+        "kv": [
+          {
+            "old": "carbonio-tasks/db-name",
+            "new": "carbonio-tasks/database/credentials/db-name"
+          },
+          {
+            "old": "carbonio-tasks/db-username",
+            "new": "carbonio-tasks/database/credentials/db-username"
+          },
+          {
+            "old": "carbonio-tasks/db-password",
+            "new": "carbonio-tasks/database/credentials/db-password"
+          },
+          {
+            "old": "carbonio-tasks/hikari-max-pool-size",
+            "new": "carbonio-tasks/database/db-pool-max-size"
+          },
+          {
+            "old": "carbonio-tasks/hikari-min-idle-connections",
+            "new": "carbonio-tasks/database/db-pool-min-size"
+          },
+          {
+            "old": "carbonio-tasks/hikari-idle-timeout",
+            "new": "carbonio-tasks/database/db-pool-idle-timeout"
+          },
+          {
+            "old": "carbonio-tasks/hikari-leak-detection-threshold",
+            "new": "carbonio-tasks/database/db-pool-leak-detection"
+          },
+          {
+            "old": "carbonio-tasks/hikari-max-lifetime",
+            "new": "carbonio-tasks/database/db-pool-max-lifetime"
+          },
+          {
+            "old": "carbonio-tasks/database.credentials.db-name",
+            "new": "carbonio-tasks/database/credentials/db-name"
+          },
+          {
+            "old": "carbonio-tasks/database.credentials.db-username",
+            "new": "carbonio-tasks/database/credentials/db-username"
+          },
+          {
+            "old": "carbonio-tasks/database.credentials.db-password",
+            "new": "carbonio-tasks/database/credentials/db-password"
+          }
+        ],
+        "properties": []
+      }
+    },
+    {
+      "name": "carbonio-tasks-db",
+      "dir": "tasks-db",
+      "user": "carbonio-tasks-db",
+      "hcl": [
+        "carbonio-tasks-db.hcl"
+      ],
+      "sidecars": [
+        "carbonio-tasks-db-sidecar.service"
+      ],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-tasks-db",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "package/intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-turn-server",
+      "dir": "turn-server",
+      "user": "zextras",
+      "hcl": [
+        "carbonio-turn-server.hcl"
+      ],
+      "sidecars": [],
+      "restart": [
+        "carbonio-turn-server.service"
+      ],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-turn-server",
+      "files": [
+        {
+          "name": "policies.json",
+          "path": "package/policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/service-protocol.json"
+        }
+      ],
+      "generated": true,
+      "setup": "turn-server",
+      "configure": [
+        "carbonio-turn-server-configs",
+        "carbonio-turn-server-configs-hcl"
+      ],
+      "companions": [
+        "carbonio-turn-server-auth"
+      ],
+      "comment": "carbonio-turn-server-configs-hcl produces the HCL files of both turn-server and turn-server-auth, which the same package setup sets up."
+    },
+    {
+      "name": "carbonio-turn-server-auth",
+      "dir": "turn-server-auth",
+      "user": "zextras",
+      "hcl": [
+        "carbonio-turn-server-auth.hcl"
+      ],
+      "sidecars": [
+        "carbonio-turn-server-auth-sidecar.service"
+      ],
+      "restart": [
+        "carbonio-turn-server-auth.service"
+      ],
+      "token_env": [
+        {
+          "unit": "carbonio-turn-server-auth.service",
+          "var": "CONSUL_HTTP_TOKEN"
+        }
+      ],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-turn-server",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "package/carbonio-turn-server-auth-intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/carbonio-turn-server-auth-policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/carbonio-turn-server-auth-service-protocol.json"
+        }
+      ],
+      "generated": true,
+      "routing": [
+        "carbonio-turn-server-routing"
+      ]
+    },
+    {
+      "name": "carbonio-user-management",
+      "dir": "user-management",
+      "user": "carbonio-user-management",
+      "hcl": [
+        "carbonio-user-management.hcl"
+      ],
+      "sidecars": [
+        "carbonio-user-management-sidecar.service"
+      ],
+      "restart": [
+        "carbonio-user-management.service"
+      ],
+      "token_env": [
+        {
+          "unit": "carbonio-user-management.service",
+          "var": "CONSUL_HTTP_TOKEN"
+        }
+      ],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-user-management",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "package/intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/service-protocol.json"
+        }
+      ],
+      "migrations": {
+        "kv": [],
+        "properties": [
+          {
+            "old": "carbonio.user-management.host",
+            "new": "carbonio.service.host"
+          },
+          {
+            "old": "carbonio.user-management.port",
+            "new": "carbonio.service.port"
+          },
+          {
+            "old": "carbonio.mailbox.url",
+            "host": "carbonio.mailbox.host",
+            "port": "carbonio.mailbox.port"
+          }
+        ]
+      }
+    },
+    {
+      "name": "carbonio-videorecorder",
+      "dir": "videorecorder",
+      "user": "videoserver",
+      "hcl": [
+        "carbonio-videorecorder.hcl"
+      ],
+      "sidecars": [
+        "carbonio-videorecorder-sidecar.service"
+      ],
+      "restart": [
+        "carbonio-videorecorder.service"
+      ],
+      "token_env": [
+        {
+          "unit": "carbonio-videorecorder.service",
+          "var": "CONSUL_HTTP_TOKEN"
+        }
+      ],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-videorecorder",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "package/intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/service-protocol.json"
+        }
+      ],
+      "migrations": {
+        "kv": [
+          {
+            "old": "carbonio-videorecorder-db/db-name",
+            "new": "carbonio-videorecorder/database/credentials/db-name"
+          },
+          {
+            "old": "carbonio-videorecorder-db/db-username",
+            "new": "carbonio-videorecorder/database/credentials/db-username"
+          },
+          {
+            "old": "carbonio-videorecorder-db/db-password",
+            "new": "carbonio-videorecorder/database/credentials/db-password"
+          }
+        ],
+        "properties": []
+      },
+      "generated": true,
+      "configure": [
+        "carbonio-videorecorder-configs"
+      ],
+      "routing": [
+        "carbonio-videorecorder-routing"
+      ],
+      "extra_rules": {
+        "key_prefix": [
+          {
+            "carbonio-videoserver/meta/": {
+              "policy": "read"
+            }
+          }
+        ]
+      },
+      "comment": "The HCL is rendered from the template of the package with the identifier videoserver published for this node, so the role may read carbonio-videoserver/meta/."
+    },
+    {
+      "name": "carbonio-videorecorder-db",
+      "dir": "videorecorder-db",
+      "user": "carbonio-videorecorder-db",
+      "hcl": [
+        "carbonio-videorecorder-db.hcl"
+      ],
+      "sidecars": [
+        "carbonio-videorecorder-db-sidecar.service"
+      ],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-videorecorder-db",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "package/intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "carbonio-videoserver",
+      "dir": "videoserver",
+      "user": "videoserver",
+      "hcl": [
+        "carbonio-videoserver.hcl"
+      ],
+      "sidecars": [
+        "carbonio-videoserver-sidecar.service"
+      ],
+      "restart": [
+        "carbonio-videoserver.service"
+      ],
+      "token_env": [
+        {
+          "unit": "carbonio-videoserver.service",
+          "var": "CONSUL_HTTP_TOKEN"
+        }
+      ],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-videoserver-advanced",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "videoserver/videoserver/intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "videoserver/videoserver/policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "videoserver/videoserver/service-protocol.json"
+        }
+      ],
+      "alt_repos": [
+        "zextras/carbonio-videoserver-ce"
+      ],
+      "generated": true,
+      "configure": [
+        "carbonio-videoserver-configs"
+      ],
+      "routing": [
+        "carbonio-videoserver-routing"
+      ]
+    },
+    {
+      "name": "carbonio-ws-collaboration",
+      "dir": "ws-collaboration",
+      "user": "carbonio-ws-collaboration",
+      "hcl": [
+        "carbonio-ws-collaboration.hcl"
+      ],
+      "sidecars": [
+        "carbonio-ws-collaboration-sidecar.service"
+      ],
+      "restart": [
+        "carbonio-ws-collaboration.service"
+      ],
+      "token_env": [
+        {
+          "unit": "carbonio-ws-collaboration.service",
+          "var": "CONSUL_HTTP_TOKEN"
+        }
+      ],
+      "post_setup": [
+        "carbonio-ws-collaboration-configs",
+        "carbonio-ws-collaboration-configs-cleanup"
+      ],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-ws-collaboration",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "package/intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/service-protocol.json"
+        }
+      ],
+      "alt_repos": [
+        "zextras/carbonio-ws-collaboration-ce"
+      ]
+    },
+    {
+      "name": "carbonio-ws-collaboration-db",
+      "dir": "ws-collaboration-db",
+      "user": "carbonio-ws-collaboration-db",
+      "hcl": [
+        "carbonio-ws-collaboration-db.hcl"
+      ],
+      "sidecars": [
+        "carbonio-ws-collaboration-db-sidecar.service"
+      ],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-ws-collaboration-db",
+      "files": [
+        {
+          "name": "intentions.json",
+          "path": "package/intentions.json"
+        },
+        {
+          "name": "policies.json",
+          "path": "package/policies.json"
+        },
+        {
+          "name": "service-protocol.json",
+          "path": "package/service-protocol.json"
+        }
+      ]
+    },
+    {
+      "name": "zsf-carbonio-email-templates-db",
+      "dir": "zsf-email-templates-db",
+      "user": "root",
+      "hcl": [
+        "zsf-carbonio-email-templates-db.hcl"
+      ],
+      "sidecars": [],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/zsf-carbonio-email-templates-db",
+      "files": [
+        {
+          "name": "policies.json",
+          "path": "package/policies.json"
+        }
+      ]
+    }
+  ]
+}

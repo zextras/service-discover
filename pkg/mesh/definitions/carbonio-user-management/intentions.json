@@ -1,0 +1,37 @@
+{
+  "Kind": "service-intentions",
+  "Name": "carbonio-user-management",
+  "Sources": [
+    {
+      "Name": "carbonio-proxy",
+      "Permissions": [
+        {
+          "Action": "deny",
+          "HTTP": {
+            "PathPrefix": "/internal"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "*",
+      "Permissions": [
+        {
+          "Action": "allow",
+          "HTTP": {
+            "PathPrefix": "/internal"
+          }
+        },
+        {
+          "Action": "allow",
+          "HTTP": {
+            "PathPrefix": "/q/health/live",
+            "Methods": [
+              "GET"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

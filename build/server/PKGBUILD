@@ -27,10 +27,14 @@ conflicts=("service-discover-agent")
 source=(
   "service-discover.service"
   "service-discover-legacy.service"
+  "service-discover-sync.service"
+  "service-discover-sync.path"
 )
 sha256sums=(
-  'e8583f4829b7b3525a42b2803386df786f28c80b5e9156410b5ef98c2b7106f5'
+  '22655ea8b82413fa9e0c8a1a8a1a50d9e2908775e58cbd7c9c7c078f50e65b51'
   'f018ae09fb074da2bb38729f1864e19da5a5fa51785dec6cac3d7c516402cfad'
+  '7debb191099235bbeb722565951bf7b4aa57ff84d72d816fa452b7be59a84806'
+  'f894864a912eba0a5aee7cd5c89c5db074715665b98f6b26a738fb9494106c97'
 )
 
 _package_legacy() {
@@ -47,6 +51,10 @@ _package_systemd() {
     "${pkgdir}/usr/bin/service-discover"
   install -Dm644 service-discover.service \
     "${pkgdir}/lib/systemd/system/service-discover.service"
+  install -Dm644 service-discover-sync.service \
+    "${pkgdir}/lib/systemd/system/service-discover-sync.service"
+  install -Dm644 service-discover-sync.path \
+    "${pkgdir}/lib/systemd/system/service-discover-sync.path"
 }
 
 build() {
@@ -83,6 +91,7 @@ postinst__apt() {
     # symlink is always reconciled against the current unit (self-healing).
     if [ "$1" = "configure" ]; then
       systemctl enable service-discover.service &>/dev/null || :
+      systemctl enable --now service-discover-sync.path &>/dev/null || :
     fi
   fi
 
@@ -96,6 +105,7 @@ postinst__yum() {
     # [Install] WantedBy= symlink is always reconciled (self-healing).
     if [ $1 -ge 1 ]; then
       systemctl enable service-discover.service &>/dev/null || :
+      systemctl enable --now service-discover-sync.path &>/dev/null || :
     fi
   fi
 
@@ -112,6 +122,7 @@ prerm__apt() {
   if [ -d /run/systemd/system ]; then
     case "$1" in
       remove)
+        systemctl --no-reload disable --now service-discover-sync.path &>/dev/null || :
         systemctl --no-reload disable --now service-discover.service &>/dev/null || :
         ;;
       upgrade)
@@ -124,6 +135,7 @@ prerm__apt() {
 prerm__yum() {
   if [ -d /run/systemd/system ]; then
     if [ $1 -eq 0 ]; then
+      systemctl --no-reload disable --now service-discover-sync.path &>/dev/null || :
       systemctl --no-reload disable --now service-discover.service &>/dev/null || :
     else
       systemctl --no-reload stop service-discover.service &>/dev/null || :

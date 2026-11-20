@@ -56,6 +56,12 @@ func (a *AgentCLI) WaitJWTSVID(audience, spiffeID string, timeout, interval time
 	}
 }
 
+// ParseJWTSVID extracts the token from the output of `spire-agent api fetch jwt`, for the callers running the binary
+// themselves (e.g. as another user).
+func ParseJWTSVID(output string) (string, error) {
+	return parseJWTSVID(output)
+}
+
 // parseJWTSVID extracts the token from the pretty output of `spire-agent api fetch jwt`: the token is on the second
 // line, after the `token(<spiffe id>):` header.
 func parseJWTSVID(output string) (string, error) {

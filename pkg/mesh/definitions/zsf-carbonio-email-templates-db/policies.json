@@ -1,0 +1,23 @@
+{
+  "key_prefix": [
+    {
+      "zsf-carbonio-email-templates/": {
+        "policy": "write"
+      }
+    }
+  ],
+  "node_prefix": [
+    {
+      "": {
+        "policy": "read"
+      }
+    }
+  ],
+  "service": [
+    {
+      "zsf-carbonio-email-templates-db": {
+        "policy": "write"
+      }
+    }
+  ]
+}

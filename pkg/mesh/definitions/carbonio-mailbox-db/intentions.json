@@ -1,0 +1,26 @@
+{
+  "Kind": "service-intentions",
+  "Name": "carbonio-mailbox-db",
+  "Sources": [
+    {
+      "Name": "carbonio-mailbox",
+      "Action": "allow"
+    },
+    {
+      "Name": "carbonio-advanced",
+      "Action": "allow"
+    },
+    {
+      "Name": "carbonio-auth",
+      "Action": "allow"
+    },
+    {
+      "Name": "carbonio-storages",
+      "Action": "allow"
+    },
+    {
+      "Name": "carbonio-license-service",
+      "Action": "allow"
+    }
+  ]
+}

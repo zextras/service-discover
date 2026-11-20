@@ -1,0 +1,18 @@
+{
+  "kind": "service-intentions",
+  "name": "carbonio-mailbox-nslookup",
+  "sources": [
+    {
+      "name": "carbonio-files",
+      "action": "allow"
+    },
+    {
+      "name": "carbonio-ws-collaboration",
+      "action": "allow"
+    },
+    {
+      "name": "carbonio-preview",
+      "action": "allow"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "key_prefix": [
+    {
+      "carbonio-mta/": {
+        "policy": "read"
+      }
+    }
+  ],
+  "node_prefix": [
+    {
+      "": {
+        "policy": "read"
+      }
+    }
+  ],
+  "service": [
+    {
+      "carbonio-mta": {
+        "policy": "write"
+      }
+    },
+    {
+      "carbonio-mta-sidecar-proxy": {
+        "policy":"write"
+      }
+    }
+  ]
+}

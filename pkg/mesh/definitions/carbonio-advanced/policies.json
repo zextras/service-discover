@@ -1,0 +1,53 @@
+{
+  "key_prefix": [
+    {
+      "carbonio-advanced/": {
+        "policy": "write"
+      },
+      "carbonio-powerstore/": {
+        "policy": "read"
+      },
+      "carbonio-abq/": {
+        "policy": "read"
+      },
+      "carbonio-activesync/": {
+        "policy": "read"
+      },
+      "carbonio-auth/": {
+        "policy": "read"
+      },
+      "carbonio-core/": {
+        "policy": "read"
+      },
+      "carbonio-ha/": {
+        "policy": "read"
+      },
+      "carbonio-backup/": {
+        "policy": "read"
+      },
+      "carbonio-subscription/": {
+        "policy": "read"
+      },
+      "featureFlags/": {
+        "policy": "read"
+      }
+    }
+  ],
+  "node_prefix": [
+    {
+      "": {
+        "policy": "read"
+      }
+    }
+  ],
+  "service": [
+    {
+      "carbonio-advanced": {
+        "policy": "write"
+      },
+      "carbonio-advanced-sidecar-proxy": {
+        "policy": "write"
+      }
+    }
+  ]
+}

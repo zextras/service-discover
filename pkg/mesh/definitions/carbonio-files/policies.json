@@ -1,0 +1,39 @@
+{
+  "key_prefix": [
+    {
+      "carbonio-files/": {
+        "policy": "read"
+      },
+      "carbonio-message-broker/": {
+        "policy": "read"
+      },
+      "featureFlags/": {
+        "policy": "read"
+      }
+    }
+  ],
+  "key": [
+    {
+      "carbonio-files/page-token-secret-key": {
+        "policy": "write"
+      }
+    }
+  ],
+  "node_prefix": [
+    {
+      "": {
+        "policy": "read"
+      }
+    }
+  ],
+  "service": [
+    {
+      "carbonio-files": {
+        "policy": "write"
+      },
+      "carbonio-files-sidecar-proxy": {
+        "policy": "write"
+      }
+    }
+  ]
+}

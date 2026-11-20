@@ -1,0 +1,19 @@
+{
+  "Kind": "service-intentions",
+  "Name": "carbonio-preview",
+  "Sources":
+  [
+    {
+      "Name": "carbonio-files",
+      "Action": "allow"
+    },
+    {
+      "Name": "carbonio-ws-collaboration",
+      "Action": "allow"
+    },
+    {
+      "Name": "carbonio-mailbox",
+      "Action": "allow"
+    }
+  ]
+}

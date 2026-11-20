@@ -1,0 +1,71 @@
+{
+  "Kind": "service-intentions",
+  "Name": "carbonio-storages",
+  "Sources": [
+    {
+      "Name": "carbonio-advanced",
+      "Permissions": [
+        {
+          "Action": "allow",
+          "HTTP": {
+            "PathPrefix": "/quota"
+          }
+        },
+        {
+          "Action": "allow",
+          "HTTP": {
+            "PathPrefix": "/blob",
+            "Methods": [ "GET" ]
+          }
+        }
+      ]
+    },
+    {
+      "Name": "carbonio-proxy",
+      "Permissions": [
+        {
+          "Action": "allow",
+          "HTTP": {
+            "PathPrefix": "/admin/quota",
+            "Methods": [ "GET", "PUT", "DELETE" ]
+          }
+        },
+        {
+          "Action": "allow",
+          "HTTP": {
+            "PathPrefix": "/quota/myself",
+            "Methods": [ "GET" ]
+          }
+        }
+      ]
+    },
+    {
+      "Name": "carbonio-files",
+      "Permissions": [
+        {
+          "Action": "allow",
+          "HTTP": {
+            "PathPrefix": "/quota",
+            "Methods": [
+              "GET"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "Name": "carbonio-docs-connector",
+      "Permissions": [
+        {
+          "Action": "allow",
+          "HTTP": {
+            "PathPrefix": "/quota",
+            "Methods": [
+              "GET"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

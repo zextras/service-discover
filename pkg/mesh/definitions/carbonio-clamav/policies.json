@@ -1,0 +1,26 @@
+{
+  "key_prefix": [
+    {
+      "carbonio-clamav/": {
+        "policy": "read"
+      }
+    }
+  ],
+  "node_prefix": [
+    {
+      "": {
+        "policy": "read"
+      }
+    }
+  ],
+  "service": [
+    {
+      "carbonio-clamav": {
+        "policy": "write"
+      },
+      "carbonio-clamav-sidecar-proxy": {
+        "policy": "write"
+      }
+    }
+  ]
+}

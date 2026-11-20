@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 Zextras <https://www.zextras.com>
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
+[Unit]
+Description=Zextras Service Discover watch of the service definitions of the packages
+Documentation=https://docs.zextras.com/
+PartOf=service-discover.target
+
+[Path]
+# A package installed after service-discover started puts its service definition here.
+PathChanged=/etc/zextras/service-discover
+Unit=service-discover-sync.service
+
+[Install]
+WantedBy=service-discover.target

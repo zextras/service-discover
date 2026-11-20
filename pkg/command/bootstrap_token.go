@@ -130,6 +130,17 @@ func (v *BootstrapToken) ReadToken() (string, error) {
 	return aclBootstrapToken.SecretID, nil
 }
 
+// Token returns the bootstrap token to the commands using it in process: $SETUP_CONSUL_TOKEN when it is defined,
+// otherwise the token decrypted from the cluster credentials, asking the password.
+func (v *BootstrapToken) Token() (string, error) {
+	token, present := os.LookupEnv(SetupConsulToken)
+	if present && token != "" {
+		return token, nil
+	}
+
+	return v.ReadToken()
+}
+
 func (v *BootstrapToken) Run(globalFlags *GlobalCommonFlags) error {
 	token, present := os.LookupEnv(SetupConsulToken)
 	if !v.Setup || !present || token == "" {

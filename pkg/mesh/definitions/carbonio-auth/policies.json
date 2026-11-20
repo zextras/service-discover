@@ -1,0 +1,26 @@
+{
+  "key_prefix": [
+    {
+      "carbonio-auth/": {
+        "policy": "read"
+      }
+    }
+  ],
+  "node_prefix": [
+    {
+      "": {
+        "policy": "read"
+      }
+    }
+  ],
+  "service": [
+    {
+      "carbonio-auth": {
+        "policy": "write"
+      },
+      "carbonio-auth-sidecar-proxy": {
+        "policy": "write"
+      }
+    }
+  ]
+}

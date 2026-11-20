@@ -1,0 +1,26 @@
+{
+  "key_prefix": [
+    {
+      "carbonio-turn-server/": {
+        "policy": "write"
+      },
+      "carbonio-videoserver/meta/": {
+        "policy": "read"
+      }
+    }
+  ],
+  "node_prefix": [
+    {
+      "": {
+        "policy": "read"
+      }
+    }
+  ],
+  "service": [
+    {
+      "carbonio-turn-server": {
+        "policy": "write"
+      }
+    }
+  ]
+}

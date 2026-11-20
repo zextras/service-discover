@@ -1,0 +1,36 @@
+{
+  "key_prefix": [
+    {
+      "carbonio-license-service/": {
+        "policy": "read"
+      },
+      "carbonio-license/": {
+        "policy": "read"
+      }
+    }
+  ],
+  "node_prefix": [
+    {
+      "": {
+        "policy": "read"
+      }
+    }
+  ],
+  "service_prefix": [
+    {
+      "": {
+        "policy": "read"
+      }
+    }
+  ],
+  "service": [
+    {
+      "carbonio-license-service": {
+        "policy": "write"
+      },
+      "carbonio-license-service-sidecar-proxy": {
+        "policy": "write"
+      }
+    }
+  ]
+}

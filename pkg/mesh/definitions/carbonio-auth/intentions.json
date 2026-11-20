@@ -1,0 +1,31 @@
+{
+  "Kind": "service-intentions",
+  "Name": "carbonio-auth",
+  "Sources": [
+    {
+      "Name": "carbonio-proxy",
+      "Action": "allow"
+    },
+    {
+      "Name": "carbonio-files",
+      "Permissions": [
+        {
+          "Action": "allow",
+          "HTTP": {
+            "PathRegex": "/.*/token/validate/?",
+            "Header": [
+              {
+                "Name": "Authorization",
+                "Present": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "Name": "carbonio-ws-collaboration",
+      "Action": "allow"
+    }
+  ]
+}

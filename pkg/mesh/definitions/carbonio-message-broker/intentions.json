@@ -1,0 +1,22 @@
+{
+  "Kind": "service-intentions",
+  "Name": "carbonio-message-broker",
+  "Sources": [
+    {
+      "Name": "carbonio-ws-collaboration",
+      "Action": "allow"
+    },
+    {
+      "Name": "carbonio-files",
+      "Action": "allow"
+    },
+    {
+      "Name": "carbonio-videoserver",
+      "Action": "allow"
+    },
+    {
+      "Name": "carbonio-mailbox",
+      "Action": "allow"
+    }
+  ]
+}

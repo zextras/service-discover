@@ -1,0 +1,26 @@
+{
+  "key_prefix": [
+    {
+      "carbonio-memcached/": {
+        "policy": "read"
+      }
+    }
+  ],
+  "node_prefix": [
+    {
+      "": {
+        "policy": "read"
+      }
+    }
+  ],
+  "service": [
+    {
+      "carbonio-memcached": {
+        "policy": "write"
+      },
+      "carbonio-memcached-sidecar-proxy": {
+        "policy": "write"
+      }
+    }
+  ]
+}

@@ -56,8 +56,21 @@ pipeline {
                 container('golang') {
                     withEnv(['K8S_IMAGE_PULL_SECRET=private-registry-secret']) {
                         script {
+                            // The modules are tested in two waves: all of them at once exhaust the memory of the build agent
+                            Closure testModules = { Map group ->
+                                Map builds = [:]
+                                group.each { key, value ->
+                                    builds[key] = {
+                                        dir(value) {
+                                            sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml -- -coverprofile=coverage.out ./...'
+                                            junit allowEmptyResults: false, checksName: "Test for " + key, testResults: 'tests.xml'
+                                        }
+                                    }
+                                }
+                                parallel builds
+                            }
+
                             Map modules = [:]
-                            Map builds = [:]
                             modules['encrypter'] = 'pkg/encrypter'
                             modules['exec'] = 'pkg/exec'
                             modules['formatter'] = 'pkg/formatter'
@@ -65,19 +78,16 @@ pipeline {
                             modules['carbonio'] = 'pkg/carbonio'
                             modules['spire'] = 'pkg/spire'
                             modules['permissions'] = 'pkg/permissions'
-                            modules['service-discoverd'] = 'cmd/service-discoverd'
-                            modules['legacytoken'] = 'pkg/legacytoken'
-                            modules['term'] = 'pkg/term'
-                            modules.each { key, value ->
-                                builds[key] = {
-                                    dir(value) {
-                                        sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml -- -coverprofile=coverage.out ./...'
-                                        junit allowEmptyResults: false, checksName: "Test for " + key, testResults: 'tests.xml'
-                                    }
-                                }
-                            }
+                            testModules(modules)
 
-                            parallel builds
+                            Map more = [:]
+                            more['service-discoverd'] = 'cmd/service-discoverd'
+                            more['legacytoken'] = 'pkg/legacytoken'
+                            more['term'] = 'pkg/term'
+                            more['mesh'] = 'pkg/mesh'
+                            more['meshcmd'] = 'pkg/meshcmd'
+                            testModules(more)
+
                             dir('pkg/command') {
                                 sh 'go run gotest.tools/gotestsum@latest --format testname --junitfile tests.xml -- -coverprofile=coverage.out ./...'
                                 junit allowEmptyResults: false, checksName: 'Test for command', testResults: 'tests.xml'
