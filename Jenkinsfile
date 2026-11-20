@@ -65,6 +65,7 @@ pipeline {
                             modules['carbonio'] = 'pkg/carbonio'
                             modules['spire'] = 'pkg/spire'
                             modules['permissions'] = 'pkg/permissions'
+                            modules['service-discoverd'] = 'cmd/service-discoverd'
                             modules.each { key, value ->
                                 builds[key] = {
                                     dir(value) {

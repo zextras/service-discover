@@ -139,12 +139,29 @@ func runServiceDiscoverDaemon(deps deps, args []string) {
 		return
 	}
 
-	ldapHandler, localServer, err := readLocalConfig(deps)
-	if err != nil {
-		deps.Log(err.Log)
-		deps.Exit(err.ExitCode)
+	mainJSONPath := "/etc/zextras/service-discover/main.json"
+	if len(args) > 2 {
+		mainJSONPath = args[2]
+	}
 
-		return
+	var (
+		ldapHandler carbonio.LdapHandler
+		localServer string
+		servers     []string
+	)
+
+	// An agent joined through SPIRE gets the servers from the auto-config persisted by Consul: it neither needs LDAP
+	// nor the localconfig. The configuration is read before dropping privileges, it is not readable otherwise.
+	autoConfig := !isServer && autoConfigEnabled(mainJSONPath)
+
+	if !autoConfig {
+		ldapHandler, localServer, err = readLocalConfig(deps)
+		if err != nil {
+			deps.Log(err.Log)
+			deps.Exit(err.ExitCode)
+
+			return
+		}
 	}
 
 	err = changeUser(deps)
@@ -156,17 +173,14 @@ func runServiceDiscoverDaemon(deps deps, args []string) {
 		return
 	}
 
-	servers, err := queryAllServiceDiscoverServers(deps, ldapHandler)
-	if err != nil {
-		deps.Log(err.Log)
-		deps.Exit(err.ExitCode)
+	if !autoConfig {
+		servers, err = queryAllServiceDiscoverServers(deps, ldapHandler)
+		if err != nil {
+			deps.Log(err.Log)
+			deps.Exit(err.ExitCode)
 
-		return
-	}
-
-	mainJSONPath := "/etc/zextras/service-discover/main.json"
-	if len(args) > 2 {
-		mainJSONPath = args[2]
+			return
+		}
 	}
 
 	errTLS := addGrpcTLS(mainJSONPath)
@@ -186,6 +200,25 @@ func runServiceDiscoverDaemon(deps deps, args []string) {
 	}
 
 	panic("service-discoverd failure")
+}
+
+// autoConfigEnabled reports whether the Consul configuration enables auto_config. A configuration that cannot be read
+// or parsed is not an auto_config one: the regular startup reports the problem.
+func autoConfigEnabled(configPath string) bool {
+	data, err := os.ReadFile(filepath.Clean(configPath)) //nolint:gosec // path of the service configuration
+	if err != nil {
+		return false
+	}
+
+	var cfg struct {
+		AutoConfig struct {
+			Enabled bool `json:"enabled"`
+		} `json:"auto_config"`
+	}
+
+	err = json.Unmarshal(data, &cfg)
+
+	return err == nil && cfg.AutoConfig.Enabled
 }
 
 func checkRoot(d deps) *ErrorWithExitCode {

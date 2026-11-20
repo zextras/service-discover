@@ -480,3 +480,78 @@ func setupMock(mockDependencies *mockDependencies, isServer bool) {
 	mockDependencies.On("Log", mock.AnythingOfType("[]interface {}")).Return()
 	mockDependencies.On("Exit", mock.AnythingOfType("int")).Return()
 }
+
+func writeMainJSON(t *testing.T, content string) string {
+	t.Helper()
+
+	path := t.TempDir() + "/main.json"
+	assert.NoError(t, os.WriteFile(path, []byte(content), 0600))
+
+	return path
+}
+
+func setupAutoConfigMock(mockDependencies *mockDependencies) {
+	mockDependencies.On("Getuid").Return(0)
+	mockDependencies.On("Getenv", "SHELL").Return("/bin/custom-shell")
+	mockDependencies.On("Getenv", "NOTIFY_SOCKET").Return("/run/dbus/systemd-socket")
+	mockDependencies.On("UserLookup", "service-discover").Return(
+		&user.User{Uid: "100", Gid: "120", Username: "service-discover"}, nil,
+	)
+	mockDependencies.On("Setgid", 120).Return(nil)
+	mockDependencies.On("Setuid", 100).Return(nil)
+	mockDependencies.On("Log", mock.AnythingOfType("[]interface {}")).Return()
+	mockDependencies.On("Exit", mock.AnythingOfType("int")).Return()
+}
+
+func Test_runServiceDiscoverDaemon_autoConfig(t *testing.T) {
+	const autoConfigAgent = `{"ports": {"grpc_tls": 8503}, "auto_config": {"enabled": true, "server_addresses": ["10.0.0.1:8300"]}}`
+
+	t.Run("agent with auto_config skips ldap and retry-join", func(t *testing.T) {
+		mockDependencies := new(mockDependencies)
+		setupAutoConfigMock(mockDependencies)
+		// no LoadLocalConfig, CreateNewHandler nor QueryAllServersWithService expectations: calling them panics.
+		mockDependencies.On(
+			"Exec",
+			"/usr/bin/consul",
+			[]string{"/usr/bin/consul", "agent", "-config-dir", "/etc/zextras/service-discover/"},
+			[]string{"SHELL=/bin/custom-shell", "NOTIFY_SOCKET=/run/dbus/systemd-socket"},
+		).Return(nil)
+
+		runServiceDiscoverDaemon(mockDependencies, []string{discoverdBinPath, "agent", writeMainJSON(t, autoConfigAgent)})
+
+		mockDependencies.AssertNumberOfCalls(t, "Exec", 1)
+		mockDependencies.AssertNotCalled(t, "LoadLocalConfig")
+		mockDependencies.AssertNotCalled(t, "QueryAllServersWithService", mock.Anything)
+		mockDependencies.AssertCalled(t, "Exit", ExitCodeExecError)
+	})
+
+	t.Run("agent with auto_config disabled keeps the ldap flow", func(t *testing.T) {
+		mockDependencies := new(mockDependencies)
+		setupMock(mockDependencies, false)
+
+		path := writeMainJSON(t, `{"ports": {"grpc_tls": 8503}, "auto_config": {"enabled": false}}`)
+		runServiceDiscoverDaemon(mockDependencies, []string{discoverdBinPath, "agent", path})
+
+		mockDependencies.AssertCalled(t, "LoadLocalConfig")
+		mockDependencies.AssertNumberOfCalls(t, "Exec", 1)
+	})
+
+	t.Run("server ignores auto_config and keeps the ldap flow", func(t *testing.T) {
+		mockDependencies := new(mockDependencies)
+		setupMock(mockDependencies, true)
+
+		path := writeMainJSON(t, autoConfigAgent)
+		runServiceDiscoverDaemon(mockDependencies, []string{discoverdBinPath, "server", path})
+
+		mockDependencies.AssertCalled(t, "LoadLocalConfig")
+		mockDependencies.AssertNumberOfCalls(t, "Exec", 1)
+	})
+}
+
+func Test_autoConfigEnabled(t *testing.T) {
+	assert.True(t, autoConfigEnabled(writeMainJSON(t, `{"auto_config": {"enabled": true}}`)))
+	assert.False(t, autoConfigEnabled(writeMainJSON(t, `{"auto_config": {"enabled": false}}`)))
+	assert.False(t, autoConfigEnabled(writeMainJSON(t, `{}`)))
+	assert.False(t, autoConfigEnabled(writeMainJSON(t, `not json`)))
+	assert.False(t, autoConfigEnabled(t.TempDir()+"/missing.json"))
+}

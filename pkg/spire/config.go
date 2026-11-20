@@ -72,8 +72,9 @@ server_api {
 	)
 }
 
-// AgentConf renders the configuration of a SPIRE agent attesting itself to serverHost with a one-time join token.
-func AgentConf(configDir, serverHost, joinToken string) string {
+// AgentConf renders the configuration of a SPIRE agent attesting itself to serverHost:serverPort with a one-time join
+// token.
+func AgentConf(configDir, serverHost string, serverPort int, joinToken string) string {
 	return fmt.Sprintf(`agent {
   data_dir = %q
   log_level = "INFO"
@@ -99,7 +100,7 @@ plugins {
   }
 }
 `,
-		AgentDataDir, serverHost, ServerPort, AgentSocket, TrustDomain,
+		AgentDataDir, serverHost, serverPort, AgentSocket, TrustDomain,
 		filepath.Join(configDir, BundleFile), joinToken, AgentDataDir,
 	)
 }

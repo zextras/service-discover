@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/user"
@@ -23,6 +24,7 @@ import (
 	"github.com/zextras/service-discover/pkg/exec"
 	"github.com/zextras/service-discover/pkg/formatter"
 	"github.com/zextras/service-discover/pkg/permissions"
+	"github.com/zextras/service-discover/pkg/spire"
 	"github.com/zextras/service-discover/pkg/systemd"
 	"github.com/zextras/service-discover/pkg/term"
 )
@@ -45,6 +47,8 @@ func New() Setup {
 		ConsulFileConfig:  config.ConsultFileConfig,
 		ClusterCredential: config.ClusterCredential,
 		MutableConfigFile: command.ConsulMutableConfigFile,
+		SpireConfigDir:    spire.ConfigDir,
+		Stdin:             os.Stdin,
 	}
 }
 
@@ -185,11 +189,16 @@ type Setup struct {
 	ConsulFileConfig  string `kong:"-"`
 	ClusterCredential string `kong:"-"`
 	MutableConfigFile string `kong:"-"`
+	SpireConfigDir    string `kong:"-"`
+	// Stdin is where the join bundle is read from when --join is "-".
+	Stdin io.Reader `kong:"-"`
 
 	Wizard bool `help:"Initialize the setup in interactive mode. All the non interactive flags will be ignored if this is set"` //nolint:lll
 
 	Password    string `help:"Set a custom password for the encrypted secret files. If none is set, a random one will be generated and printed"` //nolint:lll
 	BindAddress string `arg:"" optional:"" help:"The binding address to bind service-discoverd daemon"`
+
+	Join string `help:"Join the cluster with the SPIRE join bundle printed by 'service-discover join-token' on a server, read from the given file or from the standard input if '-'. No cluster credential password nor LDAP access are needed" placeholder:"FILE"` //nolint:lll
 }
 
 func gatherInputs(deps interactiveDependencies) (*setupConfiguration, error) {
@@ -273,6 +282,10 @@ func preRun(_ string, deps businessDependencies) error {
 }
 
 func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
+	if s.Join != "" {
+		return s.runJoin(commonFlags)
+	}
+
 	userInterface, err := term.New(os.Stdin, os.Stdout, term.DefaultTermPrompt)
 	if err != nil {
 		return err
@@ -548,7 +561,7 @@ func (s *Setup) setup(deps businessDependencies) (formatter.Formatter, error) {
 	return &formatter.EmptyFormatter{}, nil
 }
 
-func writeSetupConfig(consulAgentConfig *setupConfig, destination string) error {
+func writeSetupConfig(consulAgentConfig any, destination string) error {
 	consulAgentBs, err := json.MarshalIndent(consulAgentConfig, "", "  ")
 	if err != nil {
 		return err
