@@ -51,6 +51,9 @@ func NewEnv(trustDomain string) (*Env, error) {
 		Systemctl:   systemctl,
 		Sleep:       time.Sleep,
 		Now:         time.Now,
+		CertDir:     CertDir,
+		Exec:        execCommand,
+		Consul:      newConsulService,
 	}, nil
 }
 
@@ -72,6 +75,9 @@ func NewOfflineEnv(trustDomain string) *Env {
 		Systemctl:   systemctl,
 		Sleep:       time.Sleep,
 		Now:         time.Now,
+		CertDir:     CertDir,
+		Exec:        execCommand,
+		Consul:      func(string) (Consul, error) { return nil, errOffline },
 	}
 }
 

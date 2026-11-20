@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul/api/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -45,6 +46,44 @@ type fakeMachine struct {
 	now        time.Time
 	slept      time.Duration
 	nextSecret int
+
+	kv        map[string]string // the KV store, whatever the token
+	kvTokens  []string          // tokens the KV store was used with
+	instances map[string][]Instance
+	entries   []api.ConfigEntry
+	commands  []*Command
+	exec      func(*Command) ([]byte, error) // answers the commands, nothing is run
+}
+
+// fakeConsul is the KV store and the catalog of the machine.
+type fakeConsul struct{ machine *fakeMachine }
+
+func (c fakeConsul) Get(key string) (string, bool, error) {
+	value, found := c.machine.kv[key]
+
+	return value, found, nil
+}
+
+func (c fakeConsul) Put(key, value string) error {
+	c.machine.kv[key] = value
+
+	return nil
+}
+
+func (c fakeConsul) Delete(key string) error {
+	delete(c.machine.kv, key)
+
+	return nil
+}
+
+func (c fakeConsul) Instances(service string, _ bool) ([]Instance, error) {
+	return c.machine.instances[service], nil
+}
+
+func (c fakeConsul) SetConfigEntry(entry api.ConfigEntry) error {
+	c.machine.entries = append(c.machine.entries, entry)
+
+	return nil
 }
 
 var (
@@ -63,9 +102,11 @@ func newMachine(t *testing.T) *fakeMachine {
 			"carbonio-auth":    {UID: 1002, GID: 1002},
 			"carbonio-mailbox": {UID: 1003, GID: 1003},
 		},
-		chowns: map[string]Account{},
-		tokens: map[string]bool{},
-		now:    time.Unix(0, 0),
+		chowns:    map[string]Account{},
+		tokens:    map[string]bool{},
+		now:       time.Unix(0, 0),
+		kv:        map[string]string{},
+		instances: map[string][]Instance{},
 	}
 
 	machine.env = &Env{
@@ -135,7 +176,22 @@ func newMachine(t *testing.T) *fakeMachine {
 			machine.slept += d
 			machine.now = machine.now.Add(d)
 		},
-		Now: func() time.Time { return machine.now },
+		Now:     func() time.Time { return machine.now },
+		CertDir: filepath.Join(root, "ssl"),
+		Exec: func(cmd *Command) ([]byte, error) {
+			machine.commands = append(machine.commands, cmd)
+
+			if machine.exec == nil {
+				return nil, nil
+			}
+
+			return machine.exec(cmd)
+		},
+		Consul: func(token string) (Consul, error) {
+			machine.kvTokens = append(machine.kvTokens, token)
+
+			return fakeConsul{machine: machine}, nil
+		},
 	}
 
 	require.NoError(t, os.MkdirAll(machine.env.ServicesDir, 0o755))
@@ -477,13 +533,21 @@ func TestConsulConfigArgs(t *testing.T) {
 	args, err := ConsulConfigArgs(machine.env, defs)
 	require.NoError(t, err)
 
-	dir := machine.env.ServicesDir
-	assert.Equal(t, []string{
-		"-config-file", filepath.Join(dir, "carbonio-unknown.hcl"),
-		"-config-file", filepath.Join(dir, "config.json"),
-		"-config-file", filepath.Join(dir, "main.json"),
-		"-config-dir", machine.env.RenderedDir,
-	}, args)
+	assert.Equal(t, []string{"-config-dir", machine.env.RenderedDir}, args)
+
+	for _, name := range []string{"carbonio-unknown.hcl", "config.json", "main.json"} {
+		copied, readErr := os.ReadFile(filepath.Join(machine.env.RenderedDir, name))
+		require.NoError(t, readErr, name)
+
+		original, readErr := os.ReadFile(filepath.Join(machine.env.ServicesDir, name))
+		require.NoError(t, readErr)
+		assert.Equal(t, original, copied, "the files that are not service definitions of a known service are copied")
+	}
+
+	for _, name := range []string{"README", ".hidden.json", "carbonio-files.hcl.rpm", "templates"} {
+		assert.NoFileExists(t, filepath.Join(machine.env.RenderedDir, name))
+	}
+
 	assert.NoFileExists(t, filepath.Join(machine.env.RenderedDir, "carbonio-files.hcl"))
 	assert.Empty(t, machine.fetched, "the preparation does not talk to SPIRE")
 
@@ -493,7 +557,7 @@ func TestConsulConfigArgs(t *testing.T) {
 
 	args, err = ConsulConfigArgs(machine.env, defs)
 	require.NoError(t, err)
-	assert.Equal(t, machine.env.RenderedDir, args[len(args)-1])
+	assert.Equal(t, []string{"-config-dir", machine.env.RenderedDir}, args)
 
 	content, err := os.ReadFile(filepath.Join(machine.env.RenderedDir, "carbonio-files.hcl"))
 	require.NoError(t, err)
@@ -507,6 +571,37 @@ func TestConsulConfigArgs(t *testing.T) {
 	_, err = ConsulConfigArgs(machine.env, defs)
 	require.NoError(t, err)
 	assert.NoFileExists(t, filepath.Join(machine.env.RenderedDir, "carbonio-files.hcl"))
+
+	// So is the copy of a file that is gone.
+	require.NoError(t, os.Remove(filepath.Join(machine.env.ServicesDir, "main.json")))
+
+	_, err = ConsulConfigArgs(machine.env, defs)
+	require.NoError(t, err)
+	assert.NoFileExists(t, filepath.Join(machine.env.RenderedDir, "main.json"))
+}
+
+func TestSync_lateInstalledDefinitionsReloadConsulWithoutARestart(t *testing.T) {
+	t.Parallel()
+
+	machine := newMachine(t)
+	machine.installFiles(t)
+
+	defs := loadDefs(t)
+	require.NoError(t, Sync(machine.env, defs, SyncOptions{}))
+
+	reloads := machine.calls("reload")
+
+	// A service of a package nobody knows is installed while Consul runs: it is copied and Consul reloaded.
+	require.NoError(t, os.WriteFile(filepath.Join(machine.env.ServicesDir, "carbonio-late.hcl"), []byte("service {}\n"), 0o644))
+	require.NoError(t, Sync(machine.env, defs, SyncOptions{}))
+
+	assert.FileExists(t, filepath.Join(machine.env.RenderedDir, "carbonio-late.hcl"))
+	assert.Equal(t, reloads+1, machine.calls("reload"))
+	assert.NotContains(t, machine.restarts(), "service-discover.service", "Consul is reloaded, never restarted")
+
+	// Nothing changed: no reload.
+	require.NoError(t, Sync(machine.env, defs, SyncOptions{}))
+	assert.Equal(t, reloads+1, machine.calls("reload"))
 }
 
 func TestConsulConfigArgs_brokenDefinitionIsLeftOut(t *testing.T) {

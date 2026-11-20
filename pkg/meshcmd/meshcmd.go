@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/zextras/service-discover/pkg/command"
@@ -72,10 +73,12 @@ func (s *Sync) Run(_ *command.GlobalCommonFlags) error {
 		return errNotRoot
 	}
 
-	return s.syncServices(s.Service)
+	return s.syncServices(s.Service, false)
 }
 
-func (s *Sync) syncServices(services []string) error {
+// syncServices synchronizes the services. With setup it also does what their package setup did when installed, and
+// restarts them.
+func (s *Sync) syncServices(services []string, setup bool) error {
 	defs, err := mesh.Load()
 	if err != nil {
 		return err
@@ -87,12 +90,14 @@ func (s *Sync) syncServices(services []string) error {
 	}
 
 	return mesh.Sync(env, defs, mesh.SyncOptions{
-		Services:  services,
-		Renew:     s.Renew,
-		NoRestart: s.NoRestart,
-		NoBlock:   s.NoBlock,
-		Wait:      s.Wait,
-		Out:       s.writer,
+		Services:     services,
+		Renew:        s.Renew,
+		NoRestart:    s.NoRestart,
+		NoBlock:      s.NoBlock,
+		Setup:        setup,
+		ForceRestart: setup,
+		Wait:         s.Wait,
+		Out:          s.writer,
 	})
 }
 
@@ -109,13 +114,13 @@ type PendingSetup struct {
 	Wait        time.Duration `default:"30s" help:"How long to wait for SPIRE to issue the identity of the service"`
 	TrustDomain string        `name:"trust-domain" default:"carbonio" hidden:"" help:"SPIFFE trust domain"`
 
-	writer io.Writer               `kong:"-"`
-	getuid func() int              `kong:"-"`
-	exit   func(int)               `kong:"-"`
-	run    func(name string) error `kong:"-"`
+	writer io.Writer                               `kong:"-"`
+	getuid func() int                              `kong:"-"`
+	exit   func(int)                               `kong:"-"`
+	run    func(name string, args ...string) error `kong:"-"`
 
-	spireMode func() bool                   `kong:"-"`
-	sync      func(services []string) error `kong:"-"`
+	spireMode func() bool                               `kong:"-"`
+	sync      func(services []string, setup bool) error `kong:"-"`
 }
 
 // Run implements the command.
@@ -147,7 +152,8 @@ func (p *PendingSetup) Run(_ *command.GlobalCommonFlags) error {
 		p.sync = synchronizer.syncServices
 	}
 
-	err = p.sync([]string{def.Name})
+	// The script restarted the units, so the setup does too, and it sets up the services its package has besides.
+	err = p.sync(append([]string{def.Name}, def.Companions...), true)
 	if err != nil {
 		return err
 	}
@@ -155,7 +161,12 @@ func (p *PendingSetup) Run(_ *command.GlobalCommonFlags) error {
 	for _, post := range def.PostSetup {
 		_, _ = fmt.Fprintf(p.writer, "%s: running %s\n", def.Name, post)
 
-		err = p.run(post)
+		fields := strings.Fields(post)
+		if len(fields) == 0 {
+			continue
+		}
+
+		err = p.run(fields[0], fields[1:]...)
 		if err != nil {
 			return fmt.Errorf("%s failed: %w", post, err)
 		}
@@ -167,8 +178,8 @@ func (p *PendingSetup) Run(_ *command.GlobalCommonFlags) error {
 	return err
 }
 
-func runCommand(name string) error {
-	cmd := exec.Command(name) //nolint:noctx // command of a package, named by the embedded definitions
+func runCommand(name string, args ...string) error {
+	cmd := exec.Command(name, args...) //nolint:noctx // command of a package, named by the embedded definitions
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 

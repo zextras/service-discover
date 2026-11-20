@@ -289,7 +289,53 @@
       ],
       "alt_repos": [
         "zextras/carbonio-docs-connector-ce"
-      ]
+      ],
+      "migrations": {
+        "kv": [
+          {
+            "old": "carbonio-docs-connector/db-name",
+            "new": "carbonio-docs-connector/database/credentials/db-name"
+          },
+          {
+            "old": "carbonio-docs-connector/db-username",
+            "new": "carbonio-docs-connector/database/credentials/db-username"
+          },
+          {
+            "old": "carbonio-docs-connector/db-password",
+            "new": "carbonio-docs-connector/database/credentials/db-password"
+          },
+          {
+            "old": "carbonio-docs-connector/hikari-max-pool-size",
+            "new": "carbonio-docs-connector/database/db-pool-max-size"
+          },
+          {
+            "old": "carbonio-docs-connector/hikari-min-idle-connections",
+            "new": "carbonio-docs-connector/database/db-pool-min-size"
+          },
+          {
+            "old": "carbonio-docs-connector/hikari-idle-timeout",
+            "new": "carbonio-docs-connector/database/db-pool-idle-timeout"
+          },
+          {
+            "old": "carbonio-docs-connector/hikari-leak-detection-threshold",
+            "new": "carbonio-docs-connector/database/db-pool-leak-detection"
+          },
+          {
+            "old": "carbonio-docs-connector/hikari-max-lifetime",
+            "new": "carbonio-docs-connector/database/db-pool-max-lifetime"
+          }
+        ],
+        "properties": [
+          {
+            "old": "carbonio.postgres.host",
+            "new": "carbonio.postgresql.host"
+          },
+          {
+            "old": "carbonio.postgres.port",
+            "new": "carbonio.postgresql.port"
+          }
+        ]
+      }
     },
     {
       "name": "carbonio-docs-connector-db",
@@ -326,7 +372,9 @@
       "name": "carbonio-docs-editor",
       "dir": "docs-editor",
       "user": "carbonio-docs-editor",
-      "hcl": [],
+      "hcl": [
+        "carbonio-docs-editor.hcl"
+      ],
       "sidecars": [
         "carbonio-docs-editor-sidecar.service"
       ],
@@ -340,7 +388,7 @@
         }
       ],
       "post_setup": [],
-      "pending_setup": "keep",
+      "pending_setup": "replace",
       "consumer_only": false,
       "repo": "zextras/carbonio-docs-editor",
       "files": [
@@ -356,7 +404,10 @@
           "name": "service-protocol.json",
           "path": "package/service-protocol.json"
         }
-      ]
+      ],
+      "generated": true,
+      "setup": "docs-editor",
+      "comment": "The HCL is generated from the template of the package by the setup step docs-editor, with the identifier of this node in its metadata, and the router and resolver are written once the service is registered."
     },
     {
       "name": "carbonio-files",
@@ -402,7 +453,44 @@
       ],
       "alt_repos": [
         "zextras/carbonio-files-ce"
-      ]
+      ],
+      "migrations": {
+        "kv": [
+          {
+            "old": "carbonio-files/db-name",
+            "new": "carbonio-files/database/credentials/db-name"
+          },
+          {
+            "old": "carbonio-files/db-username",
+            "new": "carbonio-files/database/credentials/db-username"
+          },
+          {
+            "old": "carbonio-files/db-password",
+            "new": "carbonio-files/database/credentials/db-password"
+          },
+          {
+            "old": "carbonio-files/hikari-max-pool-size",
+            "new": "carbonio-files/database/db-pool-max-size"
+          },
+          {
+            "old": "carbonio-files/hikari-min-idle-connections",
+            "new": "carbonio-files/database/db-pool-min-size"
+          },
+          {
+            "old": "carbonio-files/hikari-idle-timeout",
+            "new": "carbonio-files/database/db-pool-idle-timeout"
+          },
+          {
+            "old": "carbonio-files/hikari-leak-detection-threshold",
+            "new": "carbonio-files/database/db-pool-leak-detection"
+          },
+          {
+            "old": "carbonio-files/hikari-max-lifetime",
+            "new": "carbonio-files/database/db-pool-max-lifetime"
+          }
+        ],
+        "properties": []
+      }
     },
     {
       "name": "carbonio-files-db",
@@ -960,7 +1048,100 @@
       ],
       "alt_repos": [
         "zextras/carbonio-preview-ce"
-      ]
+      ],
+      "configure": [
+        "/usr/bin/carbonio-preview-bin --setup http://127.0.0.1:8500"
+      ],
+      "extra_rules": {
+        "key": [
+          {
+            "carbonio-preview/database/pool/max-connections": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/database/db-pool-max-size": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/database/pool/min-connections": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/database/db-pool-min-size": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/database/pool/connection-max-lifetime-seconds": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/database/db-pool-max-lifetime": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/storage/fetch-timeout-seconds": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/image-document/fetch-timeout-seconds": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/render/cache-max-mb": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/cache-max-mb": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/render/max-concurrent-operations": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/image-document/max-concurrent-operations": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/render/pdf-subprocess-pool-size": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/document/subprocess-pool-size": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/document/enable-preview": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/document/enable-thumbnail": {
+              "policy": "write"
+            }
+          },
+          {
+            "carbonio-preview/document/conversion-timeout-seconds": {
+              "policy": "write"
+            }
+          }
+        ]
+      },
+      "comment": "The configuration migration is the --setup of carbonio-preview-bin, run with the token of the service in SETUP_CONSUL_TOKEN; the extra rules are the keys it moves."
     },
     {
       "name": "carbonio-preview-db",
@@ -997,22 +1178,235 @@
       "name": "carbonio-prometheus",
       "dir": "carbonio-prometheus",
       "user": "carbonio-prometheus",
-      "hcl": [],
+      "hcl": [
+        "carbonio-prometheus.hcl"
+      ],
       "sidecars": [],
       "restart": [
         "carbonio-prometheus.service"
       ],
       "token_env": [],
       "post_setup": [],
-      "pending_setup": "keep",
-      "consumer_only": true,
+      "pending_setup": "replace",
+      "consumer_only": false,
       "repo": "zextras/carbonio-prometheus",
       "files": [
         {
           "name": "policies.json",
           "path": "packages/prometheus/policies.json"
         }
-      ]
+      ],
+      "substitute_files": [
+        "carbonio-prometheus/prometheus.yml",
+        "carbonio-prometheus/scrape_config.d/scrape-exporters.yml",
+        "carbonio-prometheus/scrape_config.d/scrape-services.yml",
+        "carbonio-prometheus/scrape_config.d/scrape-blackbox.yml"
+      ],
+      "extra_rules": {
+        "service": [
+          {
+            "carbonio-prometheus": {
+              "policy": "write"
+            }
+          }
+        ]
+      },
+      "comment": "Besides reading the catalog to find what to scrape, prometheus registers itself: that is the extra rule. Its configuration files carry its token, so they are updated when the token is renewed."
+    },
+    {
+      "name": "carbonio-prometheus-alertmanager",
+      "dir": "carbonio-prometheus-alertmanager",
+      "user": "carbonio-prometheus",
+      "hcl": [
+        "carbonio-prometheus-alertmanager.hcl"
+      ],
+      "sidecars": [],
+      "restart": [
+        "carbonio-prometheus-alertmanager.service"
+      ],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-prometheus",
+      "setup": "alertmanager",
+      "comment": "The setup stores the configuration of the package in carbonio-alertmanager/config and renders alertmanager.yml from it: that is the key rule."
+    },
+    {
+      "name": "carbonio-prometheus-blackbox-exporter",
+      "dir": "carbonio-prometheus-blackbox-exporter",
+      "user": "carbonio-prometheus",
+      "hcl": [
+        "carbonio-prometheus-blackbox-exporter.hcl"
+      ],
+      "sidecars": [],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-prometheus",
+      "comment": "Exporter run as the user carbonio-prometheus, shared by all the prometheus packages: an identity of its own limits what its token can do in Consul (it registers this service only), not what the process can do on the machine."
+    },
+    {
+      "name": "carbonio-prometheus-clamav-exporter",
+      "dir": "carbonio-prometheus-clamav-exporter",
+      "user": "carbonio-prometheus",
+      "hcl": [
+        "carbonio-prometheus-clamav-exporter.hcl"
+      ],
+      "sidecars": [],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-prometheus",
+      "comment": "Exporter run as the user carbonio-prometheus, shared by all the prometheus packages: an identity of its own limits what its token can do in Consul (it registers this service only), not what the process can do on the machine."
+    },
+    {
+      "name": "carbonio-prometheus-consul-exporter",
+      "dir": "carbonio-prometheus-consul-exporter",
+      "user": "carbonio-prometheus",
+      "hcl": [
+        "carbonio-prometheus-consul-exporter.hcl"
+      ],
+      "sidecars": [],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-prometheus",
+      "comment": "Exporter run as the user carbonio-prometheus, shared by all the prometheus packages: an identity of its own limits what its token can do in Consul (it registers this service only), not what the process can do on the machine."
+    },
+    {
+      "name": "carbonio-prometheus-haproxy-exporter",
+      "dir": "carbonio-prometheus-haproxy-exporter",
+      "user": "carbonio-prometheus",
+      "hcl": [
+        "carbonio-prometheus-haproxy-exporter.hcl"
+      ],
+      "sidecars": [],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-prometheus",
+      "comment": "Exporter run as the user carbonio-prometheus, shared by all the prometheus packages: an identity of its own limits what its token can do in Consul (it registers this service only), not what the process can do on the machine."
+    },
+    {
+      "name": "carbonio-prometheus-mysqld-exporter",
+      "dir": "carbonio-prometheus-mysqld-exporter",
+      "user": "carbonio-prometheus",
+      "hcl": [
+        "carbonio-prometheus-mysqld-exporter.hcl"
+      ],
+      "sidecars": [],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-prometheus",
+      "comment": "Exporter run as the user carbonio-prometheus, shared by all the prometheus packages: an identity of its own limits what its token can do in Consul (it registers this service only), not what the process can do on the machine."
+    },
+    {
+      "name": "carbonio-prometheus-nginx-exporter",
+      "dir": "carbonio-prometheus-nginx-exporter",
+      "user": "carbonio-prometheus",
+      "hcl": [
+        "carbonio-prometheus-nginx-exporter.hcl"
+      ],
+      "sidecars": [],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-prometheus",
+      "comment": "Exporter run as the user carbonio-prometheus, shared by all the prometheus packages: an identity of its own limits what its token can do in Consul (it registers this service only), not what the process can do on the machine."
+    },
+    {
+      "name": "carbonio-prometheus-node-exporter",
+      "dir": "carbonio-prometheus-node-exporter",
+      "user": "carbonio-prometheus",
+      "hcl": [
+        "carbonio-prometheus-node-exporter.hcl"
+      ],
+      "sidecars": [],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-prometheus",
+      "comment": "Exporter run as the user carbonio-prometheus, shared by all the prometheus packages: an identity of its own limits what its token can do in Consul (it registers this service only), not what the process can do on the machine."
+    },
+    {
+      "name": "carbonio-prometheus-openldap-exporter",
+      "dir": "carbonio-prometheus-openldap-exporter",
+      "user": "carbonio-prometheus",
+      "hcl": [
+        "carbonio-prometheus-openldap-exporter.hcl"
+      ],
+      "sidecars": [],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-prometheus",
+      "comment": "Exporter run as the user carbonio-prometheus, shared by all the prometheus packages: an identity of its own limits what its token can do in Consul (it registers this service only), not what the process can do on the machine."
+    },
+    {
+      "name": "carbonio-prometheus-postfix-exporter",
+      "dir": "carbonio-prometheus-postfix-exporter",
+      "user": "carbonio-prometheus",
+      "hcl": [
+        "carbonio-prometheus-postfix-exporter.hcl"
+      ],
+      "sidecars": [],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-prometheus",
+      "comment": "Exporter run as the user carbonio-prometheus, shared by all the prometheus packages: an identity of its own limits what its token can do in Consul (it registers this service only), not what the process can do on the machine."
+    },
+    {
+      "name": "carbonio-prometheus-postgres-exporter",
+      "dir": "carbonio-prometheus-postgres-exporter",
+      "user": "carbonio-prometheus",
+      "hcl": [
+        "carbonio-prometheus-postgres-exporter.hcl"
+      ],
+      "sidecars": [],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-prometheus",
+      "comment": "Exporter run as the user carbonio-prometheus, shared by all the prometheus packages: an identity of its own limits what its token can do in Consul (it registers this service only), not what the process can do on the machine."
+    },
+    {
+      "name": "carbonio-prometheus-process-exporter",
+      "dir": "carbonio-prometheus-process-exporter",
+      "user": "carbonio-prometheus",
+      "hcl": [
+        "carbonio-prometheus-process-exporter.hcl"
+      ],
+      "sidecars": [],
+      "restart": [],
+      "token_env": [],
+      "post_setup": [],
+      "pending_setup": "replace",
+      "consumer_only": false,
+      "repo": "zextras/carbonio-prometheus",
+      "comment": "Exporter run as the user carbonio-prometheus, shared by all the prometheus packages: an identity of its own limits what its token can do in Consul (it registers this service only), not what the process can do on the machine."
     },
     {
       "name": "carbonio-proxy",
@@ -1156,7 +1550,56 @@
       ],
       "alt_repos": [
         "zextras/carbonio-tasks-ce"
-      ]
+      ],
+      "migrations": {
+        "kv": [
+          {
+            "old": "carbonio-tasks/db-name",
+            "new": "carbonio-tasks/database/credentials/db-name"
+          },
+          {
+            "old": "carbonio-tasks/db-username",
+            "new": "carbonio-tasks/database/credentials/db-username"
+          },
+          {
+            "old": "carbonio-tasks/db-password",
+            "new": "carbonio-tasks/database/credentials/db-password"
+          },
+          {
+            "old": "carbonio-tasks/hikari-max-pool-size",
+            "new": "carbonio-tasks/database/db-pool-max-size"
+          },
+          {
+            "old": "carbonio-tasks/hikari-min-idle-connections",
+            "new": "carbonio-tasks/database/db-pool-min-size"
+          },
+          {
+            "old": "carbonio-tasks/hikari-idle-timeout",
+            "new": "carbonio-tasks/database/db-pool-idle-timeout"
+          },
+          {
+            "old": "carbonio-tasks/hikari-leak-detection-threshold",
+            "new": "carbonio-tasks/database/db-pool-leak-detection"
+          },
+          {
+            "old": "carbonio-tasks/hikari-max-lifetime",
+            "new": "carbonio-tasks/database/db-pool-max-lifetime"
+          },
+          {
+            "old": "carbonio-tasks/database.credentials.db-name",
+            "new": "carbonio-tasks/database/credentials/db-name"
+          },
+          {
+            "old": "carbonio-tasks/database.credentials.db-username",
+            "new": "carbonio-tasks/database/credentials/db-username"
+          },
+          {
+            "old": "carbonio-tasks/database.credentials.db-password",
+            "new": "carbonio-tasks/database/credentials/db-password"
+          }
+        ],
+        "properties": []
+      }
     },
     {
       "name": "carbonio-tasks-db",
@@ -1193,14 +1636,16 @@
       "name": "carbonio-turn-server",
       "dir": "turn-server",
       "user": "zextras",
-      "hcl": [],
+      "hcl": [
+        "carbonio-turn-server.hcl"
+      ],
       "sidecars": [],
       "restart": [
         "carbonio-turn-server.service"
       ],
       "token_env": [],
       "post_setup": [],
-      "pending_setup": "keep",
+      "pending_setup": "replace",
       "consumer_only": false,
       "repo": "zextras/carbonio-turn-server",
       "files": [
@@ -1212,13 +1657,25 @@
           "name": "service-protocol.json",
           "path": "package/service-protocol.json"
         }
-      ]
+      ],
+      "generated": true,
+      "setup": "turn-server",
+      "configure": [
+        "carbonio-turn-server-configs",
+        "carbonio-turn-server-configs-hcl"
+      ],
+      "companions": [
+        "carbonio-turn-server-auth"
+      ],
+      "comment": "carbonio-turn-server-configs-hcl produces the HCL files of both turn-server and turn-server-auth, which the same package setup sets up."
     },
     {
       "name": "carbonio-turn-server-auth",
       "dir": "turn-server-auth",
       "user": "zextras",
-      "hcl": [],
+      "hcl": [
+        "carbonio-turn-server-auth.hcl"
+      ],
       "sidecars": [
         "carbonio-turn-server-auth-sidecar.service"
       ],
@@ -1232,7 +1689,7 @@
         }
       ],
       "post_setup": [],
-      "pending_setup": "keep",
+      "pending_setup": "replace",
       "consumer_only": false,
       "repo": "zextras/carbonio-turn-server",
       "files": [
@@ -1248,6 +1705,10 @@
           "name": "service-protocol.json",
           "path": "package/carbonio-turn-server-auth-service-protocol.json"
         }
+      ],
+      "generated": true,
+      "routing": [
+        "carbonio-turn-server-routing"
       ]
     },
     {
@@ -1286,13 +1747,33 @@
           "name": "service-protocol.json",
           "path": "package/service-protocol.json"
         }
-      ]
+      ],
+      "migrations": {
+        "kv": [],
+        "properties": [
+          {
+            "old": "carbonio.user-management.host",
+            "new": "carbonio.service.host"
+          },
+          {
+            "old": "carbonio.user-management.port",
+            "new": "carbonio.service.port"
+          },
+          {
+            "old": "carbonio.mailbox.url",
+            "host": "carbonio.mailbox.host",
+            "port": "carbonio.mailbox.port"
+          }
+        ]
+      }
     },
     {
       "name": "carbonio-videorecorder",
       "dir": "videorecorder",
       "user": "videoserver",
-      "hcl": [],
+      "hcl": [
+        "carbonio-videorecorder.hcl"
+      ],
       "sidecars": [
         "carbonio-videorecorder-sidecar.service"
       ],
@@ -1306,7 +1787,7 @@
         }
       ],
       "post_setup": [],
-      "pending_setup": "keep",
+      "pending_setup": "replace",
       "consumer_only": false,
       "repo": "zextras/carbonio-videorecorder",
       "files": [
@@ -1322,7 +1803,41 @@
           "name": "service-protocol.json",
           "path": "package/service-protocol.json"
         }
-      ]
+      ],
+      "migrations": {
+        "kv": [
+          {
+            "old": "carbonio-videorecorder-db/db-name",
+            "new": "carbonio-videorecorder/database/credentials/db-name"
+          },
+          {
+            "old": "carbonio-videorecorder-db/db-username",
+            "new": "carbonio-videorecorder/database/credentials/db-username"
+          },
+          {
+            "old": "carbonio-videorecorder-db/db-password",
+            "new": "carbonio-videorecorder/database/credentials/db-password"
+          }
+        ],
+        "properties": []
+      },
+      "generated": true,
+      "configure": [
+        "carbonio-videorecorder-configs"
+      ],
+      "routing": [
+        "carbonio-videorecorder-routing"
+      ],
+      "extra_rules": {
+        "key_prefix": [
+          {
+            "carbonio-videoserver/meta/": {
+              "policy": "read"
+            }
+          }
+        ]
+      },
+      "comment": "The HCL is rendered from the template of the package with the identifier videoserver published for this node, so the role may read carbonio-videoserver/meta/."
     },
     {
       "name": "carbonio-videorecorder-db",
@@ -1375,7 +1890,7 @@
         }
       ],
       "post_setup": [],
-      "pending_setup": "keep",
+      "pending_setup": "replace",
       "consumer_only": false,
       "repo": "zextras/carbonio-videoserver-advanced",
       "files": [
@@ -1394,6 +1909,13 @@
       ],
       "alt_repos": [
         "zextras/carbonio-videoserver-ce"
+      ],
+      "generated": true,
+      "configure": [
+        "carbonio-videoserver-configs"
+      ],
+      "routing": [
+        "carbonio-videoserver-routing"
       ]
     },
     {

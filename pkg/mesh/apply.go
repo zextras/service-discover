@@ -14,7 +14,10 @@ import (
 	"github.com/zextras/service-discover/pkg/spire"
 )
 
-const policyDescriptionPrefix = "Carbonio mesh policy of "
+const (
+	policyDescriptionPrefix      = "Carbonio mesh policy of "
+	extraPolicyDescriptionPrefix = "Carbonio mesh additional rules of "
+)
 
 var errUnknownService = errors.New("unknown service")
 
@@ -120,7 +123,18 @@ func applyDefinition(cluster Cluster, def *Definition, opts ApplyOptions) error 
 		return err
 	}
 
-	err = ensureRole(cluster, def, policy, log)
+	policies := []string{policy.Name}
+
+	extra, err := ensureExtraPolicy(cluster, def, log)
+	if err != nil {
+		return err
+	}
+
+	if extra != "" {
+		policies = append(policies, extra)
+	}
+
+	err = ensureRole(cluster, def, policies, log)
 	if err != nil {
 		return err
 	}
@@ -153,7 +167,31 @@ func ensurePolicy(cluster Cluster, def *Definition, log func(string, ...any)) (*
 		return nil, err
 	}
 
-	desired := &api.ACLPolicy{Name: def.PolicyName(), Description: policyDescriptionPrefix + def.Name, Rules: rules}
+	return writePolicy(cluster, def.PolicyName(), policyDescriptionPrefix+def.Name, rules, log)
+}
+
+// ensureExtraPolicy writes the policy of the additional rules of the service and returns its name, empty when the
+// service needs none.
+func ensureExtraPolicy(cluster Cluster, def *Definition, log func(string, ...any)) (string, error) {
+	rules, err := def.ExtraPolicy()
+	if err != nil || rules == "" {
+		return "", err
+	}
+
+	policy, err := writePolicy(cluster, def.ExtraPolicyName(), extraPolicyDescriptionPrefix+def.Name, rules, log)
+	if err != nil {
+		return "", err
+	}
+
+	return policy.Name, nil
+}
+
+func writePolicy(
+	cluster Cluster,
+	name, description, rules string,
+	log func(string, ...any),
+) (*api.ACLPolicy, error) {
+	desired := &api.ACLPolicy{Name: name, Description: description, Rules: rules}
 
 	existing, err := cluster.PolicyByName(desired.Name)
 	if err != nil {
@@ -188,11 +226,14 @@ func ensurePolicy(cluster Cluster, def *Definition, log func(string, ...any)) (*
 	return desired, nil
 }
 
-func ensureRole(cluster Cluster, def *Definition, policy *api.ACLPolicy, log func(string, ...any)) error {
+func ensureRole(cluster Cluster, def *Definition, policies []string, log func(string, ...any)) error {
 	desired := &api.ACLRole{
 		Name:        def.RoleName(),
 		Description: "Carbonio mesh role of " + def.Name,
-		Policies:    []*api.ACLRolePolicyLink{{Name: policy.Name}},
+	}
+
+	for _, name := range policies {
+		desired.Policies = append(desired.Policies, &api.ACLRolePolicyLink{Name: name})
 	}
 
 	existing, err := cluster.RoleByName(desired.Name)
@@ -211,9 +252,16 @@ func ensureRole(cluster Cluster, def *Definition, policy *api.ACLPolicy, log fun
 		return nil
 	}
 
-	onlyPolicy := len(existing.Policies) == 1 && existing.Policies[0].Name == policy.Name
+	linked := make([]string, 0, len(existing.Policies))
+	for _, link := range existing.Policies {
+		linked = append(linked, link.Name)
+	}
 
-	if onlyPolicy && len(existing.ServiceIdentities) == 0 && len(existing.NodeIdentities) == 0 &&
+	slices.Sort(linked)
+
+	wanted := slices.Sorted(slices.Values(policies))
+
+	if slices.Equal(linked, wanted) && len(existing.ServiceIdentities) == 0 && len(existing.NodeIdentities) == 0 &&
 		len(existing.TemplatedPolicies) == 0 && existing.Description == desired.Description {
 		return nil
 	}

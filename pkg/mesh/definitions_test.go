@@ -34,7 +34,6 @@ func TestLoad_embeddedDefinitionsAreConsistent(t *testing.T) {
 
 		assert.NotEmpty(t, def.User, def.Name)
 		assert.NotEmpty(t, def.Repo, def.Name)
-		assert.NotEmpty(t, def.Files, def.Name)
 
 		policy, err := def.Policy()
 		require.NoError(t, err, def.Name)
@@ -53,6 +52,22 @@ func TestLoad_embeddedDefinitionsAreConsistent(t *testing.T) {
 
 		if def.ConsumerOnly {
 			assert.Empty(t, def.HCL, "%s registers nothing", def.Name)
+		}
+
+		if def.Generated {
+			assert.NotEmpty(t, def.HCL, "%s: the HCL files its setup generates", def.Name)
+		}
+
+		for _, companion := range def.Companions {
+			_, found := Find(defs, companion)
+			assert.True(t, found, "%s: companion %s", def.Name, companion)
+		}
+
+		_, err = def.ExtraPolicy()
+		require.NoError(t, err, def.Name)
+
+		for _, command := range slices.Concat(def.Configure, def.Routing, def.PostSetup) {
+			assert.NotEmpty(t, strings.Fields(command), def.Name)
 		}
 	}
 

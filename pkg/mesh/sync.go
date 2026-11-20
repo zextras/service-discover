@@ -27,6 +27,8 @@ const (
 	CarbonioDir = "/etc/carbonio"
 	// SystemdDir is where the drop-ins of the administrator live.
 	SystemdDir = "/etc/systemd/system"
+	// CertDir holds the TLS certificate and key of the node.
+	CertDir = "/opt/zextras/ssl/carbonio/commercial"
 	// ConsulUnit is the unit of the Consul agent, server or client.
 	ConsulUnit = "service-discover.service"
 	// ConsulUser is the user the Consul agent runs as.
@@ -52,6 +54,7 @@ type Env struct {
 	RenderedDir string
 	CarbonioDir string
 	SystemdDir  string
+	CertDir     string
 	TrustDomain string
 
 	// LookupUser returns the account of a user, fs.ErrNotExist when the user does not exist.
@@ -68,6 +71,10 @@ type Env struct {
 	Logout func(token string) error
 	// Systemctl runs systemctl with the given arguments.
 	Systemctl func(args ...string) error
+	// Exec runs a process of the machine.
+	Exec func(*Command) ([]byte, error)
+	// Consul returns a client of the local agent using the given token, the one of a service.
+	Consul func(token string) (Consul, error)
 	// Sleep and Now allow tests to run without waiting.
 	Sleep func(time.Duration)
 	Now   func() time.Time
@@ -84,8 +91,14 @@ type SyncOptions struct {
 	// NoBlock queues the restarts without waiting for the units to start. It is needed when the synchronization runs
 	// from the start of Consul itself, that the units to restart are ordered after.
 	NoBlock bool
+	// Setup runs the setup of the services as their package did when installed: the migrations of their
+	// configuration, the generation of their service definitions and of what depends on the node, and the routing.
+	// The other synchronizations only keep the credentials up to date.
+	Setup bool
+	// ForceRestart reloads Consul and restarts the units of the services even when nothing changed.
+	ForceRestart bool
 	// Wait is how long to wait for the SPIRE agent to issue an identity, that is available only some seconds after
-	// the entries have been registered on the server.
+	// the entries have been registered on the server, and for a service to be healthy before its routing.
 	Wait time.Duration
 	// Out receives one line per change, nothing when nil.
 	Out io.Writer
@@ -99,6 +112,8 @@ type outcome struct {
 	tokenChange bool // the token file has been created or replaced
 	envChange   bool // a systemd drop-in has been written
 	hclChange   bool // a rendered service definition has changed
+	forced      bool // the setup asked to restart everything
+	token       string
 }
 
 // Installed returns the definitions of the services installed on this node: the package has put its service
@@ -122,7 +137,7 @@ func (e *Env) Installed(defs []Definition) []Definition {
 }
 
 func (e *Env) packageInstalled(def *Definition) bool {
-	if len(def.HCL) == 0 {
+	if len(def.HCL) == 0 || def.Generated {
 		return isDir(e.serviceDirectory(def))
 	}
 
@@ -168,8 +183,13 @@ func Sync(env *Env, defs []Definition, opts SyncOptions) error {
 
 	for i := range selected {
 		res, syncErr := syncService(env, &selected[i], opts, deadline, log)
+		res.forced = opts.ForceRestart
+
 		if syncErr != nil {
 			failures = append(failures, fmt.Errorf("%s: %w", selected[i].Name, syncErr))
+
+			// A service that could not be set up is not routed.
+			res.token = ""
 		}
 
 		// What changed before a failure still has to reach the units: the next run finds it up to date and would
@@ -177,13 +197,22 @@ func Sync(env *Env, defs []Definition, opts SyncOptions) error {
 		outcomes = append(outcomes, res)
 	}
 
-	removed, err := removeStale(env, withToken(env, defs), log)
+	mirrored, err := mirrorPassThrough(env, defs, log)
+	if err != nil {
+		failures = append(failures, err)
+	}
+
+	removed, err := removeStale(env, defs, log)
 	if err != nil {
 		failures = append(failures, err)
 	}
 
 	if !opts.NoRestart {
-		failures = append(failures, apply(env, outcomes, removed, opts.NoBlock, log)...)
+		failures = append(failures, apply(env, outcomes, mirrored || len(removed) > 0, opts.NoBlock, log)...)
+
+		if opts.Setup {
+			failures = append(failures, finishSetup(env, outcomes, opts, log)...)
+		}
 	}
 
 	return errors.Join(failures...)
@@ -227,12 +256,31 @@ func syncService(
 		return res, err
 	}
 
+	previous := readToken(env.tokenFile(def))
+
 	token, changed, err := ensureToken(env, def, account, opts.Renew, deadline, log)
 	if err != nil {
 		return res, err
 	}
 
 	res.tokenChange = changed
+	res.token = token
+
+	if len(def.SubstituteFiles) > 0 {
+		substituted, subErr := substitute(env, def, token, previous, log)
+		if subErr != nil {
+			return res, subErr
+		}
+
+		res.envChange = substituted
+	}
+
+	if opts.Setup {
+		setupErr := prepareService(&setupContext{env: env, def: def, token: token, log: log, out: opts.Out})
+		if setupErr != nil {
+			return res, setupErr
+		}
+	}
 
 	if !def.ConsumerOnly {
 		res.hclChange, err = renderDefinitions(env, def, token, log)
@@ -251,6 +299,26 @@ func syncService(
 	}
 
 	return res, nil
+}
+
+// finishSetup runs the part of the setup of the services that needs them registered.
+func finishSetup(env *Env, outcomes []outcome, opts SyncOptions, log func(string, ...any)) []error {
+	var failures []error
+
+	for _, res := range outcomes {
+		if res.token == "" {
+			continue
+		}
+
+		ctx := &setupContext{env: env, def: res.def, token: res.token, log: log, out: opts.Out}
+
+		err := finishService(ctx, opts.Wait)
+		if err != nil {
+			failures = append(failures, fmt.Errorf("%s: %w", res.def.Name, err))
+		}
+	}
+
+	return failures
 }
 
 // ensureToken returns the token of the service, logging in when the token file has none or a stale one. The
@@ -414,8 +482,63 @@ func writeDropIn(env *Env, tokenEnv TokenEnv, token string, log func(string, ...
 	return true, nil
 }
 
-// removeStale deletes the rendered definitions that do not have a package definition anymore, so that a removed
-// package stops registering its service. It returns the removed names.
+// mirrorPassThrough copies into RenderedDir, unchanged, the configuration files of ServicesDir that are not service
+// definitions of a known service: the configuration of the agent and the definitions of unknown services. It reports
+// whether any copy changed.
+func mirrorPassThrough(env *Env, defs []Definition, log func(string, ...any)) (bool, error) {
+	entries, err := os.ReadDir(env.ServicesDir)
+	if err != nil {
+		return false, fmt.Errorf("unable to read the configuration of the agent: %w", err)
+	}
+
+	consul, err := env.LookupUser(ConsulUser)
+	if err != nil {
+		return false, fmt.Errorf("unable to find the Consul user: %w", err)
+	}
+
+	changed := false
+
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !isConfigFile(name) || knownHCL(defs, name) {
+			continue
+		}
+
+		src, readErr := os.ReadFile(filepath.Join(env.ServicesDir, name))
+		if readErr != nil {
+			return changed, readErr
+		}
+
+		target := filepath.Join(env.RenderedDir, name)
+		if bytes.Equal(readFileOrNil(target), src) {
+			continue
+		}
+
+		err = os.MkdirAll(env.RenderedDir, renderedDirMode)
+		if err != nil {
+			return changed, err
+		}
+
+		err = env.Chown(env.RenderedDir, consul.UID, consul.GID)
+		if err != nil {
+			return changed, err
+		}
+
+		err = writeFile(env, target, src, renderedMode, consul)
+		if err != nil {
+			return changed, err
+		}
+
+		log("copied %s to %s", filepath.Join(env.ServicesDir, name), target)
+
+		changed = true
+	}
+
+	return changed, nil
+}
+
+// removeStale deletes the files of RenderedDir that do not come from ServicesDir anymore: the definition of a removed
+// package, or of a service that lost its token, must stop registering the service. It returns the removed names.
 func removeStale(env *Env, defs []Definition, log func(string, ...any)) ([]string, error) {
 	entries, err := os.ReadDir(env.RenderedDir)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -426,22 +549,29 @@ func removeStale(env *Env, defs []Definition, log func(string, ...any)) ([]strin
 		return nil, err
 	}
 
+	rendered := withToken(env, defs)
+
 	var removed []string
 
 	for _, entry := range entries {
-		packaged := isFile(filepath.Join(env.ServicesDir, entry.Name())) && knownHCL(defs, entry.Name())
-		if entry.IsDir() || packaged {
+		name := entry.Name()
+		if entry.IsDir() {
 			continue
 		}
 
-		err = os.Remove(filepath.Join(env.RenderedDir, entry.Name()))
+		// A copy stays while its source exists and, for a known service, while the service can be rendered.
+		if isFile(filepath.Join(env.ServicesDir, name)) && (!knownHCL(defs, name) || knownHCL(rendered, name)) {
+			continue
+		}
+
+		err = os.Remove(filepath.Join(env.RenderedDir, name))
 		if err != nil {
 			return removed, err
 		}
 
-		log("removed %s: the package definition is gone", filepath.Join(env.RenderedDir, entry.Name()))
+		log("removed %s: the package definition is gone", filepath.Join(env.RenderedDir, name))
 
-		removed = append(removed, entry.Name())
+		removed = append(removed, name)
 	}
 
 	return removed, nil
@@ -453,22 +583,21 @@ func knownHCL(defs []Definition, name string) bool {
 
 // apply reloads Consul when a service definition changed, and restarts the units reading something that changed:
 // the sidecars read both the token and the definition, the other units only the token.
-func apply(env *Env, outcomes []outcome, removed []string, noBlock bool, log func(string, ...any)) []error {
+func apply(env *Env, outcomes []outcome, reload, noBlock bool, log func(string, ...any)) []error {
 	var (
 		failures []error
-		reload   = len(removed) > 0
 		restart  []string
 		dropIns  bool
 	)
 
 	for _, res := range outcomes {
-		reload = reload || res.hclChange
+		reload = reload || res.hclChange || res.forced
 
-		if res.tokenChange || res.hclChange {
+		if res.tokenChange || res.hclChange || res.forced {
 			restart = appendUnique(restart, res.def.Sidecars...)
 		}
 
-		if res.tokenChange || res.envChange {
+		if res.tokenChange || res.envChange || res.forced {
 			restart = appendUnique(restart, res.def.Restart...)
 
 			for _, tokenEnv := range res.def.TokenEnv {

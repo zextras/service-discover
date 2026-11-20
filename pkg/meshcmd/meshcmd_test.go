@@ -7,6 +7,7 @@ package meshcmd
 import (
 	"bytes"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,6 +20,7 @@ var errSync = errors.New("sync failed")
 type recorder struct {
 	exits    []int
 	synced   [][]string
+	setups   []bool
 	commands []string
 	syncErr  error
 	runErr   error
@@ -33,13 +35,14 @@ func (r *recorder) command(script string, spire bool, uid int) (*PendingSetup, *
 		getuid:    func() int { return uid },
 		spireMode: func() bool { return spire },
 		exit:      func(code int) { r.exits = append(r.exits, code) },
-		run: func(name string) error {
-			r.commands = append(r.commands, name)
+		run: func(name string, args ...string) error {
+			r.commands = append(r.commands, strings.Join(append([]string{name}, args...), " "))
 
 			return r.runErr
 		},
-		sync: func(services []string) error {
+		sync: func(services []string, setup bool) error {
 			r.synced = append(r.synced, services)
+			r.setups = append(r.setups, setup)
 
 			return r.syncErr
 		},
@@ -60,7 +63,7 @@ func TestPendingSetup_nodesNotUsingSpireRunTheScript(t *testing.T) {
 func TestPendingSetup_scriptsNotCoveredRunTheScript(t *testing.T) {
 	t.Parallel()
 
-	for _, script := range []string{"100-unknown.sh", "300-carbonio-docs-editor.sh"} {
+	for _, script := range []string{"100-unknown.sh", "131-set-carbonio-prometheus-openldap-exporter.sh"} {
 		rec := &recorder{}
 		cmd, _ := rec.command(script, true, 0)
 
@@ -118,4 +121,29 @@ func TestSync_mustBeRoot(t *testing.T) {
 	cmd := Sync{writer: &bytes.Buffer{}, getuid: func() int { return 1000 }, spireMode: func() bool { return true }}
 
 	require.ErrorIs(t, cmd.Run(&command.GlobalCommonFlags{}), errNotRoot)
+}
+
+func TestPendingSetup_setsUpTheServiceAndItsCompanions(t *testing.T) {
+	t.Parallel()
+
+	rec := &recorder{}
+	cmd, _ := rec.command("611-carbonio-turn-server.sh", true, 0)
+
+	require.NoError(t, cmd.Run(&command.GlobalCommonFlags{}))
+	assert.Empty(t, rec.exits, "the script is not run")
+	assert.Equal(t, [][]string{{"carbonio-turn-server", "carbonio-turn-server-auth"}}, rec.synced)
+	assert.Equal(t, []bool{true}, rec.setups, "the setup steps run and the units are restarted")
+}
+
+func TestPendingSetup_everyCarbonioPrometheusScriptIsCovered(t *testing.T) {
+	t.Parallel()
+
+	for _, script := range []string{"131-carbonio-prometheus.sh", "131-carbonio-prometheus-alertmanager.sh"} {
+		rec := &recorder{}
+		cmd, _ := rec.command(script, true, 0)
+
+		require.NoError(t, cmd.Run(&command.GlobalCommonFlags{}), script)
+		assert.Empty(t, rec.exits, script)
+		assert.Len(t, rec.synced, 1, script)
+	}
 }

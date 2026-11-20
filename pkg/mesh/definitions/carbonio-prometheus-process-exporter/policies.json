@@ -1,0 +1,16 @@
+{
+  "node_prefix": [
+    {
+      "": {
+        "policy": "read"
+      }
+    }
+  ],
+  "service": [
+    {
+      "carbonio-prometheus-process-exporter": {
+        "policy": "write"
+      }
+    }
+  ]
+}

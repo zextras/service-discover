@@ -52,6 +52,6 @@ func TestPendingSetupClassification(t *testing.T) {
 		}
 	}
 
-	assert.True(t, keep["carbonio-docs-editor"])
+	assert.False(t, keep["carbonio-docs-editor"], "its mesh part is a setup step")
 	assert.False(t, keep["carbonio-files"])
 }

@@ -112,7 +112,15 @@ func TestApply_registersEveryDefinition(t *testing.T) {
 
 	require.NoError(t, Apply(cluster, defs, ApplyOptions{TrustDomain: "carbonio.lab", AuthMethod: "spire", Out: out}))
 
-	assert.Len(t, cluster.policies, len(defs))
+	withExtra := 0
+
+	for i := range defs {
+		if extra, _ := defs[i].ExtraPolicy(); extra != "" {
+			withExtra++
+		}
+	}
+
+	assert.Len(t, cluster.policies, len(defs)+withExtra)
 	assert.Len(t, cluster.roles, len(defs))
 	assert.Len(t, cluster.rules, len(defs))
 	assert.NotEmpty(t, cluster.entries)
@@ -125,8 +133,7 @@ func TestApply_registersEveryDefinition(t *testing.T) {
 	assert.Equal(t, "spire", rule.AuthMethod)
 
 	role := cluster.roles[files.RoleName()]
-	require.Len(t, role.Policies, 1)
-	assert.Equal(t, files.PolicyName(), role.Policies[0].Name)
+	assert.Equal(t, []string{files.PolicyName(), files.ExtraPolicyName()}, policyNames(role))
 
 	rules, _ := files.Policy()
 	assert.Equal(t, rules, cluster.policies[files.PolicyName()].Rules)
@@ -182,9 +189,10 @@ func TestApply_repairsDrift(t *testing.T) {
 	opts := ApplyOptions{TrustDomain: "carbonio", AuthMethod: "spire", Services: []string{"carbonio-files"}}
 
 	require.NoError(t, Apply(cluster, defs, opts))
-	require.Len(t, cluster.policies, 1)
+	require.Len(t, cluster.policies, 2, "the policy of the package and the one of its additional rules")
 
 	cluster.policies["carbonio-files-policy"].Rules = `key_prefix "" { policy = "write" }`
+	cluster.policies["carbonio-files-extra-policy"].Rules = `key_prefix "" { policy = "write" }`
 	cluster.roles["carbonio-files-role"].Policies = nil
 	findRule(t, cluster, "carbonio-files-role").Selector = `value.spiffe_id == "spiffe://other/service/x"`
 
@@ -197,7 +205,11 @@ func TestApply_repairsDrift(t *testing.T) {
 	rules, _ := files.Policy()
 
 	assert.Equal(t, rules, cluster.policies["carbonio-files-policy"].Rules)
-	assert.Equal(t, "carbonio-files-policy", cluster.roles["carbonio-files-role"].Policies[0].Name)
+	extra, _ := files.ExtraPolicy()
+
+	assert.Equal(t, extra, cluster.policies["carbonio-files-extra-policy"].Rules)
+	assert.Equal(t, []string{"carbonio-files-policy", "carbonio-files-extra-policy"},
+		policyNames(cluster.roles["carbonio-files-role"]))
 	assert.Equal(t, `value.spiffe_id == "spiffe://carbonio/service/carbonio-files"`,
 		findRule(t, cluster, "carbonio-files-role").Selector)
 	assert.Len(t, cluster.rules, 1, "the rule is updated, not duplicated")
@@ -217,7 +229,7 @@ func TestApply_selectsServices(t *testing.T) {
 	require.NoError(t, Apply(cluster, defs, ApplyOptions{
 		TrustDomain: "carbonio", AuthMethod: "spire", Services: []string{"carbonio-files", "carbonio-preview"},
 	}))
-	assert.Len(t, cluster.policies, 2)
+	assert.Len(t, cluster.policies, 4, "both have additional rules")
 
 	err = Apply(cluster, defs, ApplyOptions{TrustDomain: "carbonio", AuthMethod: "spire", Services: []string{"nope"}})
 	require.ErrorIs(t, err, errUnknownService)
@@ -235,5 +247,42 @@ func TestApply_continuesAfterAFailureAndReportsIt(t *testing.T) {
 	err = Apply(cluster, defs, ApplyOptions{TrustDomain: "carbonio", AuthMethod: "spire"})
 	require.ErrorIs(t, err, errCluster)
 	require.ErrorContains(t, err, "carbonio-files")
-	assert.Len(t, cluster.policies, len(defs), "the other services are registered")
+	expected := len(defs)
+
+	for i := range defs {
+		if extra, _ := defs[i].ExtraPolicy(); extra != "" {
+			expected++
+		}
+	}
+
+	assert.Len(t, cluster.policies, expected, "the other services are registered")
+}
+
+func policyNames(role *api.ACLRole) []string {
+	names := make([]string, 0, len(role.Policies))
+	for _, link := range role.Policies {
+		names = append(names, link.Name)
+	}
+
+	return names
+}
+
+func TestApply_roleKeepsOnlyItsPolicies(t *testing.T) {
+	t.Parallel()
+
+	defs, err := Load()
+	require.NoError(t, err)
+
+	cluster := newFakeCluster()
+	opts := ApplyOptions{TrustDomain: "carbonio", AuthMethod: "spire", Services: []string{"carbonio-files"}}
+
+	require.NoError(t, Apply(cluster, defs, opts))
+
+	// A policy somebody linked to the role does not stay.
+	role := cluster.roles["carbonio-files-role"]
+	role.Policies = append(role.Policies, &api.ACLRolePolicyLink{Name: "global-management"})
+
+	require.NoError(t, Apply(cluster, defs, opts))
+	assert.Equal(t, []string{"carbonio-files-policy", "carbonio-files-extra-policy"},
+		policyNames(cluster.roles["carbonio-files-role"]))
 }

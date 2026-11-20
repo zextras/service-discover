@@ -155,3 +155,71 @@ func (c *consulLogin) Logout(secret string) error {
 
 	return err
 }
+
+// consulService implements Consul on the local agent with the token of a service.
+type consulService struct {
+	client *api.Client
+}
+
+func newConsulService(token string) (Consul, error) {
+	cfg := api.DefaultConfig()
+	cfg.Token = token
+
+	client, err := api.NewClient(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return &consulService{client: client}, nil
+}
+
+func (c *consulService) Get(key string) (string, bool, error) {
+	pair, _, err := c.client.KV().Get(key, nil)
+	if err != nil {
+		return "", false, err
+	}
+
+	if pair == nil {
+		return "", false, nil
+	}
+
+	return string(pair.Value), true, nil
+}
+
+func (c *consulService) Put(key, value string) error {
+	_, err := c.client.KV().Put(&api.KVPair{Key: key, Value: []byte(value)}, nil)
+
+	return err
+}
+
+func (c *consulService) Delete(key string) error {
+	_, err := c.client.KV().Delete(key, nil)
+
+	return err
+}
+
+func (c *consulService) Instances(service string, passing bool) ([]Instance, error) {
+	entries, _, err := c.client.Health().Service(service, "", passing, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	instances := make([]Instance, 0, len(entries))
+
+	for _, entry := range entries {
+		address := entry.Service.Address
+		if address == "" {
+			address = entry.Node.Address
+		}
+
+		instances = append(instances, Instance{Address: address, Meta: entry.Service.Meta})
+	}
+
+	return instances, nil
+}
+
+func (c *consulService) SetConfigEntry(entry api.ConfigEntry) error {
+	_, _, err := c.client.ConfigEntries().Set(entry, nil)
+
+	return err
+}

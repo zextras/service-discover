@@ -24,11 +24,12 @@ func SPIREMode() bool {
 
 // ConsulConfigArgs prepares the configuration of Consul on a node using SPIRE and returns the arguments to load it.
 //
-// The Consul configuration directory holds, together with the configuration of the agent, the service definitions of
-// the packages. These carry no token and the token of each service is issued by SPIRE: Consul gets the definitions
-// rendered with the token (RenderedDir) instead of the package ones. The services without a token yet are not
-// registered, they are as soon as the synchronization has issued it. Everything else in the directory is passed as it
-// is. It has to run as root, before dropping the privileges: the tokens are readable by the service users only.
+// Consul loads one directory, RenderedDir, instead of the one of the packages. It holds the service definitions of the
+// packages with the token of their service injected, and a verbatim copy of everything else (the configuration of the
+// agent, the definitions of services unknown to service-discover). The services without a token yet are not
+// registered, they are as soon as the synchronization has issued it. A directory, unlike a list of files, is read
+// again by Consul when it reloads: whatever a package installs later reaches the running agent with a reload. It has
+// to run as root, before dropping the privileges: the tokens are readable by the service users only.
 //
 // The arguments are usable whenever they are not nil: the error may then only report the services that could not be
 // rendered, that are left out, and Consul can start anyway.
@@ -39,23 +40,7 @@ func ConsulConfigArgs(env *Env, defs []Definition) ([]string, error) {
 		return nil, errors.Join(errNoRenderedDir, renderErr)
 	}
 
-	entries, err := os.ReadDir(env.ServicesDir)
-	if err != nil {
-		return nil, errors.Join(fmt.Errorf("unable to read the configuration of the agent: %w", err), renderErr)
-	}
-
-	var args []string
-
-	for _, entry := range entries {
-		name := entry.Name()
-		if entry.IsDir() || !isConfigFile(name) || knownHCL(defs, name) {
-			continue
-		}
-
-		args = append(args, "-config-file", filepath.Join(env.ServicesDir, name))
-	}
-
-	return append(args, "-config-dir", env.RenderedDir), renderErr
+	return []string{"-config-dir", env.RenderedDir}, renderErr
 }
 
 var errNoRenderedDir = errors.New("the directory of the rendered service definitions is not available")
@@ -103,7 +88,10 @@ func renderOffline(env *Env, defs []Definition) error {
 		}
 	}
 
-	_, err = removeStale(env, withToken(env, defs), discard)
+	_, err = mirrorPassThrough(env, defs, discard)
+	failures = append(failures, err)
+
+	_, err = removeStale(env, defs, discard)
 
 	return errors.Join(append(failures, err)...)
 }

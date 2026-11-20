@@ -44,6 +44,7 @@ var (
 	errInvalidName  = errors.New("invalid definition")
 	errMissingField = errors.New("name, dir and user are required")
 	errPendingSetup = errors.New("unknown pending_setup")
+	errUnknownStep  = errors.New("unknown setup step")
 )
 
 // SourceFile is a file of a definition together with the package repository it has been copied from, so that the
@@ -80,6 +81,32 @@ type Definition struct {
 	Restart []string `json:"restart"`
 	// TokenEnv lists the units getting the token through an environment variable.
 	TokenEnv []TokenEnv `json:"token_env"`
+	// Generated tells that the package does not ship the HCL files: its setup generates them. They are not on the
+	// disk before the setup, so the service counts as installed when its service-discover directory is.
+	Generated bool `json:"generated,omitempty"`
+	// Companions lists the other definitions the same pending setup script sets up: they are synchronized together,
+	// after this one.
+	Companions []string `json:"companions,omitempty"`
+	// Configure lists the commands (name and arguments) that prepare the configuration of the service and, for the
+	// Generated ones, produce the HCL files. They run when the service is set up, before the definitions are
+	// rendered, as root with the token of the service in the environment (CONSUL_HTTP_TOKEN and SETUP_CONSUL_TOKEN)
+	// and LOCAL_IP set.
+	Configure []string `json:"configure,omitempty"`
+	// Routing lists the commands that write the service router and resolver of the service, run like Configure once
+	// the service is registered.
+	Routing []string `json:"routing,omitempty"`
+	// Setup names a step of the setup implemented here, see the steps table.
+	Setup string `json:"setup,omitempty"`
+	// Migrations are the changes of the configuration of the service its upgrades need.
+	Migrations Migrations `json:"migrations"`
+	// SubstituteFiles lists, relative to /etc/carbonio, the configuration files carrying the placeholders
+	// {{ consultoken }}, {{ hostsdomain }} and {{ consulhostsdomain }}, that the setup of the package replaced in place.
+	SubstituteFiles []string `json:"substitute_files,omitempty"`
+	// ExtraRules are ACL rules the service needs beyond the ones of its package policy, in the format of the
+	// policies; see ExtraPolicy.
+	ExtraRules Rules `json:"extra_rules,omitempty"`
+	// Comment documents the choices made for the service that the files do not show.
+	Comment string `json:"comment,omitempty"`
 	// PostSetup lists the commands the package setup script runs after the mesh part. They only need the service
 	// token.
 	PostSetup []string `json:"post_setup"`
@@ -183,6 +210,46 @@ func (d *Definition) TokenFile() string {
 	return path.Join(d.ServiceDirectory(), "token")
 }
 
+// ExtraPolicyName is the name of the ACL policy holding the rules the service needs beyond its package policy.
+func (d *Definition) ExtraPolicyName() string {
+	return d.Name + "-extra-policy"
+}
+
+// ExtraPolicy returns the rules the service needs beyond the policy of its package, empty when there are none. The
+// package policy is the one the package setup scripts keep writing under the same name: the additions are in a
+// policy of their own, linked to the role, so that they are not lost when a script runs on a node outside of SPIRE.
+// They are the rules written in the definition, and the write access to the keys the migrations of the service move:
+// a migration deletes the old key, which the read access of the package policy does not allow, and writes the new
+// one.
+func (d *Definition) ExtraPolicy() (string, error) {
+	rules := Rules{}
+
+	for kind, list := range d.ExtraRules {
+		rules[kind] = slices.Clone(list)
+	}
+
+	for _, key := range d.Migrations.Keys() {
+		rules["key"] = append(rules["key"], map[string]Rule{key: {Policy: "write"}})
+	}
+
+	if len(rules) == 0 {
+		return "", nil
+	}
+
+	raw, err := json.MarshalIndent(rules, "", "  ")
+
+	return string(raw), err
+}
+
+// Rules are ACL rules in the JSON format of the policies: for each resource kind, a list of maps from the resource to
+// the rule.
+type Rules map[string][]map[string]Rule
+
+// Rule is the access to a resource.
+type Rule struct {
+	Policy string `json:"policy"`
+}
+
 // Policy returns the rules of the ACL policy of the service.
 func (d *Definition) Policy() (string, error) {
 	raw, err := fs.ReadFile(d.fsys, path.Join(d.Name, policiesFile))
@@ -230,7 +297,18 @@ func (d *Definition) validate() error {
 		return fmt.Errorf("%w: %q", errPendingSetup, d.PendingSetup)
 	}
 
+	if d.Setup != "" {
+		if _, known := steps[d.Setup]; !known {
+			return fmt.Errorf("%w: %q", errUnknownStep, d.Setup)
+		}
+	}
+
 	_, err := d.Policy()
+	if err != nil {
+		return err
+	}
+
+	_, err = d.ExtraPolicy()
 	if err != nil {
 		return err
 	}
