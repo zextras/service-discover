@@ -55,7 +55,7 @@ var registerMesh = registerMeshServices
 // intentions. Then it creates the SPIRE entries of the services of this server. The other nodes get theirs from the
 // join token.
 func registerMeshServices(deps businessDependencies, hostname, rootToken string) error {
-	err := mesh.ApplyEmbedded(rootToken, spire.TrustDomain, nil, os.Stdout)
+	err := mesh.ApplySpecs(rootToken, spire.TrustDomain, nil, os.Stdout)
 	if err != nil {
 		return err
 	}

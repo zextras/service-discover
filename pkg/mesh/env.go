@@ -128,7 +128,7 @@ func runAgentFetch(binary string, credential *syscall.Credential, spiffeID strin
 	ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
 	defer cancel()
 
-	//nolint:gosec // fixed binary, the SPIFFE ID comes from the embedded definitions
+	//nolint:gosec // fixed binary, the SPIFFE ID comes from the definitions of the specs package
 	cmd := exec.CommandContext(ctx, binary, "api", "fetch", "jwt",
 		"-audience", spire.AudienceLogin, "-spiffeID", spiffeID, "-socketPath", spire.AgentSocket)
 	cmd.Dir = "/"

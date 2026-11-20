@@ -5,7 +5,7 @@
 package mesh
 
 import (
-	"encoding/json"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -16,60 +16,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLoad_embeddedDefinitionsAreConsistent(t *testing.T) {
+func TestLoad_fixtureDefinitionsAreConsistent(t *testing.T) {
 	t.Parallel()
 
 	defs, err := Load()
 	require.NoError(t, err)
 	require.NotEmpty(t, defs)
 
-	names := map[string]bool{}
-
-	for i := range defs {
-		def := &defs[i]
-
-		assert.False(t, names[def.Name], "duplicate %s", def.Name)
-
-		names[def.Name] = true
-
-		assert.NotEmpty(t, def.User, def.Name)
-		assert.NotEmpty(t, def.Repo, def.Name)
-
-		policy, err := def.Policy()
-		require.NoError(t, err, def.Name)
-		assert.True(t, json.Valid([]byte(policy)), "%s: policies.json is not JSON", def.Name)
-
-		entries, err := def.ConfigEntries()
-		require.NoError(t, err, def.Name)
-
-		for _, entry := range entries {
-			assert.NotEmpty(t, entry.GetName(), def.Name)
-		}
-
-		for _, unit := range def.Sidecars {
-			assert.True(t, strings.HasSuffix(unit, "-sidecar.service"), "%s: %s", def.Name, unit)
-		}
-
-		if def.ConsumerOnly {
-			assert.Empty(t, def.HCL, "%s registers nothing", def.Name)
-		}
-
-		if def.Generated {
-			assert.NotEmpty(t, def.HCL, "%s: the HCL files its setup generates", def.Name)
-		}
-
-		for _, companion := range def.Companions {
-			_, found := Find(defs, companion)
-			assert.True(t, found, "%s: companion %s", def.Name, companion)
-		}
-
-		_, err = def.ExtraPolicy()
-		require.NoError(t, err, def.Name)
-
-		for _, command := range slices.Concat(def.Configure, def.Routing, def.PostSetup) {
-			assert.NotEmpty(t, strings.Fields(command), def.Name)
-		}
-	}
+	_, err = ValidateDir(filepath.Join("testdata", "specs"))
+	require.NoError(t, err)
 
 	assert.True(t, slices.IsSortedFunc(defs, func(a, b Definition) int { return strings.Compare(a.Name, b.Name) }), "sorted by name")
 }
@@ -150,37 +105,6 @@ func TestLoadFS_rejectsInvalidDefinitions(t *testing.T) {
 
 	_, err = LoadFS(fstest.MapFS{})
 	require.Error(t, err)
-}
-
-func TestDefinition_extraPolicyLetsTheSidecarsResolveTheirUpstreams(t *testing.T) {
-	t.Parallel()
-
-	defs, err := Load()
-	require.NoError(t, err)
-
-	for i := range defs {
-		def := &defs[i]
-
-		rules, err := def.ExtraPolicy()
-		require.NoError(t, err, def.Name)
-
-		if len(def.HCL) == 0 {
-			assert.NotContains(t, rules, "service_prefix", "%s registers nothing", def.Name)
-
-			continue
-		}
-
-		var parsed Rules
-
-		require.NoError(t, json.Unmarshal([]byte(rules), &parsed), def.Name)
-		assert.True(t, readsAllServices(parsed), "%s: the sidecar has no upstream without the read access", def.Name)
-
-		for _, entry := range parsed["service_prefix"] {
-			for prefix, rule := range entry {
-				assert.Equal(t, "read", rule.Policy, "%s: the access to the services %q is read only", def.Name, prefix)
-			}
-		}
-	}
 }
 
 func TestReadsAllServices(t *testing.T) {

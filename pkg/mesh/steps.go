@@ -462,7 +462,7 @@ func execCommand(cmd *Command) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
 	defer cancel()
 
-	// The commands are the ones of the packages, named by the embedded definitions.
+	// The commands are the ones of the packages, named by the definitions of the specs package.
 	run := exec.CommandContext(ctx, cmd.Name, cmd.Args...) //nolint:gosec
 	run.Env = append(os.Environ(), cmd.Env...)
 

@@ -64,7 +64,7 @@ type ApplyOptions struct {
 // Apply registers the definitions in Consul: for each one the ACL policy, the role linking it, the binding rule
 // issuing the role to the JWT-SVID of the service and the config entries (protocol, intentions...). It is idempotent:
 // objects that are already as defined are left untouched, and running it again after a package upgrade brings the
-// cluster to the embedded definitions.
+// cluster to the definitions of the service-discover-specs package.
 func Apply(cluster Cluster, defs []Definition, opts ApplyOptions) error {
 	selected, err := selectDefinitions(defs, opts.Services)
 	if err != nil {
@@ -95,13 +95,22 @@ func Apply(cluster Cluster, defs []Definition, opts ApplyOptions) error {
 	return errors.Join(failures...)
 }
 
-// ApplyEmbedded registers the embedded definitions of the services (or only the named ones) with the given token,
-// the bootstrap token, through the local Consul agent. It is the entry point for the setup of the first server and
-// for the commands that have to bring a cluster to the definitions of this version.
-func ApplyEmbedded(token, trustDomain string, services []string, out io.Writer) error {
+// ApplySpecs registers the definitions of the installed service-discover-specs package (or only the named services)
+// with the given token, the bootstrap token, through the local Consul agent. It is the entry point for the setup of
+// the first server and for the commands that have to bring a cluster to the installed definitions.
+func ApplySpecs(token, trustDomain string, services []string, out io.Writer) error {
 	defs, err := Load()
 	if err != nil {
 		return err
+	}
+
+	if out != nil {
+		dir, _ := SpecsDir()
+
+		manifest, manifestErr := ReadManifest(dir)
+		if manifestErr == nil {
+			_, _ = fmt.Fprintf(out, "service definitions: %s %s, %d services\n", manifest.Name, manifest.Version, len(defs))
+		}
 	}
 
 	cluster, err := NewCluster(token)

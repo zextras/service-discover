@@ -699,3 +699,105 @@ func TestSync_changesBeforeAFailureStillRestartTheUnits(t *testing.T) {
 	assert.Contains(t, machine.restarts(), "carbonio-files-sidecar.service")
 	assert.Equal(t, 1, machine.calls("reload"))
 }
+
+func denied() error { return api.StatusError{Code: 403, Body: "Permission denied"} }
+
+// A package of a service the servers do not know yet (they apply the definitions when they get the specs package): the
+// identity is not issued, or the login is denied. Neither is a failure of the node.
+func TestSync_aServiceTheServersHaveNotRegisteredYetIsPending(t *testing.T) {
+	t.Parallel()
+
+	t.Run("no SPIRE identity", func(t *testing.T) {
+		t.Parallel()
+
+		machine := newMachine(t)
+		machine.installFiles(t)
+		machine.failFetch = 1000
+
+		var out bytes.Buffer
+
+		err := Sync(machine.env, loadDefs(t), SyncOptions{Wait: 5 * time.Second, Out: &out})
+		require.ErrorIs(t, err, ErrPending)
+		require.ErrorIs(t, err, errFetch, "and what the node saw is kept")
+		assert.Contains(t, out.String(), "carbonio-files: waiting for the servers to register it")
+		assert.NoFileExists(t, machine.tokenFile("files"))
+	})
+
+	t.Run("login denied until the deadline", func(t *testing.T) {
+		t.Parallel()
+
+		machine := newMachine(t)
+		machine.installFiles(t)
+
+		attempts := 0
+		machine.env.Login = func(string) (string, error) {
+			attempts++
+
+			return "", denied()
+		}
+
+		err := Sync(machine.env, loadDefs(t), SyncOptions{Wait: 5 * time.Second})
+		require.ErrorIs(t, err, ErrPending)
+		assert.Greater(t, attempts, 1, "the login is tried again while the binding rule reaches the servers")
+		assert.Empty(t, machine.restarts())
+	})
+
+	t.Run("login denied, then accepted", func(t *testing.T) {
+		t.Parallel()
+
+		machine := newMachine(t)
+		machine.installFiles(t)
+
+		denials := 2
+		login := machine.env.Login
+		machine.env.Login = func(jwt string) (string, error) {
+			if denials > 0 {
+				denials--
+
+				return "", denied()
+			}
+
+			return login(jwt)
+		}
+
+		require.NoError(t, Sync(machine.env, loadDefs(t), SyncOptions{Wait: time.Minute}))
+		assert.FileExists(t, machine.tokenFile("files"))
+	})
+
+	t.Run("a login failing otherwise is a failure", func(t *testing.T) {
+		t.Parallel()
+
+		machine := newMachine(t)
+		machine.installFiles(t)
+		machine.env.Login = func(string) (string, error) { return "", errUnit }
+
+		err := Sync(machine.env, loadDefs(t), SyncOptions{Wait: 5 * time.Second})
+		require.ErrorIs(t, err, errUnit)
+		assert.NotErrorIs(t, err, ErrPending)
+	})
+
+	t.Run("a service that had a token is not pending", func(t *testing.T) {
+		t.Parallel()
+
+		machine := newMachine(t)
+		machine.installFiles(t)
+		require.NoError(t, Sync(machine.env, loadDefs(t), SyncOptions{Wait: time.Minute}))
+
+		machine.tokens = map[string]bool{} // the token expired
+		machine.env.Login = func(string) (string, error) { return "", denied() }
+
+		err := Sync(machine.env, loadDefs(t), SyncOptions{Wait: 5 * time.Second})
+		require.Error(t, err)
+		assert.NotErrorIs(t, err, ErrPending, "it was registered: it is broken")
+	})
+
+	t.Run("a failure besides the pending one is a failure", func(t *testing.T) {
+		t.Parallel()
+
+		waiting := &waitingError{errFetch}
+
+		assert.NotErrorIs(t, joinFailures([]error{waiting, errUnit}), ErrPending)
+		require.ErrorIs(t, joinFailures([]error{waiting, waiting}), ErrPending)
+		require.NoError(t, joinFailures(nil))
+	})
+}

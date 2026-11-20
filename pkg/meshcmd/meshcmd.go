@@ -25,6 +25,11 @@ const (
 	// itself, because this node or this script is not handled by the central registration.
 	ExitRunScript = 10
 
+	// ExitPending is the exit status of "service sync" and "service pending-setup" when what they wait for is on the
+	// servers: they have not applied the definition of a service installed on this node yet (EX_TEMPFAIL). The unit
+	// running the sync starts it again, the pending setup stays to be done.
+	ExitPending = 75
+
 	defaultWait = 30 * time.Second
 	rootUID     = 0
 )
@@ -40,7 +45,9 @@ type Service struct {
 // New returns the Service commands writing on writer.
 func New(writer io.Writer) Service {
 	return Service{
-		Sync: Sync{writer: writer, getuid: os.Getuid, spireMode: mesh.SPIREMode, servicesDir: mesh.ServicesDir},
+		Sync: Sync{
+			writer: writer, getuid: os.Getuid, exit: os.Exit, spireMode: mesh.SPIREMode, servicesDir: mesh.ServicesDir,
+		},
 		PendingSetup: PendingSetup{
 			writer: writer, getuid: os.Getuid, exit: os.Exit, run: runCommand, spireMode: mesh.SPIREMode,
 		},
@@ -59,14 +66,31 @@ type Sync struct {
 
 	writer    io.Writer   `kong:"-"`
 	getuid    func() int  `kong:"-"`
+	exit      func(int)   `kong:"-"`
 	spireMode func() bool `kong:"-"`
 
 	servicesDir string                                    `kong:"-"`
 	sync        func(services []string, setup bool) error `kong:"-"`
 }
 
-// Run implements the command.
-func (s *Sync) Run(_ *command.GlobalCommonFlags) error {
+// Run implements the command. A service the servers have not registered yet (the specs package reached this node
+// before the servers) is not an error: it ends with ExitPending, to be run again later, as the servers apply the
+// definitions as soon as they get the package.
+func (s *Sync) Run(flags *command.GlobalCommonFlags) error {
+	err := s.run(flags)
+	if errors.Is(err, mesh.ErrPending) {
+		_, _ = fmt.Fprintf(s.writer,
+			"Waiting for the servers to register the services of this node, run again later: %v\n", err)
+
+		s.exit(ExitPending)
+
+		return nil
+	}
+
+	return err
+}
+
+func (s *Sync) run(_ *command.GlobalCommonFlags) error {
 	if !s.spireMode() {
 		_, err := fmt.Fprintln(s.writer, "This node does not use SPIRE: the services keep the token of the agent.")
 
@@ -156,7 +180,9 @@ func (s *Sync) syncServices(services []string, setup bool) error {
 //
 // For the services whose script does nothing else the command is the whole setup. For the ones running other
 // commands too, that only need the token of the service, those commands are run after the synchronization. In every
-// other case the exit status is ExitRunScript and the caller runs the script.
+// other case the exit status is ExitRunScript and the caller runs the script. A service the servers have not registered
+// yet (they did not get the specs package yet) ends with ExitPending: the setup is not an error, it has to be done
+// again later.
 type PendingSetup struct {
 	Script      string        `arg:"" help:"Name of the pending setup script, e.g. 511-carbonio-files.sh"`
 	Wait        time.Duration `default:"30s" help:"How long to wait for SPIRE to issue the identity of the service"`
@@ -202,6 +228,18 @@ func (p *PendingSetup) Run(_ *command.GlobalCommonFlags) error {
 
 	// The script restarted the units, so the setup does too, and it sets up the services its package has besides.
 	err = p.sync(append([]string{def.Name}, def.Companions...), true)
+	if errors.Is(err, mesh.ErrPending) {
+		// The servers got the specs package after this node: the setup has to be done again once they applied it, and
+		// the caller keeps the script pending for that. The commands after the synchronization need the token, so they
+		// wait too.
+		_, _ = fmt.Fprintf(p.writer, "%s: the servers have not registered %s yet, the setup stays pending: run it again "+
+			"later (exit status %d): %v\n", p.Script, def.Name, ExitPending, err)
+
+		p.exit(ExitPending)
+
+		return nil
+	}
+
 	if err != nil {
 		return err
 	}
@@ -227,7 +265,7 @@ func (p *PendingSetup) Run(_ *command.GlobalCommonFlags) error {
 }
 
 func runCommand(name string, args ...string) error {
-	cmd := exec.Command(name, args...) //nolint:noctx // command of a package, named by the embedded definitions
+	cmd := exec.Command(name, args...) //nolint:noctx // command named by the definitions of the specs package
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 

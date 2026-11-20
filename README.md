@@ -5,6 +5,7 @@ Service Discover is a service discovery and configuration management solution ba
 ## Table of Contents
 
 - [Project Structure](#project-structure)
+- [Service definitions](#service-definitions)
 - [Prerequisites](#prerequisites)
 - [Building](#building)
 - [Testing](#testing)
@@ -21,6 +22,33 @@ test/               # Test utilities and mocks
 build_packages.sh   # Build helper script (Not for production uses)
 Jenkinsfile         # CI/CD pipeline
 ```
+
+## Service definitions
+
+What the mesh needs to know about each Carbonio service (its Consul policy, role and intentions, its SPIRE identity,
+the user it runs as, the units to restart, the commands of its setup) is **not** in this repository: it is in the
+[`service-discover-specs`](https://github.com/zextras/service-discover-specs) repository, shipped as the
+`service-discover-specs` package, which `service-discover-server` and `service-discover-agent` depend on. A new
+service is added there, and needs no release of service-discover.
+
+- The definitions are read from `/usr/share/service-discover/specs` (`SERVICE_DISCOVER_SPECS_DIR` points the commands
+  to another directory, for tests and development). They are never read from Consul or from a directory a node can
+  write: the installed package has to be owned by root, not writable by others, and match the sha256 of its
+  `manifest.json`, otherwise the commands refuse it.
+- On the servers, the `service-discover-mesh-apply.path` unit watches `manifest.json`: when the package changes, the
+  unit runs `service-discover mesh apply --unattended`. Only the Raft leader applies the definitions to Consul; a
+  server running the SPIRE server registers the SPIRE entries of all the nodes. The bootstrap token comes from the
+  password the setup stored in `/var/lib/service-discover/password`; a leader without it logs that it did nothing.
+- On the nodes, `service-discover-sync.path` runs `service sync` when `manifest.json` changes. A service whose
+  definition the servers have not applied yet (the package reached the node first) makes it end with the status 75,
+  and the unit runs it again after a minute. `service pending-setup` (the setup at the installation of a package) ends
+  with the same status 75 and a message, keeping the setup pending: it is not an error.
+- `service-discover mesh validate <dir>` checks a directory of definitions without Consul: the checks of the loader
+  and the rules across the files of a definition. The CI of `service-discover-specs` runs it.
+- `mesh apply --unattended` refuses `--revoke-legacy` on purpose: the revocation deletes the legacy token of each
+  service, the way back if a node did not really switch to its SPIRE login, and a package upgrade must not do it
+  without an operator having looked at the result of `service sync`. Run `mesh apply --revoke-legacy` by hand.
+- The tests use the subset of the definitions in `pkg/mesh/testdata/specs`.
 
 ## Prerequisites
 

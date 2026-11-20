@@ -5,13 +5,13 @@
 // Package mesh owns the service mesh definitions of the Carbonio services and registers them centrally.
 //
 // The definitions (ACL policy, service protocol and intentions of every service) used to be applied by the pending
-// setup script of each package, with the cluster bootstrap token. They are embedded here instead: the cluster applies
-// them once, with the bootstrap token, on the servers ("mesh apply"), and every node obtains the credentials of its
-// services from SPIRE ("service sync"). The packages are not involved anymore.
+// setup script of each package, with the cluster bootstrap token. They are data now, shipped by the
+// service-discover-specs package: the cluster applies them once, with the bootstrap token, on the servers ("mesh
+// apply"), and every node obtains the credentials of its services from SPIRE ("service sync"). The packages of the
+// services are not involved anymore, and a new service needs a release of the specs, not of service-discover.
 package mesh
 
 import (
-	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,13 +23,9 @@ import (
 	"github.com/hashicorp/consul/api/v2"
 )
 
-//go:embed definitions
-var embedded embed.FS
-
 const (
-	definitionsDir = "definitions"
-	indexFile      = "index.json"
-	policiesFile   = "policies.json"
+	indexFile    = "index.json"
+	policiesFile = "policies.json"
 
 	// PendingSetupReplace marks the services whose pending setup script is entirely replaced by the central
 	// registration: it has nothing to do besides the mesh and the token. PendingSetupKeep marks the ones whose script
@@ -48,7 +44,7 @@ var (
 )
 
 // SourceFile is a file of a definition together with the package repository it has been copied from, so that the
-// embedded copy can be refreshed mechanically (hack/sync-mesh-definitions.sh).
+// definitions can be refreshed mechanically (hack/sync.sh of service-discover-specs).
 type SourceFile struct {
 	Name string `json:"name"`
 	Path string `json:"path"`
@@ -115,7 +111,7 @@ type Definition struct {
 	// ConsumerOnly marks services holding a token to read the catalog but registering nothing.
 	ConsumerOnly bool `json:"consumer_only"`
 	// Repo is the package repository the files have been copied from, AltRepos are other repositories shipping the
-	// same service (e.g. the community edition) that have been compared and not embedded.
+	// same service (e.g. the community edition) that have been compared and not copied.
 	Repo     string       `json:"repo"`
 	AltRepos []string     `json:"alt_repos"`
 	Files    []SourceFile `json:"files"`
@@ -126,16 +122,6 @@ type Definition struct {
 // index is the content of index.json.
 type index struct {
 	Services []Definition `json:"services"`
-}
-
-// Load returns the embedded definitions, sorted by name.
-func Load() ([]Definition, error) {
-	sub, err := fs.Sub(embedded, definitionsDir)
-	if err != nil {
-		return nil, err
-	}
-
-	return LoadFS(sub)
 }
 
 // LoadFS reads definitions from a directory holding index.json and one directory per definition.
@@ -235,7 +221,7 @@ func (d *Definition) ExtraPolicy() (string, error) {
 	}
 
 	if len(d.HCL) > 0 && !readsAllServices(rules) {
-		rules["service_prefix"] = append(rules["service_prefix"], map[string]Rule{"": {Policy: "read"}})
+		rules["service_prefix"] = append(rules["service_prefix"], map[string]Rule{"": {Policy: policyRead}})
 	}
 
 	for _, key := range d.Migrations.Keys() {
@@ -251,6 +237,9 @@ func (d *Definition) ExtraPolicy() (string, error) {
 	return string(raw), err
 }
 
+// policyRead is the ACL access that reads without changing.
+const policyRead = "read"
+
 // Rules are ACL rules in the JSON format of the policies: for each resource kind, a list of maps from the resource to
 // the rule.
 type Rules map[string][]map[string]Rule
@@ -263,7 +252,7 @@ type Rule struct {
 // readsAllServices tells whether the rules already give at least the read access to every service.
 func readsAllServices(rules Rules) bool {
 	for _, list := range rules["service_prefix"] {
-		if rule, found := list[""]; found && (rule.Policy == "read" || rule.Policy == "write") {
+		if rule, found := list[""]; found && (rule.Policy == policyRead || rule.Policy == "write") {
 			return true
 		}
 	}

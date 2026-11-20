@@ -1,5 +1,0 @@
-{
-  "kind": "service-defaults",
-  "name": "carbonio-tasks-db",
-  "protocol": "tcp"
-}

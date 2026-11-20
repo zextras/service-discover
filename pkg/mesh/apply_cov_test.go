@@ -250,7 +250,7 @@ func TestApply_brokenDefinitions(t *testing.T) {
 	}
 }
 
-func TestApplyEmbedded(t *testing.T) {
+func TestApplySpecs(t *testing.T) {
 	replies := map[string]meshReply{
 		meshTokenSelf:               {meshOK, `{}`},
 		"PUT /v1/acl/policy":        {meshOK, `{"ID":"p"}`},
@@ -264,7 +264,7 @@ func TestApplyEmbedded(t *testing.T) {
 		stub := newMeshConsul(t, replies)
 		out := &bytes.Buffer{}
 
-		require.NoError(t, ApplyEmbedded("boot", "carbonio.lab", []string{"carbonio-files"}, out))
+		require.NoError(t, ApplySpecs("boot", "carbonio.lab", []string{"carbonio-files"}, out))
 
 		assert.Contains(t, out.String(), "carbonio-files: policy carbonio-files-policy created")
 		assert.Contains(t, out.String(), "carbonio-files: role carbonio-files-role created")
@@ -288,13 +288,13 @@ func TestApplyEmbedded(t *testing.T) {
 	t.Run("unknown service", func(t *testing.T) {
 		newMeshConsul(t, replies)
 
-		require.ErrorIs(t, ApplyEmbedded("boot", "carbonio.lab", []string{"nonexistent"}, nil), errUnknownService)
+		require.ErrorIs(t, ApplySpecs("boot", "carbonio.lab", []string{"nonexistent"}, nil), errUnknownService)
 	})
 
 	t.Run("invalid token", func(t *testing.T) {
 		newMeshConsul(t, map[string]meshReply{meshTokenSelf: {403, "ACL not found"}})
 
-		require.ErrorContains(t, ApplyEmbedded("boot", "carbonio.lab", nil, nil), "the Consul token is not valid")
+		require.ErrorContains(t, ApplySpecs("boot", "carbonio.lab", nil, nil), "the Consul token is not valid")
 	})
 }
 

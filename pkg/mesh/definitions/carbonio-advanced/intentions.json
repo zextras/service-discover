@@ -1,8 +1,0 @@
-{
-  "Kind": "service-intentions",
-  "Name": "carbonio-advanced",
-  "Sources": [{
-    "Name": "carbonio-proxy",
-    "Action": "allow"
-  }]
-}

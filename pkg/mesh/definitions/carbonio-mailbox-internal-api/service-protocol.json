@@ -1,5 +1,0 @@
-{
-  "kind": "service-defaults",
-  "name": "carbonio-mailbox-internal-api",
-  "protocol": "http"
-}

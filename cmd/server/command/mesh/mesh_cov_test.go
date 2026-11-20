@@ -166,7 +166,7 @@ func TestNew_wiresTheCommandToTheMachine(t *testing.T) {
 
 	defs, err := apply.definitions()
 	require.NoError(t, err)
-	assert.NotEmpty(t, defs, "the definitions are the embedded ones")
+	assert.NotEmpty(t, defs, "the definitions are the ones of the specs directory")
 }
 
 func TestApply_failures(t *testing.T) {

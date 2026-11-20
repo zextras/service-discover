@@ -9,7 +9,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/zextras/service-discover/pkg/encrypter"
@@ -20,6 +22,10 @@ import (
 const (
 	SetupConsulToken = "SETUP_CONSUL_TOKEN" // #nosec
 )
+
+// ErrNoStoredPassword is returned by StoredToken when the password of the cluster credentials is not stored on this
+// node.
+var ErrNoStoredPassword = errors.New("the password of the cluster credentials is not stored on this node")
 
 type BootstrapToken struct {
 	Command `kong:"-"`
@@ -136,6 +142,34 @@ func (v *BootstrapToken) Token() (string, error) {
 	token, present := os.LookupEnv(SetupConsulToken)
 	if present && token != "" {
 		return token, nil
+	}
+
+	return v.ReadToken()
+}
+
+// StoredToken returns the bootstrap token without asking anything, for the commands run by systemd units:
+// $SETUP_CONSUL_TOKEN when it is defined, otherwise the token decrypted from the cluster credentials with the password
+// the setup of the server stored in passwordFile (readable by root only). It returns ErrNoStoredPassword when the file
+// does not exist: a server imported without it, or set up by an older version, has no way to get the token but being
+// asked.
+func (v *BootstrapToken) StoredToken(passwordFile string) (string, error) {
+	token, present := os.LookupEnv(SetupConsulToken)
+	if present && token != "" {
+		return token, nil
+	}
+
+	password, err := os.ReadFile(passwordFile)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return "", ErrNoStoredPassword
+		}
+
+		return "", errors.Wrapf(err, "unable to read %s", passwordFile)
+	}
+
+	v.Password = strings.TrimRight(string(password), "\r\n")
+	if v.Password == "" {
+		return "", ErrNoStoredPassword
 	}
 
 	return v.ReadToken()
