@@ -69,8 +69,11 @@ type joinConfig struct {
 }
 
 func (s *Setup) runJoin(commonFlags *command.GlobalCommonFlags) error {
-	deps := realDependencies{}
+	return s.runJoinWith(commonFlags, &realDependencies{}, os.Stdout)
+}
 
+// runJoinWith checks the flags and the system, joins the cluster and renders the result on writer.
+func (s *Setup) runJoinWith(commonFlags *command.GlobalCommonFlags, deps businessDependencies, writer io.Writer) error {
 	if s.Wizard || s.Password != "" {
 		return errors.New("--join cannot be combined with --wizard nor --password")
 	}
@@ -79,12 +82,12 @@ func (s *Setup) runJoin(commonFlags *command.GlobalCommonFlags) error {
 		return errors.New("missing arguments: the binding address is required")
 	}
 
-	err := preRun(s.ClusterCredential, &deps)
+	err := preRun(s.ClusterCredential, deps)
 	if err != nil {
 		return err
 	}
 
-	out, err := s.join(&deps)
+	out, err := s.join(deps)
 	if err != nil {
 		return err
 	}
@@ -94,7 +97,7 @@ func (s *Setup) runJoin(commonFlags *command.GlobalCommonFlags) error {
 		return err
 	}
 
-	_, err = fmt.Fprint(os.Stdout, render)
+	_, err = fmt.Fprint(writer, render)
 
 	return err
 }

@@ -5,6 +5,7 @@
 package setup
 
 import (
+	"bytes"
 	"encoding/json"
 	"net"
 	"os"
@@ -21,6 +22,7 @@ import (
 	"github.com/zextras/service-discover/pkg/command"
 	"github.com/zextras/service-discover/pkg/command/setup/mocks"
 	mocksexec "github.com/zextras/service-discover/pkg/exec/mocks"
+	"github.com/zextras/service-discover/pkg/formatter"
 	"github.com/zextras/service-discover/pkg/spire"
 	mockssystemd "github.com/zextras/service-discover/pkg/systemd/mocks"
 )
@@ -274,4 +276,166 @@ func TestSetup_runJoinRejectsConflictingFlags(t *testing.T) {
 
 	err = (&Setup{Join: "-"}).runJoin(flags)
 	require.ErrorContains(t, err, "binding address is required")
+}
+
+func (f *joinFixture) failUnit(operation, unit string) {
+	f.unit.ExpectedCalls = nil
+
+	if operation == "start" {
+		f.unit.On("StartUnit", unit, "replace", mock.Anything).Return(0, errors.New("dbus down"))
+	}
+
+	f.unit.On("StartUnit", mock.Anything, "replace", mock.Anything).Run(func(args mock.Arguments) {
+		args.Get(2).(chan<- string) <- "done"
+	}).Return(0, nil)
+
+	if operation == "enable" {
+		f.unit.On("EnableUnitFiles", []string{unit}, false, false).Return(false, nil, errors.New("dbus down"))
+	}
+
+	f.unit.On("EnableUnitFiles", mock.Anything, false, false).Return(false, nil, nil)
+	f.unit.On("Close").Return()
+}
+
+func TestSetup_joinFailures(t *testing.T) {
+	tests := []struct {
+		name    string
+		prepare func(t *testing.T, f *joinFixture)
+		bundle  func(t *testing.T) string
+		wantErr string
+	}{
+		{name: "invalid SPIRE server address", bundle: func(t *testing.T) string {
+			t.Helper()
+
+			encoded, err := (&spire.JoinBundle{
+				Version: spire.BundleVersion, TrustDomain: spire.TrustDomain, SpireServer: "no-port",
+				SpireBundle: "b", JoinToken: testJoinToken, ConsulCA: testCA,
+				ConsulServers: []string{"10.0.0.1:8300"}, NodeName: testNode,
+			}).Encode()
+			require.NoError(t, err)
+
+			return encoded
+		}, wantErr: "invalid SPIRE server address"},
+		{name: "Consul CA cannot be written", prepare: func(_ *testing.T, f *joinFixture) {
+			f.setup.ConsulHome = filepath.Join(f.setup.ConsulHome, "missing")
+		}, wantErr: "unable to write"},
+		{name: "bind address cannot be saved", prepare: func(_ *testing.T, f *joinFixture) {
+			f.setup.MutableConfigFile = filepath.Join(f.setup.ConsulHome, "missing", "config.json")
+		}, wantErr: "missing"},
+		{name: "SPIRE configuration cannot be written", prepare: func(t *testing.T, f *joinFixture) {
+			t.Helper()
+			require.NoError(t, os.WriteFile(f.setup.SpireConfigDir, nil, 0o600))
+		}, wantErr: "unable to create"},
+		{name: "SPIRE agent does not start", prepare: func(_ *testing.T, f *joinFixture) {
+			f.failUnit("start", spire.AgentUnit)
+		}, wantErr: "unable to start " + spire.AgentUnit},
+		{name: "SPIRE agent cannot be enabled", prepare: func(_ *testing.T, f *joinFixture) {
+			f.failUnit("enable", spire.AgentUnit)
+		}, wantErr: "unable to enable " + spire.AgentUnit},
+		{name: "intro token cannot be written", prepare: func(t *testing.T, f *joinFixture) {
+			t.Helper()
+			require.NoError(t, os.Mkdir(filepath.Join(f.setup.ConsulHome, introTokenFile), 0o700))
+		}, wantErr: "unable to write"},
+		{name: "Consul configuration cannot be written", prepare: func(_ *testing.T, f *joinFixture) {
+			f.setup.ConsulFileConfig = filepath.Join(f.setup.ConsulHome, "missing", "main.json")
+		}, wantErr: "unable to save generated configuration file"},
+		{name: "service does not start", prepare: func(_ *testing.T, f *joinFixture) {
+			f.failUnit("start", serviceDiscoverUnit)
+		}, wantErr: "unable to start " + serviceDiscoverUnit},
+		{name: "service cannot be enabled", prepare: func(_ *testing.T, f *joinFixture) {
+			f.failUnit("enable", serviceDiscoverUnit)
+		}, wantErr: "unable to enable " + serviceDiscoverUnit},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fixture := newJoinFixture(t, nil)
+			fixture.setup.Join = "-"
+
+			bundle := testBundle
+			if tt.bundle != nil {
+				bundle = tt.bundle
+			}
+
+			fixture.setup.Stdin = strings.NewReader(bundle(t))
+
+			if tt.prepare != nil {
+				tt.prepare(t, fixture)
+			}
+
+			_, err := fixture.setup.join(fixture.deps)
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
+}
+
+func TestSetup_runJoinWith(t *testing.T) {
+	prepare := func(t *testing.T, uid int, consulErr error) (*joinFixture, *bytes.Buffer) {
+		t.Helper()
+
+		fixture := newJoinFixture(t, nil)
+		fixture.setup.Join = "-"
+		fixture.setup.Stdin = strings.NewReader(testBundle(t))
+
+		version := new(mocksexec.Cmd)
+		version.On("Run").Return(consulErr)
+
+		fixture.deps.On("CreateCommand", command.ConsulBin, "version").Return(version).
+			On("GetuidSyscall").Return(uid)
+
+		return fixture, &bytes.Buffer{}
+	}
+
+	t.Run("joins the cluster and prints the result", func(t *testing.T) {
+		fixture, out := prepare(t, 0, nil)
+
+		require.NoError(t, fixture.setup.runJoinWith(&command.GlobalCommonFlags{Format: formatter.JSONFormatOutput}, fixture.deps, out))
+
+		assert.FileExists(t, fixture.setup.ConsulFileConfig)
+	})
+
+	t.Run("requires the consul binary", func(t *testing.T) {
+		fixture, out := prepare(t, 0, errors.New("not found"))
+
+		err := fixture.setup.runJoinWith(&command.GlobalCommonFlags{}, fixture.deps, out)
+
+		assert.ErrorContains(t, err, "unable to execute consul binary")
+	})
+
+	t.Run("requires root", func(t *testing.T) {
+		fixture, out := prepare(t, 1000, nil)
+
+		err := fixture.setup.runJoinWith(&command.GlobalCommonFlags{}, fixture.deps, out)
+
+		assert.ErrorContains(t, err, "must be executed as root")
+	})
+
+	t.Run("reports the join failures", func(t *testing.T) {
+		fixture, out := prepare(t, 0, nil)
+		fixture.setup.Stdin = strings.NewReader("not-a-bundle!")
+
+		err := fixture.setup.runJoinWith(&command.GlobalCommonFlags{}, fixture.deps, out)
+
+		assert.ErrorContains(t, err, "invalid join bundle")
+		assert.Empty(t, out.String())
+	})
+}
+
+func TestSetup_runDelegatesToJoin(t *testing.T) {
+	t.Parallel()
+
+	err := (&Setup{Join: "-", Password: "secret"}).Run(&command.GlobalCommonFlags{})
+
+	require.ErrorContains(t, err, "cannot be combined")
+}
+
+func TestNew_wiresTheJoinInputs(t *testing.T) {
+	t.Parallel()
+
+	setup := New()
+
+	assert.Equal(t, spire.ConfigDir, setup.SpireConfigDir)
+	assert.Equal(t, os.Stdin, setup.Stdin)
 }
