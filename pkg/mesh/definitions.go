@@ -221,11 +221,21 @@ func (d *Definition) ExtraPolicyName() string {
 // They are the rules written in the definition, and the write access to the keys the migrations of the service move:
 // a migration deletes the old key, which the read access of the package policy does not allow, and writes the new
 // one.
+//
+// Every service registering something also reads the catalog: the token of the service is the one its registration
+// carries, and Consul resolves the upstreams of its sidecar with it. Without the read access to the upstream services
+// the sidecar gets no upstream listener at all, and the service cannot reach its databases and the other services.
+// The package policies were written when the registration had no token and the agent resolved the upstreams. Who may
+// connect to whom is up to the intentions, the write access stays limited to the service itself.
 func (d *Definition) ExtraPolicy() (string, error) {
 	rules := Rules{}
 
 	for kind, list := range d.ExtraRules {
 		rules[kind] = slices.Clone(list)
+	}
+
+	if len(d.HCL) > 0 && !readsAllServices(rules) {
+		rules["service_prefix"] = append(rules["service_prefix"], map[string]Rule{"": {Policy: "read"}})
 	}
 
 	for _, key := range d.Migrations.Keys() {
@@ -248,6 +258,17 @@ type Rules map[string][]map[string]Rule
 // Rule is the access to a resource.
 type Rule struct {
 	Policy string `json:"policy"`
+}
+
+// readsAllServices tells whether the rules already give at least the read access to every service.
+func readsAllServices(rules Rules) bool {
+	for _, list := range rules["service_prefix"] {
+		if rule, found := list[""]; found && (rule.Policy == "read" || rule.Policy == "write") {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Policy returns the rules of the ACL policy of the service.

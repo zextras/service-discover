@@ -151,3 +151,47 @@ func TestLoadFS_rejectsInvalidDefinitions(t *testing.T) {
 	_, err = LoadFS(fstest.MapFS{})
 	require.Error(t, err)
 }
+
+func TestDefinition_extraPolicyLetsTheSidecarsResolveTheirUpstreams(t *testing.T) {
+	t.Parallel()
+
+	defs, err := Load()
+	require.NoError(t, err)
+
+	for i := range defs {
+		def := &defs[i]
+
+		rules, err := def.ExtraPolicy()
+		require.NoError(t, err, def.Name)
+
+		if len(def.HCL) == 0 {
+			assert.NotContains(t, rules, "service_prefix", "%s registers nothing", def.Name)
+
+			continue
+		}
+
+		var parsed Rules
+
+		require.NoError(t, json.Unmarshal([]byte(rules), &parsed), def.Name)
+		assert.True(t, readsAllServices(parsed), "%s: the sidecar has no upstream without the read access", def.Name)
+
+		for _, entry := range parsed["service_prefix"] {
+			for prefix, rule := range entry {
+				assert.Equal(t, "read", rule.Policy, "%s: the access to the services %q is read only", def.Name, prefix)
+			}
+		}
+	}
+}
+
+func TestReadsAllServices(t *testing.T) {
+	t.Parallel()
+
+	read := map[string]Rule{"": {Policy: "read"}}
+
+	assert.True(t, readsAllServices(Rules{"service_prefix": {read}}))
+	assert.True(t, readsAllServices(Rules{"service_prefix": {{"": {Policy: "write"}}}}))
+	assert.False(t, readsAllServices(Rules{"service_prefix": {{"carbonio-": {Policy: "read"}}}}))
+	assert.False(t, readsAllServices(Rules{"service_prefix": {{"": {Policy: "deny"}}}}))
+	assert.False(t, readsAllServices(Rules{"service": {read}}))
+	assert.False(t, readsAllServices(Rules{}))
+}

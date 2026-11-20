@@ -147,5 +147,5 @@ func TestDefinition_extraPolicyListsTheMovedKeys(t *testing.T) {
 
 	rules, err = proxy.ExtraPolicy()
 	require.NoError(t, err)
-	assert.Empty(t, rules, "no additional rules, no additional policy")
+	assert.JSONEq(t, `{"service_prefix": [{"": {"policy": "read"}}]}`, rules, "only the read access to the upstreams")
 }
