@@ -54,6 +54,7 @@ type Sync struct {
 	NoRestart   bool          `name:"no-restart" help:"Only update the files: do not reload Consul nor restart any unit"`
 	NoBlock     bool          `name:"no-block" help:"Do not wait for the restarted units to start"`
 	Wait        time.Duration `default:"30s" help:"How long to wait for SPIRE to issue the identity of a service"`
+	Settle      time.Duration `help:"Wait this long before synchronizing and repeat while the service definitions keep changing, for the runs started by a package unpacking its files"` //nolint:lll
 	TrustDomain string        `name:"trust-domain" default:"carbonio" hidden:"" help:"SPIFFE trust domain"`
 
 	writer    io.Writer   `kong:"-"`
@@ -73,7 +74,47 @@ func (s *Sync) Run(_ *command.GlobalCommonFlags) error {
 		return errNotRoot
 	}
 
-	return s.syncServices(s.Service, false)
+	if s.Settle <= 0 {
+		return s.syncServices(s.Service, false)
+	}
+
+	// The path unit starts the run at the first file a package unpacks, and the events of the files unpacked while
+	// it runs are lost: wait for the unpacking, and run again if the definitions changed during the run.
+	for {
+		time.Sleep(s.Settle)
+
+		before := servicesFingerprint(mesh.ServicesDir)
+
+		err := s.syncServices(s.Service, false)
+		if err != nil {
+			return err
+		}
+
+		if servicesFingerprint(mesh.ServicesDir) == before {
+			return nil
+		}
+	}
+}
+
+// servicesFingerprint summarizes the names, sizes and modification times of the files in dir.
+func servicesFingerprint(dir string) string {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return ""
+	}
+
+	var builder strings.Builder
+
+	for _, entry := range entries {
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+
+		fmt.Fprintf(&builder, "%s %d %d\n", entry.Name(), info.Size(), info.ModTime().UnixNano())
+	}
+
+	return builder.String()
 }
 
 // syncServices synchronizes the services. With setup it also does what their package setup did when installed, and

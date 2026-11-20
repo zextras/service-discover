@@ -6,11 +6,12 @@
 Description=Zextras Service Discover registration of the installed services
 Documentation=https://docs.zextras.com/
 After=service-discover.service
-# Not started again for every file a package unpacks: the path unit triggers it as many times as needed.
+# Not started again for every file a package unpacks: the path unit triggers it as many times as needed. The run
+# starts at the first file and --settle waits for the others: the events of the files unpacked during a run are lost.
 StartLimitIntervalSec=0
 
 [Service]
 Type=oneshot
 # On a node using SPIRE: obtain the credentials of the services installed since the last run and register them. It does
 # nothing elsewhere, and nothing when nothing changed.
-ExecStart=/usr/bin/service-discover service sync --no-block --wait 10s
+ExecStart=/usr/bin/service-discover service sync --no-block --wait 10s --settle 2s

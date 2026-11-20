@@ -7,6 +7,8 @@ package meshcmd
 import (
 	"bytes"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -146,4 +148,21 @@ func TestPendingSetup_everyCarbonioPrometheusScriptIsCovered(t *testing.T) {
 		assert.Empty(t, rec.exits, script)
 		assert.Len(t, rec.synced, 1, script)
 	}
+}
+
+func TestServicesFingerprintChangesWithTheFiles(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	empty := servicesFingerprint(dir)
+
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "a.hcl"), []byte("x"), 0o600))
+
+	one := servicesFingerprint(dir)
+	assert.NotEqual(t, empty, one)
+	assert.Equal(t, one, servicesFingerprint(dir))
+
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "a.hcl"), []byte("xy"), 0o600))
+	assert.NotEqual(t, one, servicesFingerprint(dir))
+	assert.Empty(t, servicesFingerprint(filepath.Join(dir, "missing")))
 }
