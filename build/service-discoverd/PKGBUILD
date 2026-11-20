@@ -31,7 +31,7 @@ build() {
   cd "${repodir}"
   CGO_ENABLED=0 go build \
     -o "${srcdir}/service-discoverd" \
-    cmd/service-discoverd/service-discoverd.go
+    ./cmd/service-discoverd
 }
 
 package() {
