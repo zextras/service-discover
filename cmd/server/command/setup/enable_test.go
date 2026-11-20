@@ -5,6 +5,7 @@
 package setup
 
 import (
+	"io"
 	"os"
 	osexec "os/exec"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/zextras/service-discover/cmd/server/config"
+	"github.com/zextras/service-discover/pkg/carbonio"
 	mocks2 "github.com/zextras/service-discover/pkg/carbonio/mocks"
 	"github.com/zextras/service-discover/pkg/command"
 	"github.com/zextras/service-discover/pkg/command/setup/mocks"
@@ -37,6 +39,8 @@ type enableFixture struct {
 	caPEM      string
 	created    *[]string
 	restarts   *int
+	ldapCopy   *[]byte
+	uploads    *int
 }
 
 // newEnableFixture builds a server set up before SPIRE existed. methodJSON is what Consul answers when the auth
@@ -77,8 +81,27 @@ func newEnableFixture(t *testing.T, leader, methodJSON string) *enableFixture {
 	unit.On("EnableUnitFiles", mock.Anything, false, false).Return(false, nil, nil)
 	unit.On("Close").Return()
 
+	credential := filepath.Join(t.TempDir(), "cluster-credential")
+	require.NoError(t, writeCredentialEntries(credential, "pw", []credentialEntry{
+		{name: command.GossipKey, mode: 0600, modTime: time.Now(), content: []byte("k")},
+		{name: "ca", mode: 0600, modTime: time.Now(), content: []byte("ca")},
+	}))
+
+	initial := mustRead(t, credential)
+	ldapCopy, uploads := &initial, new(int)
+
 	ldap := new(mocks2.LdapHandler)
-	ldap.On("CheckServerAvailability", true).Return(nil)
+	ldap.On("CheckServerAvailability", mock.Anything).Return(nil)
+	ldap.On("DownloadBinary", carbonio.LdapConfigBaseDn, carbonio.AttrCarbonioCredentials).
+		Return(func(string, string) []byte { return *ldapCopy }, nil)
+	ldap.On("UploadBinary", mock.Anything, carbonio.LdapConfigBaseDn, carbonio.AttrCarbonioCredentials).
+		Run(func(args mock.Arguments) {
+			content, err := io.ReadAll(args.Get(0).(io.Reader))
+			require.NoError(t, err)
+
+			*ldapCopy = content
+			*uploads++
+		}).Return(nil)
 
 	created, restarts := &[]string{}, new(int)
 	output := func(out string, err error) *mocks22.Cmd {
@@ -125,15 +148,15 @@ func newEnableFixture(t *testing.T, leader, methodJSON string) *enableFixture {
 	return &enableFixture{
 		setup: Setup{
 			ConsulHome: consulHome, ConsulFileConfig: mainJSON, MutableConfigFile: mutable,
-			LocalConfigPath: localConfig.Name(), SpireConfigDir: spireDir,
+			LocalConfigPath: localConfig.Name(), SpireConfigDir: spireDir, ClusterCredential: credential,
 		},
 		deps: deps, unit: unit, consulHome: consulHome, spireDir: spireDir, caPEM: caPEM,
-		created: created, restarts: restarts,
+		created: created, restarts: restarts, ldapCopy: ldapCopy, uploads: uploads,
 	}
 }
 
 func secretsFor() func() (clusterSecrets, error) {
-	return func() (clusterSecrets, error) { return clusterSecrets{token: "root"}, nil }
+	return func() (clusterSecrets, error) { return clusterSecrets{password: "pw", token: "root"}, nil }
 }
 
 func readMain(t *testing.T, f *enableFixture) map[string]any {
@@ -165,7 +188,7 @@ func TestSetup_enableSpire_caKeyFromTheClusterCredentials(t *testing.T) {
 	}
 
 	_, err := f.setup.enableSpire(f.deps, func() (clusterSecrets, error) {
-		return clusterSecrets{token: "root", caKeyPEM: key}, nil
+		return clusterSecrets{password: "pw", token: "root", caKeyPEM: key}, nil
 	})
 	require.NoError(t, err)
 	assert.True(t, signed, "the key was available while setting SPIRE up")
@@ -212,6 +235,15 @@ func TestSetup_enableSpire_firstRunThenIdempotent(t *testing.T) {
 	assert.Contains(t, (*f.created)[0], "create:")
 	assert.Contains(t, (*f.created)[0], spire.LocalJWKSURL)
 
+	// The cluster credentials, in LDAP and on this server, carry the SPIRE settings and keep everything else.
+	assert.Equal(t, 1, *f.uploads)
+	assert.Equal(t, *f.ldapCopy, mustRead(t, f.setup.ClusterCredential))
+
+	published := credentialsFrom(t, f)
+	assert.Equal(t, spire.LocalJWKSURL, published[spire.ClusterJWKSURLFile])
+	assert.Equal(t, "k", published[command.GossipKey])
+	assert.Equal(t, "ca", published["ca"])
+
 	// Second run, with the auth method already there: nothing to do, nothing restarted.
 	methodJSON := `{"Config":{"JWKSURL":"` + spire.LocalJWKSURL + `"}}`
 	g := newEnableFixture(t, "10.0.0.2:8300", methodJSON)
@@ -219,11 +251,13 @@ func TestSetup_enableSpire_firstRunThenIdempotent(t *testing.T) {
 	g.setup.ConsulFileConfig = f.setup.ConsulFileConfig
 	g.setup.SpireConfigDir = f.spireDir
 	g.setup.ConsulHome = f.consulHome
+	*g.ldapCopy = *f.ldapCopy
 
 	_, err = g.setup.enableSpire(g.deps, secretsFor())
 	require.NoError(t, err)
 	assert.Equal(t, 0, *g.restarts)
 	assert.Empty(t, *g.created)
+	assert.Equal(t, 0, *g.uploads, "the cluster credentials are already up to date")
 	g.deps.AssertNotCalled(t, "CreateCommand", spire.ServerBin, "token", "generate", "-spiffeID",
 		"spiffe://carbonio/node/mail.example.com", "-ttl", "600", "-output", "json", "-socketPath", spire.ServerSocket)
 }
@@ -378,4 +412,60 @@ func TestSetup_readClusterSecrets(t *testing.T) {
 
 	_, err = setup.readClusterSecrets("wrong")
 	require.Error(t, err)
+}
+
+func credentialsFrom(t *testing.T, f *enableFixture) map[string]string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "ldap-copy")
+	require.NoError(t, os.WriteFile(path, *f.ldapCopy, 0600))
+
+	entries, err := readCredentialEntries(path, "pw")
+	require.NoError(t, err)
+
+	out := map[string]string{}
+	for _, entry := range entries {
+		out[entry.name] = string(entry.content)
+	}
+
+	return out
+}
+
+// Without high availability the keys are fetched from the first server by every Consul server, whoever is the Raft
+// leader: no server but the one running SPIRE may be pointed to its loopback address.
+func TestSetup_enableSpire_singleSpireServerNeverUsesTheLoopback(t *testing.T) {
+	first := newEnableFixture(t, "10.0.0.2:8300", "")
+
+	_, err := first.setup.enableSpire(first.deps, secretsFor())
+	require.NoError(t, err)
+
+	url := "https://10.0.0.2:8082/keys"
+	assert.Equal(t, url, credentialsFrom(t, first)[spire.ClusterJWKSURLFile], "new servers get it from the credentials")
+
+	// the second server, whose Raft leader is the first one
+	second := newEnableFixture(t, "10.0.0.2:8300", `{"Config":{"JWKSURL":"`+url+`"}}`)
+
+	_, err = second.setup.enableSpire(second.deps, secretsFor())
+	require.NoError(t, err)
+
+	for _, f := range []*enableFixture{first, second} {
+		static := readMain(t, f)["auto_config"].(map[string]any)["authorization"].(map[string]any)["static"].(map[string]any)
+		assert.Equal(t, url, static["jwks_url"])
+	}
+
+	for _, call := range append(first.deps.Calls, second.deps.Calls...) {
+		for _, arg := range call.Arguments {
+			assert.NotContains(t, strings.Join(argStrings(arg), " "), "127.0.0.1:8082")
+		}
+	}
+
+	assert.Empty(t, *second.created, "the auth method is already right")
+}
+
+func argStrings(arg any) []string {
+	if text, ok := arg.(string); ok {
+		return []string{text}
+	}
+
+	return nil
 }

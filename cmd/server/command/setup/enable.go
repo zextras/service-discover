@@ -61,6 +61,7 @@ func (o *enableOutput) add(step string) {
 
 // clusterSecrets are the secrets of the cluster needed to enable SPIRE.
 type clusterSecrets struct {
+	password string
 	token    string
 	caKeyPEM []byte
 }
@@ -75,7 +76,7 @@ func (e *Enable) Run(commonFlags *command.GlobalCommonFlags) error {
 
 	password := e.Password
 
-	if password == "" && e.needsPassword() {
+	if password == "" {
 		password, err = e.askPassword()
 		if err != nil {
 			return err
@@ -99,18 +100,6 @@ func (e *Enable) Run(commonFlags *command.GlobalCommonFlags) error {
 	_, err = os.Stdout.WriteString(render)
 
 	return err
-}
-
-// needsPassword tells whether the cluster credentials have to be opened: the bootstrap token can be given in the
-// environment and the CA key may still be on this server.
-func (e *Enable) needsPassword() bool {
-	if os.Getenv(command.SetupConsulToken) == "" {
-		return true
-	}
-
-	_, err := os.Stat(filepath.Join(e.setup.ConsulHome, command.ConsulCAKey))
-
-	return err != nil
 }
 
 func (e *Enable) askPassword() (string, error) {
@@ -175,7 +164,7 @@ func (s *Setup) readClusterSecrets(password string) (clusterSecrets, error) {
 		return clusterSecrets{}, errors.WithMessage(err, "unable to decode ACL Bootstrap token")
 	}
 
-	secrets := clusterSecrets{token: bootstrap.SecretID, caKeyPEM: files[caKeyPath]}
+	secrets := clusterSecrets{password: password, token: bootstrap.SecretID, caKeyPEM: files[caKeyPath]}
 
 	if token := os.Getenv(command.SetupConsulToken); token != "" {
 		secrets.token = token
@@ -268,6 +257,15 @@ func (s *Setup) enableSpire(
 	err = s.enableAuthMethod(deps, secrets.token, jwksURL, leader, bindAddress, out)
 	if err != nil {
 		return nil, err
+	}
+
+	published, err := s.publishJWKSURL(deps.LdapHandler(localConfig), secrets.password, jwksURL)
+	if err != nil {
+		return nil, errors.WithMessage(err, "unable to add the SPIRE settings to the cluster credentials")
+	}
+
+	if published {
+		out.add("Cluster credentials updated (and uploaded to LDAP): the servers added later will get SPIRE too")
 	}
 
 	out.add("SPIRE is enabled on this server")
