@@ -17,8 +17,8 @@ const (
 	LineBreak         = "\n"
 )
 
-// NotATerminalError is an error that happens when the passed environment is not properly a terminal, and it is
-// impossible to open it as it.
+// NotATerminalError is an error that tells the passed environment is not properly a terminal. Terminals returned by New
+// never report it: callers keep handling it for the Terminal implementations that do.
 type NotATerminalError int
 
 func (n NotATerminalError) Error() string {
@@ -86,7 +86,8 @@ func (t *terminal) Close() error {
 	return term.Restore(t.stdIn, t.oldStateTerm)
 }
 
-// New returns a new terminal with the given reader and writer functions.
+// New returns a new terminal with the given reader and writer functions. When the reader is not a terminal (e.g. a
+// pipe) the returned terminal reads plain lines from it, prints no prompt and does not hide anything.
 func New(reader *os.File, writer io.Writer, prompt string) (Terminal, error) {
 	stdIn := int(reader.Fd())
 	res := &terminal{
@@ -94,7 +95,8 @@ func New(reader *os.File, writer io.Writer, prompt string) (Terminal, error) {
 	}
 
 	if !term.IsTerminal(res.stdIn) {
-		return nil, NotATerminalError(stdIn)
+		// Piped or redirected input (e.g. echo password | service-discover bootstrap-token): read plain lines.
+		return newLineTerminal(reader, writer), nil
 	}
 
 	var err error
