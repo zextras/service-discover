@@ -13,6 +13,9 @@ PartOf=service-discover.target
 [Service]
 Type=notify
 ExecStart=/usr/bin/service-discoverd agent
+# On a node using SPIRE: obtain the credentials of the installed Carbonio services and register them. It does nothing
+# elsewhere. Failures are not fatal, the command can be run again. --no-block: the units to restart start after this one.
+ExecStartPost=-/usr/bin/service-discover service sync --no-block --wait 10s
 Restart=on-failure
 RestartSec=15s
 # consul exits 1 when stopped without leaving the cluster; a requested stop is

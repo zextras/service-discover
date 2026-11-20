@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/zextras/service-discover/pkg/carbonio"
+	"github.com/zextras/service-discover/pkg/mesh"
+	"github.com/zextras/service-discover/pkg/spire"
 )
 
 const (
@@ -87,6 +89,20 @@ func (r realDependencies) CreateNewHandler(localConfig carbonio.LocalConfig) car
 	return carbonio.CreateNewHandler(localConfig)
 }
 
+// ConsulConfigArgs returns the configuration arguments of Consul for a node using SPIRE, nil for the others.
+func (r realDependencies) ConsulConfigArgs() ([]string, error) {
+	if !mesh.SPIREMode() {
+		return nil, nil
+	}
+
+	defs, err := mesh.Load()
+	if err != nil {
+		return nil, err
+	}
+
+	return mesh.ConsulConfigArgs(mesh.NewOfflineEnv(spire.TrustDomain), defs)
+}
+
 func (r realDependencies) Now() time.Time {
 	return time.Now()
 }
@@ -95,7 +111,7 @@ func (r realDependencies) Sleep(d time.Duration) {
 	time.Sleep(d)
 }
 
-type deps interface {
+type deps interface { //nolint:interfacebloat // the dependencies of the startup
 	Exit(code int)
 	Now() time.Time
 	Sleep(d time.Duration)
@@ -108,6 +124,7 @@ type deps interface {
 	Exec(argv0 string, argv []string, envv []string) (err error)
 	LoadLocalConfig() (carbonio.LocalConfig, error)
 	CreateNewHandler(localConfig carbonio.LocalConfig) carbonio.LdapHandler
+	ConsulConfigArgs() ([]string, error)
 }
 
 type ErrorWithExitCode struct {
@@ -164,6 +181,13 @@ func runServiceDiscoverDaemon(deps deps, args []string) {
 		}
 	}
 
+	// On a node using SPIRE the service definitions are rendered with the token of each service, which only root can
+	// read: Consul loads these instead of the ones of the packages.
+	configArgs, cfgErr := deps.ConsulConfigArgs()
+	if cfgErr != nil {
+		deps.Log("unable to prepare the service definitions: " + cfgErr.Error() + "\n")
+	}
+
 	err = changeUser(deps)
 
 	if err != nil {
@@ -193,7 +217,7 @@ func runServiceDiscoverDaemon(deps deps, args []string) {
 
 	waitForJWKS(deps, mainJSONPath, jwksWaitWindow, jwksPollInterval)
 
-	err = startConsul(deps, isServer, servers, localServer)
+	err = startConsul(deps, isServer, servers, localServer, configArgs)
 	if err != nil {
 		deps.Log(err.Log)
 		deps.Exit(err.ExitCode)
@@ -279,26 +303,25 @@ func changeUser(deps deps) *ErrorWithExitCode {
 	return nil
 }
 
-func startConsul(deps deps, isServer bool, servers []string, localServer string) *ErrorWithExitCode {
-	var args []string
+// startConsul replaces this process with Consul. configArgs are the arguments loading its configuration, by default
+// the whole configuration directory.
+func startConsul(
+	deps deps, isServer bool, servers []string, localServer string, configArgs []string,
+) *ErrorWithExitCode {
+	if configArgs == nil {
+		configArgs = []string{"-config-dir", "/etc/zextras/service-discover/"}
+	}
+
+	args := []string{consulBinPath, consulAgentCommand}
 
 	if isServer {
-		args = []string{
-			consulBinPath,
-			consulAgentCommand,
-			"-bootstrap-expect",
-			strconv.Itoa(len(servers)/2 + 1),
-			"-config-dir",
-			"/etc/zextras/service-discover/",
-			"-server",
-		}
-	} else {
-		args = []string{
-			consulBinPath,
-			consulAgentCommand,
-			"-config-dir",
-			"/etc/zextras/service-discover/",
-		}
+		args = append(args, "-bootstrap-expect", strconv.Itoa(len(servers)/2+1))
+	}
+
+	args = append(args, configArgs...)
+
+	if isServer {
+		args = append(args, "-server")
 	}
 
 	// HACK: consul doesn't notify readiness to systemd if the list of servers is empty
