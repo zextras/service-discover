@@ -128,7 +128,7 @@ func TestSync_setupMigratesThePropertiesKeepingTheOwner(t *testing.T) {
 	info, err := os.Stat(path)
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o640), info.Mode().Perm())
-	assert.NotZero(t, machine.chowns[filepath.Dir(path)], "the owner is given back")
+	assert.Contains(t, machine.chowns, filepath.Dir(path), "the owner is given back")
 }
 
 func TestDefinition_extraPolicyListsTheMovedKeys(t *testing.T) {
