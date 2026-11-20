@@ -48,6 +48,8 @@ func New() Setup {
 		ClusterCredential: config.ClusterCredential,
 		MutableConfigFile: command.ConsulMutableConfigFile,
 		SpireConfigDir:    spire.ConfigDir,
+		SpireDataDir:      spire.AgentDataDir,
+		HostsFile:         "/etc/hosts",
 		Stdin:             os.Stdin,
 	}
 }
@@ -190,6 +192,8 @@ type Setup struct {
 	ClusterCredential string `kong:"-"`
 	MutableConfigFile string `kong:"-"`
 	SpireConfigDir    string `kong:"-"`
+	SpireDataDir      string `kong:"-"`
+	HostsFile         string `kong:"-"`
 	// Stdin is where the join bundle is read from when --join is "-".
 	Stdin io.Reader `kong:"-"`
 

@@ -82,7 +82,7 @@ func (s *Setup) runJoinWith(commonFlags *command.GlobalCommonFlags, deps busines
 		return errors.New("missing arguments: the binding address is required")
 	}
 
-	err := preRun(s.ClusterCredential, deps)
+	err := s.joinPreRun(deps)
 	if err != nil {
 		return err
 	}
@@ -100,6 +100,25 @@ func (s *Setup) runJoinWith(commonFlags *command.GlobalCommonFlags, deps busines
 	_, err = fmt.Fprint(writer, render)
 
 	return err
+}
+
+// joinPreRun is preRun for --join: the Consul configuration left by a join that did not complete does not stop it.
+func (s *Setup) joinPreRun(deps businessDependencies) error {
+	err := deps.CreateCommand(command.ConsulBin, "version").Run()
+	if err != nil {
+		return errors.Errorf("unable to execute consul binary: %s", err)
+	}
+
+	if deps.GetuidSyscall() != rootUID {
+		return errors.New("this command must be executed as root")
+	}
+
+	_, err = os.Stat(s.ConsulFileConfig)
+	if err == nil && !s.joinPending() {
+		return errors.New("setup of service-discover already performed, manually reset and try again")
+	}
+
+	return nil
 }
 
 // readJoinBundle reads and validates the join bundle from the given file, or from Stdin if the source is "-".
@@ -141,6 +160,10 @@ func readLimitedFile(path string) ([]byte, error) {
 // join enrolls this host with a SPIRE join bundle: the local SPIRE agent attests itself with the one-time token,
 // the JWT-SVID it issues for this Consul node is used by Consul to join the cluster through auto_config. No cluster
 // credentials, LDAP access nor ACL token are involved.
+//
+// It can be run again with a new bundle after a failure: what a failed attempt wrote is removed as soon as it fails,
+// and again before a new attempt if it could not be (the host went down). A setup done with the cluster credentials
+// is never touched.
 func (s *Setup) join(deps businessDependencies) (formatter.Formatter, error) {
 	networks, err := command.NonLoopbackInterfaces(deps)
 	if err != nil {
@@ -166,55 +189,91 @@ func (s *Setup) join(deps businessDependencies) (formatter.Formatter, error) {
 		return nil, err
 	}
 
-	caPath := filepath.Join(s.ConsulHome, command.ConsulCA)
+	if s.joinPending() {
+		err = s.cleanupJoin(deps)
+		if err != nil {
+			return nil, errors.WithMessage(err, "unable to clean up the previous attempt to join")
+		}
+	}
 
-	err = s.writeStrict(deps, caPath, []byte(bundle.ConsulCA))
+	err = s.writeStrict(deps, s.joinPendingPath(), nil)
 	if err != nil {
 		return nil, err
 	}
 
-	err = command.SaveBindAddressConfiguration(s.MutableConfigFile, s.BindAddress)
+	err = s.configureJoin(deps, bundle, spireHost, spirePort)
 	if err != nil {
+		_ = s.cleanupJoin(deps)
+
 		return nil, err
 	}
 
-	err = permissions.SetStrictPermissions(deps, s.MutableConfigFile)
+	err = os.Remove(s.joinPendingPath())
 	if err != nil {
 		return nil, err
-	}
-
-	token, err := s.attestAndFetchToken(deps, bundle, spireHost, spirePort)
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.writeStrict(deps, filepath.Join(s.ConsulHome, introTokenFile), []byte(token))
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.writeJoinConfig(deps, bundle)
-	if err != nil {
-		return nil, err
-	}
-
-	err = systemd.StartSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
-	if err != nil {
-		return nil, errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
-	}
-
-	err = systemd.EnableSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
-	if err != nil {
-		return nil, errors.Errorf("unable to enable %s unit: %s", serviceDiscoverUnit, err)
 	}
 
 	return &formatter.EmptyFormatter{}, nil
 }
 
+// configureJoin writes everything a join needs and starts the SPIRE agent and Consul.
+func (s *Setup) configureJoin(
+	deps businessDependencies, bundle *spire.JoinBundle, spireHost string, spirePort int,
+) error {
+	caPath := filepath.Join(s.ConsulHome, command.ConsulCA)
+
+	err := s.writeStrict(deps, caPath, []byte(bundle.ConsulCA))
+	if err != nil {
+		return err
+	}
+
+	err = command.SaveBindAddressConfiguration(s.MutableConfigFile, s.BindAddress)
+	if err != nil {
+		return err
+	}
+
+	err = permissions.SetStrictPermissions(deps, s.MutableConfigFile)
+	if err != nil {
+		return err
+	}
+
+	serverAddress, err := s.spireServerAddress(deps, spireHost, spirePort, bundle.ConsulServers)
+	if err != nil {
+		return err
+	}
+
+	token, err := s.attestAndFetchToken(deps, bundle, serverAddress, spirePort)
+	if err != nil {
+		return err
+	}
+
+	err = s.writeStrict(deps, filepath.Join(s.ConsulHome, introTokenFile), []byte(token))
+	if err != nil {
+		return err
+	}
+
+	err = s.writeJoinConfig(deps, bundle)
+	if err != nil {
+		return err
+	}
+
+	err = systemd.StartSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
+	if err != nil {
+		return errors.WithMessagef(err, "unable to start %s", serviceDiscoverUnit)
+	}
+
+	err = systemd.EnableSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
+	if err != nil {
+		return errors.Errorf("unable to enable %s unit: %s", serviceDiscoverUnit, err)
+	}
+
+	return nil
+}
+
 // attestAndFetchToken configures and starts the local SPIRE agent, and returns the JWT-SVID it issues to the Consul
 // agent of this node. The join token is only stored in the SPIRE agent configuration, never on a command line.
 func (s *Setup) attestAndFetchToken(
-	deps businessDependencies, bundle *spire.JoinBundle, spireHost string, spirePort int,
+	deps businessDependencies, bundle *spire.JoinBundle, serverAddress string, spirePort int,
 ) (string, error) {
 	_, err := spire.WriteFile(deps, s.SpireConfigDir, spire.BundleFile,
 		[]byte(bundle.SpireBundle), spire.AgentUser, spireFileMode)
@@ -223,7 +282,7 @@ func (s *Setup) attestAndFetchToken(
 	}
 
 	_, err = spire.WriteFile(deps, s.SpireConfigDir, spire.AgentConfFile,
-		[]byte(spire.AgentConf(s.SpireConfigDir, spireHost, spirePort, bundle.JoinToken)),
+		[]byte(spire.AgentConf(s.SpireConfigDir, serverAddress, spirePort, bundle.JoinToken)),
 		spire.AgentUser, spireSecretMode)
 	if err != nil {
 		return "", err
