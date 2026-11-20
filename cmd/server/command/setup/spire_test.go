@@ -84,7 +84,7 @@ func TestSetup_generateCertificateAndConfig_autoConfig(t *testing.T) {
 		On("Chown", mock.AnythingOfType("string"), 1234, 123456).Return(nil).
 		On("Chmod", mock.AnythingOfType("string"), os.FileMode(0600)).Return(nil)
 
-	cfg, err := setup.generateCertificateAndConfig(mockDep, "mail.example.com", "gossipKey", "https://mail.example.com:8082")
+	cfg, err := setup.generateCertificateAndConfig(mockDep, "mail.example.com", "gossipKey", "https://mail.example.com:8082/keys")
 	require.NoError(t, err)
 
 	bs, err := json.Marshal(cfg)
@@ -96,12 +96,12 @@ func TestSetup_generateCertificateAndConfig_autoConfig(t *testing.T) {
 		"authorization": map[string]any{
 			"enabled": true,
 			"static": map[string]any{
-				"oidc_discovery_url":     "https://mail.example.com:8082",
-				"oidc_discovery_ca_cert": caPEM,
-				"bound_issuer":           "https://mail.example.com:8082",
-				"bound_audiences":        []any{"consul-auto-config"},
-				"claim_mappings":         map[string]any{"sub": "spiffe_id"},
-				"claim_assertions":       []any{`value.spiffe_id == "spiffe://carbonio/consul/${node}"`},
+				"jwks_url":         "https://mail.example.com:8082/keys",
+				"jwks_ca_cert":     caPEM,
+				"bound_issuer":     "spiffe://carbonio",
+				"bound_audiences":  []any{"consul-auto-config"},
+				"claim_mappings":   map[string]any{"sub": "spiffe_id"},
+				"claim_assertions": []any{`value.spiffe_id == "spiffe://carbonio/consul/${node}"`},
 			},
 		},
 	}, got["auto_config"])
@@ -114,7 +114,7 @@ func TestSetup_generateCertificateAndConfig_withoutOIDC(t *testing.T) {
 	assert.NotContains(t, string(bs), "auto_config", "servers of clusters without SPIRE must keep the old config")
 }
 
-func TestSetup_clusterOIDCURL(t *testing.T) {
+func TestSetup_clusterJWKSURL(t *testing.T) {
 	setup := Setup{ClusterCredential: filepath.Join(t.TempDir(), "cred.tar.gpg"), Password: "pw"}
 
 	createTarball := func(files map[string]string) {
@@ -135,17 +135,17 @@ func TestSetup_clusterOIDCURL(t *testing.T) {
 		writer.Close()
 	}
 
-	createTarball(map[string]string{"gossip-key": "k", spire.ClusterOIDCURLFile: "https://mail.example.com:8082\n"})
+	createTarball(map[string]string{"gossip-key": "k", spire.ClusterJWKSURLFile: "https://mail.example.com:8082/keys\n"})
 
-	got, err := setup.clusterOIDCURL()
+	got, err := setup.clusterJWKSURL()
 	require.NoError(t, err)
-	assert.Equal(t, "https://mail.example.com:8082", got)
+	assert.Equal(t, "https://mail.example.com:8082/keys", got)
 
 	createTarball(map[string]string{"gossip-key": "k"})
 
-	got, err = setup.clusterOIDCURL()
+	got, err = setup.clusterJWKSURL()
 	require.NoError(t, err)
-	assert.Empty(t, got, "tarballs created before SPIRE do not have the OIDC URL")
+	assert.Empty(t, got, "tarballs created before SPIRE do not have the keys URL")
 }
 
 func TestSetup_setupSpireServer(t *testing.T) {
@@ -156,13 +156,13 @@ func TestSetup_setupSpireServer(t *testing.T) {
 
 	var oidcChecks []string
 
-	waitOIDCDiscovery = func(url string, caPEM []byte, _, _ time.Duration) error {
+	waitJWKS = func(url string, caPEM []byte, _, _ time.Duration) error {
 		oidcChecks = append(oidcChecks, url+"|"+string(caPEM))
 
 		return nil
 	}
 
-	defer func() { waitOIDCDiscovery = spire.WaitOIDCDiscovery }()
+	defer func() { waitJWKS = spire.WaitJWKS }()
 
 	consulHome, spireDir := t.TempDir(), filepath.Join(t.TempDir(), "spire")
 	caPEM := writeTestCA(t, consulHome)
@@ -183,10 +183,10 @@ func TestSetup_setupSpireServer(t *testing.T) {
 	deps.On("SystemdUnitHandler").Return(unit, nil).
 		On("CreateCommand", spire.ServerBin, "healthcheck", "-socketPath", spire.ServerSocket).Return(health)
 
-	oidcURL, err := setup.setupSpireServer(deps, "mail.example.com", "10.0.0.1/24")
+	jwksURL, err := setup.setupSpireServer(deps, "mail.example.com", "10.0.0.1/24", false)
 	require.NoError(t, err)
-	assert.Equal(t, "https://mail.example.com:8082", oidcURL)
-	assert.Equal(t, []string{"https://mail.example.com:8082|" + caPEM}, oidcChecks)
+	assert.Equal(t, "https://mail.example.com:8082/keys", jwksURL)
+	assert.Equal(t, []string{"https://mail.example.com:8082/keys|" + caPEM}, oidcChecks)
 
 	for name, mode := range map[string]os.FileMode{
 		spire.ServerConfFile: 0640, spire.OIDCConfFile: 0640, spire.OIDCCertFile: 0640, spire.OIDCKeyFile: 0600,
@@ -199,10 +199,13 @@ func TestSetup_setupSpireServer(t *testing.T) {
 	serverConf, err := os.ReadFile(filepath.Join(spireDir, spire.ServerConfFile))
 	require.NoError(t, err)
 	assert.Contains(t, string(serverConf), `bind_address = "10.0.0.1"`)
+	assert.Contains(t, string(serverConf), `sqlite3`)
+	assert.Contains(t, string(serverConf), `jwt_issuer = "spiffe://carbonio"`)
 
 	oidcConf, err := os.ReadFile(filepath.Join(spireDir, spire.OIDCConfFile))
 	require.NoError(t, err)
 	assert.Contains(t, string(oidcConf), filepath.Join(spireDir, spire.OIDCCertFile))
+	assert.Contains(t, string(oidcConf), `addr = "10.0.0.1:8082"`, "other servers reach the only OIDC provider")
 
 	for _, name := range []string{spire.ServerUnit, spire.OIDCUnit} {
 		unit.AssertCalled(t, "StartUnit", name, "replace", mock.Anything)
@@ -262,4 +265,111 @@ func TestSetup_setupSpireAgent(t *testing.T) {
 	assert.Contains(t, string(bundle), "AAAA")
 
 	unit.AssertCalled(t, "StartUnit", spire.AgentUnit, "replace", mock.Anything)
+}
+
+func TestSetup_setupSpireServer_highAvailability(t *testing.T) {
+	previous := testingMode
+	testingMode = true
+
+	defer func() { testingMode = previous }()
+
+	var checked []string
+
+	waitJWKS = func(url string, _ []byte, _, _ time.Duration) error {
+		checked = append(checked, url)
+
+		return nil
+	}
+
+	defer func() { waitJWKS = spire.WaitJWKS }()
+
+	unit := new(mocks3.UnitManager)
+	unit.On("StartUnit", mock.Anything, "replace", mock.Anything).Run(func(args mock.Arguments) {
+		args.Get(2).(chan<- string) <- "done"
+	}).Return(0, nil)
+	unit.On("EnableUnitFiles", mock.Anything, false, false).Return(false, nil, nil)
+	unit.On("Close").Return()
+
+	health := new(mocks22.Cmd)
+	health.On("Output").Return([]byte("healthy"), nil)
+
+	const dsn = "postgres://spire:pw@db.example.com:5432/spire?sslmode=verify-full"
+
+	// The first server and the additional ones: the latter cannot get a certificate for their own hostname, because
+	// the Consul CA is name constrained to the hostname of the first one.
+	for name, additional := range map[string]bool{"first": false, "additional": true} {
+		consulHome, spireDir := t.TempDir(), filepath.Join(t.TempDir(), "spire")
+		writeTestCA(t, consulHome)
+		setup := Setup{ConsulHome: consulHome, SpireConfigDir: spireDir, spireDSN: dsn}
+
+		deps := new(mocks.BusinessDependencies)
+		mockOwnership(deps)
+		deps.On("SystemdUnitHandler").Return(unit, nil).
+			On("CreateCommand", spire.ServerBin, "healthcheck", "-socketPath", spire.ServerSocket).Return(health)
+
+		hostname := "mail.example.com"
+		if additional {
+			hostname = "mail2.example.com"
+		}
+
+		jwksURL, err := setup.setupSpireServer(deps, hostname, "10.0.0.2", additional)
+		require.NoError(t, err, name)
+		assert.Equal(t, "https://127.0.0.1:8082/keys", jwksURL, name)
+		assert.Equal(t, spire.LocalJWKSURL, checked[len(checked)-1], name)
+
+		serverConf, err := os.ReadFile(filepath.Join(spireDir, spire.ServerConfFile))
+		require.NoError(t, err)
+		assert.Contains(t, string(serverConf), `database_type = "postgres"`, name)
+		assert.Contains(t, string(serverConf), dsn, name)
+
+		info, err := os.Stat(filepath.Join(spireDir, spire.ServerConfFile))
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0600), info.Mode().Perm(), "server.conf holds the database credentials")
+
+		oidcConf, err := os.ReadFile(filepath.Join(spireDir, spire.OIDCConfFile))
+		require.NoError(t, err)
+		assert.Contains(t, string(oidcConf), `addr = "127.0.0.1:8082"`, name)
+
+		certPEM, err := os.ReadFile(filepath.Join(spireDir, spire.OIDCCertFile))
+		require.NoError(t, err)
+
+		block, _ := pem.Decode(certPEM)
+		leaf, err := x509.ParseCertificate(block.Bytes)
+		require.NoError(t, err)
+
+		pool := x509.NewCertPool()
+		caPEM, err := os.ReadFile(filepath.Join(consulHome, "consul-agent-ca.pem"))
+		require.NoError(t, err)
+		require.True(t, pool.AppendCertsFromPEM(caPEM))
+
+		_, err = leaf.Verify(x509.VerifyOptions{DNSName: "127.0.0.1", Roots: pool})
+		require.NoError(t, err, "%s: the local Consul validates the JWT-SVIDs through the loopback address", name)
+	}
+}
+
+func TestSetup_importSpireMode(t *testing.T) {
+	t.Parallel()
+
+	ha, single := Setup{spireDSN: enableTestDSN}, Setup{}
+
+	run, err := ha.importSpireMode(spire.LocalJWKSURL)
+	require.NoError(t, err)
+	assert.True(t, run, "every server of a high availability cluster runs SPIRE")
+
+	_, err = single.importSpireMode(spire.LocalJWKSURL)
+	require.ErrorContains(t, err, "--spire-datastore-file")
+
+	run, err = single.importSpireMode("https://mail.example.com:8082/keys")
+	require.NoError(t, err)
+	assert.False(t, run, "the additional server of a cluster with a single SPIRE server does not run it")
+
+	_, err = ha.importSpireMode("https://mail.example.com:8082/keys")
+	require.Error(t, err)
+
+	run, err = single.importSpireMode("")
+	require.NoError(t, err)
+	assert.False(t, run, "clusters set up before SPIRE keep the old behaviour")
+
+	_, err = ha.importSpireMode("")
+	require.Error(t, err)
 }

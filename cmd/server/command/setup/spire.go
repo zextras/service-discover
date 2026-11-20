@@ -27,7 +27,7 @@ const (
 var (
 	spirePollInterval = 500 * time.Millisecond
 	spireStartTimeout = 60 * time.Second
-	waitOIDCDiscovery = spire.WaitOIDCDiscovery
+	waitJWKS          = spire.WaitJWKS
 )
 
 // bindIP extracts the IP from a binding address, that may be given in CIDR notation.
@@ -60,10 +60,27 @@ func startAndEnableUnit(deps businessDependencies, unit string) error {
 	return nil
 }
 
-// setupSpireServer configures and starts the SPIRE server and its OIDC discovery provider on the first server. The
-// OIDC endpoint is served with a certificate signed by the Consul CA, that must already exist. It returns the OIDC
-// discovery URL Consul has to trust, once it is reachable.
-func (s *Setup) setupSpireServer(deps businessDependencies, hostname, bindAddress string) (string, error) {
+// highAvailability reports whether every Consul server runs its own SPIRE server, all of them sharing the same
+// PostgreSQL datastore. Without a datastore only one server runs SPIRE, on a local SQLite database.
+func (s *Setup) highAvailability() bool {
+	return s.spireDSN != ""
+}
+
+// setupSpireServer configures and starts the SPIRE server and its OIDC discovery provider of this server. The OIDC
+// endpoint is served with a certificate signed by the Consul CA, that must already exist. It returns the URL where
+// Consul fetches the keys validating the JWT-SVIDs, once it is reachable.
+//
+// With a single SPIRE server that is its OIDC endpoint, open on the bind address for the other Consul servers. In
+// high availability every Consul server validates against the provider of its own host: the provider listens on the
+// loopback address only and the URL is the same on every server. The Consul CA is name constrained to the hostname of
+// the first server (and, in clusters set up before SPIRE, to no hostname at all), so the certificate of the others is
+// issued to "localhost" and to their IP addresses: without high availability they are reached through their IP.
+// additional tells that the CA is not constrained to the hostname of this server.
+//
+//nolint:cyclop // sequential flow
+func (s *Setup) setupSpireServer(
+	deps businessDependencies, hostname, bindAddress string, additional bool,
+) (string, error) {
 	listenIP, err := bindIP(bindAddress)
 	if err != nil {
 		return "", err
@@ -79,11 +96,29 @@ func (s *Setup) setupSpireServer(deps businessDependencies, hostname, bindAddres
 		return "", errors.WithMessage(err, "unable to read the Consul CA key")
 	}
 
+	certHost, oidcListen, jwksURL := hostname, listenIP.String(), spire.JWKSURL(hostname)
+	if s.highAvailability() {
+		oidcListen, jwksURL = "127.0.0.1", spire.LocalJWKSURL
+	}
+
+	if additional {
+		certHost = "localhost"
+
+		if !s.highAvailability() {
+			jwksURL = spire.JWKSURL(listenIP.String())
+		}
+	}
+
 	certPEM, keyPEM, err := spire.SignServingCert(
-		caPEM, caKeyPEM, hostname, listenIP, time.Duration(certificateExpiration)*24*time.Hour,
+		caPEM, caKeyPEM, certHost, listenIP, time.Duration(certificateExpiration)*24*time.Hour,
 	)
 	if err != nil {
 		return "", err
+	}
+
+	serverConfMode := os.FileMode(spireFileMode)
+	if s.highAvailability() {
+		serverConfMode = spireSecretMode // it holds the credentials of the database
 	}
 
 	files := []struct {
@@ -93,8 +128,8 @@ func (s *Setup) setupSpireServer(deps businessDependencies, hostname, bindAddres
 	}{
 		{spire.OIDCCertFile, certPEM, spireFileMode},
 		{spire.OIDCKeyFile, keyPEM, spireSecretMode},
-		{spire.ServerConfFile, []byte(spire.ServerConf(listenIP.String(), hostname)), spireFileMode},
-		{spire.OIDCConfFile, []byte(spire.OIDCConf(s.SpireConfigDir, listenIP.String(), hostname)), spireFileMode},
+		{spire.ServerConfFile, []byte(spire.ServerConf(listenIP.String(), s.spireDSN)), serverConfMode},
+		{spire.OIDCConfFile, []byte(spire.OIDCConf(s.SpireConfigDir, oidcListen, hostname)), spireFileMode},
 	}
 
 	for _, file := range files {
@@ -104,10 +139,8 @@ func (s *Setup) setupSpireServer(deps businessDependencies, hostname, bindAddres
 		}
 	}
 
-	oidcURL := spire.OIDCURL(hostname)
-
 	if !manageSpireUnits() {
-		return oidcURL, nil
+		return jwksURL, nil
 	}
 
 	err = startAndEnableUnit(deps, spire.ServerUnit)
@@ -125,12 +158,12 @@ func (s *Setup) setupSpireServer(deps businessDependencies, hostname, bindAddres
 		return "", err
 	}
 
-	err = waitOIDCDiscovery(oidcURL, caPEM, spireStartTimeout, spirePollInterval)
+	err = waitJWKS(jwksURL, caPEM, spireStartTimeout, spirePollInterval)
 	if err != nil {
 		return "", err
 	}
 
-	return oidcURL, nil
+	return jwksURL, nil
 }
 
 // setupSpireAgent attests the SPIRE agent of this server to the local SPIRE server with a one-time join token and

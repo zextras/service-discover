@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/zextras/service-discover/pkg/command"
 	"github.com/zextras/service-discover/pkg/formatter"
+	"github.com/zextras/service-discover/pkg/spire"
 	"github.com/zextras/service-discover/pkg/term"
 )
 
@@ -19,6 +20,8 @@ type Wizard struct {
 	Password      string `help:"Set a custom password for the encrypted secret files. If none is set, a random one will be generated and printed"` //nolint:lll
 	BindAddress   string `arg:"" optional:"" help:"The binding address to bind service-discoverd daemon"`
 	FirstInstance bool   `optional:"" default:"false" help:"Force the setup to behave as this was the first server setup"`
+
+	SpireDatastoreFile string `optional:"" help:"File with the PostgreSQL connection string of the datastore shared by the SPIRE servers of all the Consul servers (high availability). Without it a single SPIRE server with a local SQLite database is set up"` //nolint:lll
 }
 
 // NewWizardSetup is just a wrapper over the original setup, that performs interactive UI experience.
@@ -44,6 +47,15 @@ func (s *Wizard) Run(commonFlags *command.GlobalCommonFlags) error {
 	}
 
 	err = preRun(deps)
+	if err != nil {
+		return err
+	}
+
+	if s.SpireDatastoreFile == "-" {
+		return errors.New("the wizard reads its input from the terminal: give the datastore connection string in a file")
+	}
+
+	s.originalSetup.spireDSN, err = spire.ReadDatastoreDSN(s.SpireDatastoreFile, nil)
 	if err != nil {
 		return err
 	}

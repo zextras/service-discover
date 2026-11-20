@@ -78,7 +78,7 @@ func (s *Setup) performSetup(deps businessDependencies, inputs *setupConfigurati
 		return err
 	}
 
-	oidcURL, err := s.setupSpireServer(deps, zimbraHostname, inputs.BindAddress)
+	jwksURL, err := s.setupSpireServer(deps, zimbraHostname, inputs.BindAddress, false)
 	if err != nil {
 		return errors.WithMessage(err, "unable to set up the SPIRE server")
 	}
@@ -88,7 +88,7 @@ func (s *Setup) performSetup(deps businessDependencies, inputs *setupConfigurati
 		return err
 	}
 
-	err = s.writeConsulConfiguration(deps, zimbraHostname, gossipKey, oidcURL, inputs.BindAddress)
+	err = s.writeConsulConfiguration(deps, zimbraHostname, gossipKey, jwksURL, inputs.BindAddress)
 	if err != nil {
 		return err
 	}
@@ -108,15 +108,15 @@ func (s *Setup) performSetup(deps businessDependencies, inputs *setupConfigurati
 		return err
 	}
 
-	err = s.setupSpireIntegration(deps, zimbraHostname, inputs.BindAddress, oidcURL, rootToken)
+	err = s.setupSpireIntegration(deps, zimbraHostname, inputs.BindAddress, jwksURL, rootToken)
 	if err != nil {
 		return err
 	}
 
-	err = s.createClusterCredentials(clusterSecrets{
+	err = s.createClusterCredentials(sharedSecrets{
 		aclBootstrapJSON: aclBootstrapJSON,
 		gossipKey:        gossipKey,
-		oidcURL:          oidcURL,
+		jwksURL:          jwksURL,
 	}, inputs.Password)
 	if err != nil {
 		return err
@@ -173,18 +173,18 @@ func (s *Setup) bootstrapACL(deps businessDependencies, hostname string) ([]byte
 	return aclBootstrapJSON, aclBootstrap.SecretID, nil
 }
 
-// clusterSecrets is what the first server shares with the other servers of the cluster through the cluster credentials.
-type clusterSecrets struct {
+// sharedSecrets is what the first server shares with the other servers of the cluster through the cluster credentials.
+type sharedSecrets struct {
 	aclBootstrapJSON []byte
 	gossipKey        string
-	oidcURL          string
+	jwksURL          string
 }
 
 // createClusterCredentials stores the cluster secrets, together with the CA of the cluster, in the PGP encrypted
 // cluster credentials archive.
-func (s *Setup) createClusterCredentials(secrets clusterSecrets, password string) error {
+func (s *Setup) createClusterCredentials(secrets sharedSecrets, password string) error {
 	contents := map[string][]byte{
-		spire.ClusterOIDCURLFile:   []byte(secrets.oidcURL),
+		spire.ClusterJWKSURLFile:   []byte(secrets.jwksURL),
 		command.GossipKey:          []byte(secrets.gossipKey),
 		command.ConsulACLBootstrap: secrets.aclBootstrapJSON,
 	}
@@ -389,14 +389,14 @@ func (s *Setup) createACLBootstrapToken(deps businessDependencies) ([]byte, erro
 // the "spire" auth method lets the services log in with their JWT-SVID, and the SPIRE agent of this server gets
 // attested so that the services it hosts have an identity.
 func (s *Setup) setupSpireIntegration(
-	deps businessDependencies, hostname, bindAddress, oidcURL, rootToken string,
+	deps businessDependencies, hostname, bindAddress, jwksURL, rootToken string,
 ) error {
 	caPEM, err := os.ReadFile(filepath.Join(s.ConsulHome, command.ConsulCA)) // #nosec
 	if err != nil {
 		return errors.WithMessage(err, "unable to read the Consul CA")
 	}
 
-	err = spire.EnsureAuthMethod(deps.CreateCommand, rootToken, oidcURL, string(caPEM))
+	err = spire.EnsureAuthMethod(deps.CreateCommand, rootToken, jwksURL, string(caPEM))
 	if err != nil {
 		return err
 	}
