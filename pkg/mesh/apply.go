@@ -5,9 +5,11 @@
 package mesh
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"reflect"
 	"slices"
 
 	"github.com/hashicorp/consul/api/v2"
@@ -33,6 +35,7 @@ type Cluster interface {
 	BindingRules(authMethod string) ([]*api.ACLBindingRule, error)
 	BindingRuleCreate(rule *api.ACLBindingRule) error
 	BindingRuleUpdate(rule *api.ACLBindingRule) error
+	ConfigEntry(kind, name string) (api.ConfigEntry, error)
 	SetConfigEntry(entry api.ConfigEntry) error
 }
 
@@ -58,13 +61,25 @@ func Apply(cluster Cluster, defs []Definition, opts ApplyOptions) error {
 		return err
 	}
 
-	var failures []error
+	var (
+		failures []error
+		total    entryCounts
+	)
 
 	for i := range selected {
-		err = applyDefinition(cluster, &selected[i], opts)
-		if err != nil {
-			failures = append(failures, fmt.Errorf("%s: %w", selected[i].Name, err))
+		counts, applyErr := applyDefinition(cluster, &selected[i], opts)
+		if applyErr != nil {
+			failures = append(failures, fmt.Errorf("%s: %w", selected[i].Name, applyErr))
 		}
+
+		total.created += counts.created
+		total.updated += counts.updated
+		total.unchanged += counts.unchanged
+	}
+
+	if opts.Out != nil {
+		_, _ = fmt.Fprintf(opts.Out, "config entries: %d created, %d updated, %d unchanged\n",
+			total.created, total.updated, total.unchanged)
 	}
 
 	return errors.Join(failures...)
@@ -111,7 +126,7 @@ func selectDefinitions(defs []Definition, names []string) ([]Definition, error) 
 	return selected, nil
 }
 
-func applyDefinition(cluster Cluster, def *Definition, opts ApplyOptions) error {
+func applyDefinition(cluster Cluster, def *Definition, opts ApplyOptions) (entryCounts, error) {
 	log := func(format string, args ...any) {
 		if opts.Out != nil {
 			_, _ = fmt.Fprintf(opts.Out, def.Name+": "+format+"\n", args...)
@@ -120,14 +135,14 @@ func applyDefinition(cluster Cluster, def *Definition, opts ApplyOptions) error 
 
 	policy, err := ensurePolicy(cluster, def, log)
 	if err != nil {
-		return err
+		return entryCounts{}, err
 	}
 
 	policies := []string{policy.Name}
 
 	extra, err := ensureExtraPolicy(cluster, def, log)
 	if err != nil {
-		return err
+		return entryCounts{}, err
 	}
 
 	if extra != "" {
@@ -136,29 +151,176 @@ func applyDefinition(cluster Cluster, def *Definition, opts ApplyOptions) error 
 
 	err = ensureRole(cluster, def, policies, log)
 	if err != nil {
-		return err
+		return entryCounts{}, err
 	}
 
 	err = ensureBindingRule(cluster, def, opts, log)
 	if err != nil {
-		return err
+		return entryCounts{}, err
 	}
 
 	entries, err := def.ConfigEntries()
 	if err != nil {
-		return err
+		return entryCounts{}, err
 	}
 
+	counts, err := ensureConfigEntries(cluster, entries)
+	if err != nil {
+		return counts, err
+	}
+
+	log("config entries: %d created, %d updated, %d unchanged", counts.created, counts.updated, counts.unchanged)
+
+	return counts, nil
+}
+
+// entryCounts tells what ensureConfigEntries did.
+type entryCounts struct {
+	created, updated, unchanged int
+}
+
+// ensureConfigEntries writes the config entries that do not exist or differ from the desired ones: Consul would
+// bump the index of the ones written again for nothing.
+func ensureConfigEntries(cluster Cluster, entries []api.ConfigEntry) (entryCounts, error) {
+	var counts entryCounts
+
 	for _, entry := range entries {
+		existing, err := cluster.ConfigEntry(entry.GetKind(), entry.GetName())
+		if err != nil {
+			return counts, fmt.Errorf("unable to read the %s config entry %s: %w", entry.GetKind(), entry.GetName(), err)
+		}
+
+		if existing != nil && sameConfigEntry(entry, existing) {
+			counts.unchanged++
+
+			continue
+		}
+
 		err = cluster.SetConfigEntry(entry)
 		if err != nil {
-			return fmt.Errorf("unable to write the %s config entry %s: %w", entry.GetKind(), entry.GetName(), err)
+			return counts, fmt.Errorf("unable to write the %s config entry %s: %w", entry.GetKind(), entry.GetName(), err)
+		}
+
+		if existing == nil {
+			counts.created++
+		} else {
+			counts.updated++
 		}
 	}
 
-	log("%d config entries written", len(entries))
+	return counts, nil
+}
 
-	return nil
+// serverFields are the fields Consul sets in the config entries it stores (indexes, hash, the precedence of an
+// intention, the defaults of the namespace): a stored value for them is not a difference.
+var serverFields = map[string]bool{
+	"CreateIndex": true, "ModifyIndex": true, "Hash": true, "Precedence": true, "Type": true,
+	"Namespace": true, "Partition": true, "Peer": true, "SamenessGroup": true, "Meta": true,
+	"LegacyID": true, "LegacyMeta": true, "LegacyCreateTime": true, "LegacyUpdateTime": true,
+}
+
+// sameConfigEntry tells if the existing entry holds what the desired one defines: the fields of the definition are
+// equal, and the others are empty or set by Consul.
+func sameConfigEntry(desired, existing api.ConfigEntry) bool {
+	want, wantErr := configEntryFields(desired)
+	have, haveErr := configEntryFields(existing)
+
+	return wantErr == nil && haveErr == nil && sameValue(want, have)
+}
+
+func sameValue(want, have any) bool {
+	switch wanted := want.(type) {
+	case map[string]any:
+		stored, ok := have.(map[string]any)
+		if !ok {
+			return isEmptyValue(want) && isEmptyValue(have)
+		}
+
+		for field, value := range wanted {
+			if !serverFields[field] && !sameValue(value, stored[field]) {
+				return false
+			}
+		}
+
+		for field, value := range stored {
+			if _, defined := wanted[field]; !defined && !serverFields[field] && !isEmptyValue(value) {
+				return false
+			}
+		}
+
+		return true
+	case []any:
+		stored, ok := have.([]any)
+		if !ok {
+			return isEmptyValue(want) && isEmptyValue(have)
+		}
+
+		return sameItems(wanted, stored)
+	default:
+		return reflect.DeepEqual(want, have) || (isEmptyValue(want) && isEmptyValue(have))
+	}
+}
+
+// sameItems tells if both lists hold the same items, whatever the order: Consul sorts the sources of an intention by
+// precedence.
+func sameItems(wanted, stored []any) bool {
+	if len(wanted) != len(stored) {
+		return false
+	}
+
+	used := make([]bool, len(stored))
+
+	for _, item := range wanted {
+		match := -1
+
+		for i, candidate := range stored {
+			if !used[i] && sameValue(item, candidate) {
+				match = i
+
+				break
+			}
+		}
+
+		if match < 0 {
+			return false
+		}
+
+		used[match] = true
+	}
+
+	return true
+}
+
+func configEntryFields(entry api.ConfigEntry) (map[string]any, error) {
+	raw, err := json.Marshal(entry)
+	if err != nil {
+		return nil, err
+	}
+
+	var fields map[string]any
+
+	err = json.Unmarshal(raw, &fields)
+
+	return fields, err
+}
+
+func isEmptyValue(value any) bool {
+	switch typed := value.(type) {
+	case nil:
+		return true
+	case string:
+		return typed == ""
+	case bool:
+		return !typed
+	case float64:
+		return typed == 0
+	case []any:
+		return len(typed) == 0
+	case map[string]any:
+		return len(typed) == 0
+	default:
+		return false
+	}
 }
 
 func ensurePolicy(cluster Cluster, def *Definition, log func(string, ...any)) (*api.ACLPolicy, error) {

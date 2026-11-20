@@ -38,6 +38,8 @@ type fakeMachine struct {
 	fetched    []string // SPIFFE IDs requested, with the uid they were requested as
 	logins     int
 	tokens     map[string]bool // valid tokens
+	legacy     map[string]bool // valid tokens created by hand, not by a login
+	refused    int             // number of token checks refused (ACL not found) before the ACL system answers
 	loggedOut  []string
 	systemctl  [][]string
 	inactive   bool // Consul is stopped: it is not active and has no process to signal
@@ -108,6 +110,7 @@ func newMachine(t *testing.T) *fakeMachine {
 		},
 		chowns:    map[string]Account{},
 		tokens:    map[string]bool{},
+		legacy:    map[string]bool{},
 		now:       time.Unix(0, 0),
 		kv:        map[string]string{},
 		instances: map[string][]Instance{},
@@ -116,6 +119,7 @@ func newMachine(t *testing.T) *fakeMachine {
 	machine.env = &Env{
 		ServicesDir: filepath.Join(root, "service-discover"),
 		RenderedDir: filepath.Join(root, "rendered"),
+		StateDir:    filepath.Join(root, "state"),
 		CarbonioDir: filepath.Join(root, "carbonio"),
 		SystemdDir:  filepath.Join(root, "systemd"),
 		TrustDomain: "carbonio.lab",
@@ -163,8 +167,15 @@ func newMachine(t *testing.T) *fakeMachine {
 				return false, errNoLeader
 			}
 
+			if machine.refused > 0 {
+				machine.refused--
+
+				return false, nil
+			}
+
 			return machine.tokens[token], nil
 		},
+		IsLogin: func(token string) (bool, error) { return !machine.legacy[token], nil },
 		Logout: func(token string) error {
 			machine.loggedOut = append(machine.loggedOut, token)
 			delete(machine.tokens, token)
@@ -211,6 +222,7 @@ func newMachine(t *testing.T) *fakeMachine {
 	}
 
 	require.NoError(t, os.MkdirAll(machine.env.ServicesDir, 0o755))
+	require.NoError(t, os.MkdirAll(machine.env.StateDir, 0o755))
 
 	return machine
 }

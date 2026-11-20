@@ -23,6 +23,8 @@ const (
 	// RenderedDir holds the service definitions with the token injected, loaded by Consul in place of the package
 	// ones on the nodes using SPIRE.
 	RenderedDir = "/var/lib/service-discover/services.d"
+	// StateDir keeps what the agent and the synchronization tell each other across runs.
+	StateDir = "/var/lib/service-discover"
 	// CarbonioDir is the parent of the directories of the packages.
 	CarbonioDir = "/etc/carbonio"
 	// SystemdDir is where the drop-ins of the administrator live.
@@ -57,6 +59,7 @@ type Env struct {
 	CarbonioDir string
 	SystemdDir  string
 	CertDir     string
+	StateDir    string
 	TrustDomain string
 
 	// LookupUser returns the account of a user, fs.ErrNotExist when the user does not exist.
@@ -71,6 +74,9 @@ type Env struct {
 	Login  func(jwt string) (string, error)
 	Valid  func(token string) (bool, error)
 	Logout func(token string) error
+	// IsLogin tells if a valid token was created by a login (and can be destroyed by Logout), as opposed to the
+	// tokens the package scripts created by hand before the node used SPIRE.
+	IsLogin func(token string) (bool, error)
 	// Systemctl runs systemctl with the given arguments.
 	Systemctl func(args ...string) error
 	// Exec runs a process of the machine.
@@ -116,6 +122,7 @@ type outcome struct {
 	hclChange   bool // a rendered service definition has changed
 	forced      bool // the setup asked to restart everything
 	token       string
+	superseded  string // the login token replaced by the new one, destroyed after the restart of the units
 }
 
 // Installed returns the definitions of the services installed on this node: the package has put its service
@@ -183,6 +190,8 @@ func Sync(env *Env, defs []Definition, opts SyncOptions) error {
 
 	deadline := env.Now().Add(opts.Wait)
 
+	waitForACL(env, selected, deadline)
+
 	for i := range selected {
 		res, syncErr := syncService(env, &selected[i], opts, deadline, log)
 		res.forced = opts.ForceRestart
@@ -210,7 +219,27 @@ func Sync(env *Env, defs []Definition, opts SyncOptions) error {
 	}
 
 	if !opts.NoRestart {
-		failures = append(failures, apply(env, outcomes, mirrored || len(removed) > 0, opts.NoBlock, log)...)
+		// The agent started with a different set of services than the one the running sidecars were started for:
+		// Consul numbers their ports in registration order, so all of them restart to take the ones it assigned.
+		var restart []string
+
+		restartAll := isFile(env.sidecarsMarker())
+		if restartAll {
+			installed := env.Installed(defs)
+			for i := range installed {
+				restart = appendUnique(restart, installed[i].Sidecars...)
+			}
+		}
+
+		applied := apply(env, outcomes, restart, mirrored || len(removed) > 0, opts.NoBlock, log)
+		failures = append(failures, applied...)
+
+		if restartAll && len(applied) == 0 {
+			err = os.Remove(env.sidecarsMarker())
+			if err != nil && !errors.Is(err, fs.ErrNotExist) {
+				failures = append(failures, err)
+			}
+		}
 
 		if opts.Setup {
 			failures = append(failures, finishSetup(env, outcomes, opts, log)...)
@@ -260,13 +289,14 @@ func syncService(
 
 	previous := readToken(env.tokenFile(def))
 
-	token, changed, err := ensureToken(env, def, account, opts.Renew, deadline, log)
+	token, changed, superseded, err := ensureToken(env, def, account, opts.Renew, deadline, log)
 	if err != nil {
 		return res, err
 	}
 
 	res.tokenChange = changed
 	res.token = token
+	res.superseded = superseded
 
 	if len(def.SubstituteFiles) > 0 {
 		substituted, subErr := substitute(env, def, token, previous, log)
@@ -332,50 +362,64 @@ func ensureToken(
 	renew bool,
 	deadline time.Time,
 	log func(string, ...any),
-) (string, bool, error) {
+) (string, bool, string, error) {
 	path := env.tokenFile(def)
 
+	// superseded is the login token the new one replaces, to destroy once the units using it have restarted.
+	var superseded string
+
 	current := readToken(path)
-	if current != "" && !renew {
+	if current != "" {
 		valid, err := validToken(env, current, deadline)
 		if err != nil {
-			return "", false, fmt.Errorf("unable to validate the token: %w", err)
+			return "", false, "", fmt.Errorf("unable to validate the token: %w", err)
 		}
 
 		if valid {
-			return current, false, nil
+			login, loginErr := env.IsLogin(current)
+			if loginErr != nil {
+				return "", false, "", fmt.Errorf("unable to inspect the token: %w", loginErr)
+			}
+
+			switch {
+			case !login:
+				// A token of the package scripts: the login token replaces it, it stays valid until the cluster
+				// revokes it ("spire finalize"), so whatever still uses it keeps working.
+			case renew && def.readsToken():
+				superseded = current
+			default:
+				// Running processes may hold this token (the services hosted by the mailbox read it at start): a
+				// valid one is never rotated, only a token that stopped being valid is replaced.
+				return current, false, "", nil
+			}
 		}
 	}
 
 	jwt, err := fetchJWT(env, account, def.SpiffeID(env.TrustDomain), deadline)
 	if err != nil {
-		return "", false, err
+		return "", false, "", err
 	}
 
 	token, err := env.Login(jwt)
 	if err != nil {
-		return "", false, fmt.Errorf("unable to log in Consul: %w", err)
+		return "", false, "", fmt.Errorf("unable to log in Consul: %w", err)
 	}
 
 	err = writeFile(env, path, []byte(token), tokenFileMode, account)
 	if err != nil {
-		return "", false, err
+		return "", false, "", err
 	}
 
 	log("%s: new token written to %s", def.Name, path)
 
-	// The superseded token is not needed anymore: destroy it, an invalid one is already gone.
-	if current != "" {
-		valid, validErr := env.Valid(current)
-		if validErr == nil && valid {
-			logoutErr := env.Logout(current)
-			if logoutErr != nil {
-				log("%s: unable to log out the previous token: %v", def.Name, logoutErr)
-			}
-		}
-	}
+	return token, true, superseded, nil
+}
 
-	return token, true, nil
+// readsToken tells if the token file of the service is read by processes that keep what they read: the units
+// restarted when the token changes. The ones of the services hosted inside another process (the mailbox) are not
+// known, so their token is rotated only when it is no longer valid.
+func (d *Definition) readsToken() bool {
+	return len(d.Restart) > 0 || len(d.TokenEnv) > 0
 }
 
 // validToken asks Consul whether the token is valid, again until the deadline passes while Consul fails to answer:
@@ -390,6 +434,53 @@ func validToken(env *Env, token string, deadline time.Time) (bool, error) {
 
 		env.Sleep(fetchInterval)
 	}
+}
+
+// aclProbes is how many tokens waitForACL tries on each round.
+const aclProbes = 3
+
+// waitForACL waits until Consul accepts one of the tokens of the services, or the deadline passes. A server that
+// has just been elected leader refuses every token (ACL not found) until its ACL system is up: a token refused in
+// that window is not invalid, and replacing it would break the processes running with it.
+func waitForACL(env *Env, selected []Definition, deadline time.Time) {
+	var tokens []string
+
+	for i := range selected {
+		token := readToken(env.tokenFile(&selected[i]))
+		if token != "" {
+			tokens = append(tokens, token)
+		}
+	}
+
+	tokens = tokens[:min(len(tokens), aclProbes)]
+	if len(tokens) == 0 {
+		return
+	}
+
+	for {
+		for _, token := range tokens {
+			valid, err := env.Valid(token)
+			if err == nil && valid {
+				return
+			}
+		}
+
+		if !env.Now().Before(deadline) {
+			return
+		}
+
+		env.Sleep(fetchInterval)
+	}
+}
+
+// sidecarsMarker is the file the agent creates when it starts with another set of services than the previous time.
+func (e *Env) sidecarsMarker() string {
+	return filepath.Join(e.StateDir, "restart-sidecars")
+}
+
+// servicesList is the set of service files the agent loaded at its previous start.
+func (e *Env) servicesList() string {
+	return filepath.Join(e.StateDir, "rendered-services")
 }
 
 // fetchJWT asks for the JWT-SVID until it is issued or the deadline passes: the identity of a service becomes
@@ -599,10 +690,15 @@ func knownHCL(defs []Definition, name string) bool {
 
 // apply reloads Consul when a service definition changed, and restarts the units reading something that changed:
 // the sidecars read both the token and the definition, the other units only the token.
-func apply(env *Env, outcomes []outcome, reload, noBlock bool, log func(string, ...any)) []error {
+func apply(
+	env *Env,
+	outcomes []outcome,
+	restart []string,
+	reload, noBlock bool,
+	log func(string, ...any),
+) []error {
 	var (
 		failures []error
-		restart  []string
 		dropIns  bool
 	)
 
@@ -635,7 +731,41 @@ func apply(env *Env, outcomes []outcome, reload, noBlock bool, log func(string, 
 		}
 	}
 
-	return append(failures, restartUnits(env, restart, noBlock, log)...)
+	restartFailures, failed := restartUnits(env, restart, noBlock, log)
+	failures = append(failures, restartFailures...)
+
+	return append(failures, revokeSuperseded(env, outcomes, failed, log)...)
+}
+
+// revokeSuperseded destroys the login tokens the new ones replaced, once the units that read them have been
+// restarted with the new token: a process still running with the old one must not lose it. A service whose units
+// failed to restart keeps its old token valid, the next renewal will not know it: the failure is reported.
+func revokeSuperseded(env *Env, outcomes []outcome, failed map[string]bool, log func(string, ...any)) []error {
+	var failures []error
+
+	for _, res := range outcomes {
+		if res.superseded == "" {
+			continue
+		}
+
+		units := append(slices.Clone(res.def.Sidecars), res.def.Restart...)
+		for _, tokenEnv := range res.def.TokenEnv {
+			units = append(units, tokenEnv.Unit)
+		}
+
+		if slices.ContainsFunc(units, func(unit string) bool { return failed[unit] }) {
+			log("%s: the previous token is kept, its units did not restart", res.def.Name)
+
+			continue
+		}
+
+		err := env.Logout(res.superseded)
+		if err != nil {
+			failures = append(failures, fmt.Errorf("%s: unable to log out the previous token: %w", res.def.Name, err))
+		}
+	}
+
+	return failures
 }
 
 // reloadConsul makes the running Consul agent read its service definitions again. A stopped agent reads them at its
@@ -661,8 +791,10 @@ func reloadConsul(env *Env, log func(string, ...any)) []error {
 	return nil
 }
 
-func restartUnits(env *Env, units []string, noBlock bool, log func(string, ...any)) []error {
+func restartUnits(env *Env, units []string, noBlock bool, log func(string, ...any)) ([]error, map[string]bool) {
 	var failures []error
+
+	failed := map[string]bool{}
 
 	for _, unit := range units {
 		// Units that are not installed are not a failure: the package may not ship them.
@@ -678,6 +810,7 @@ func restartUnits(env *Env, units []string, noBlock bool, log func(string, ...an
 		err := env.Systemctl(args...)
 		if err != nil {
 			failures = append(failures, fmt.Errorf("unable to restart %s: %w", unit, err))
+			failed[unit] = true
 
 			continue
 		}
@@ -685,7 +818,7 @@ func restartUnits(env *Env, units []string, noBlock bool, log func(string, ...an
 		log("%s restarted", unit)
 	}
 
-	return failures
+	return failures, failed
 }
 
 func appendUnique(list []string, items ...string) []string {

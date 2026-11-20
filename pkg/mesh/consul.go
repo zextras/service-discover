@@ -96,6 +96,20 @@ func (c *consulCluster) BindingRuleUpdate(rule *api.ACLBindingRule) error {
 	return err
 }
 
+// ConfigEntry returns the config entry, nil when it does not exist.
+func (c *consulCluster) ConfigEntry(kind, name string) (api.ConfigEntry, error) {
+	entry, _, err := c.entries.Get(kind, name, nil)
+	if err != nil {
+		if statusErr, ok := errors.AsType[api.StatusError](err); ok && statusErr.Code == http.StatusNotFound {
+			return nil, nil //nolint:nilnil // nil is the documented answer for an entry that does not exist.
+		}
+
+		return nil, err
+	}
+
+	return entry, nil
+}
+
 func (c *consulCluster) SetConfigEntry(entry api.ConfigEntry) error {
 	_, _, err := c.entries.Set(entry, nil)
 
@@ -140,6 +154,17 @@ func (c *consulLogin) Valid(secret string) (bool, error) {
 	}
 
 	return false, err
+}
+
+// IsLogin reports whether the token was created by a login of the auth method: only these can be logged out, the
+// tokens created by hand have no auth method.
+func (c *consulLogin) IsLogin(secret string) (bool, error) {
+	token, _, err := c.client.ACL().TokenReadSelf(&api.QueryOptions{Token: secret})
+	if err != nil {
+		return false, err
+	}
+
+	return token.AuthMethod != "", nil
 }
 
 // isDenied reports whether Consul refused the token: it is unknown, expired or not allowed.

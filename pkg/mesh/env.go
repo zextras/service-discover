@@ -39,6 +39,7 @@ func NewEnv(trustDomain string) (*Env, error) {
 	return &Env{
 		ServicesDir: ServicesDir,
 		RenderedDir: RenderedDir,
+		StateDir:    StateDir,
 		CarbonioDir: CarbonioDir,
 		SystemdDir:  SystemdDir,
 		TrustDomain: trustDomain,
@@ -48,6 +49,7 @@ func NewEnv(trustDomain string) (*Env, error) {
 		Login:       consul.Login,
 		Valid:       consul.Valid,
 		Logout:      consul.Logout,
+		IsLogin:     consul.IsLogin,
 		Systemctl:   systemctl,
 		Sleep:       time.Sleep,
 		Now:         time.Now,
@@ -63,6 +65,7 @@ func NewOfflineEnv(trustDomain string) *Env {
 	return &Env{
 		ServicesDir: ServicesDir,
 		RenderedDir: RenderedDir,
+		StateDir:    StateDir,
 		CarbonioDir: CarbonioDir,
 		SystemdDir:  SystemdDir,
 		TrustDomain: trustDomain,
@@ -72,6 +75,7 @@ func NewOfflineEnv(trustDomain string) *Env {
 		Login:       func(string) (string, error) { return "", errOffline },
 		Valid:       func(string) (bool, error) { return false, errOffline },
 		Logout:      func(string) error { return errOffline },
+		IsLogin:     func(string) (bool, error) { return false, errOffline },
 		Systemctl:   systemctl,
 		Sleep:       time.Sleep,
 		Now:         time.Now,

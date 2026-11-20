@@ -40,7 +40,40 @@ func ConsulConfigArgs(env *Env, defs []Definition) ([]string, error) {
 		return nil, errors.Join(errNoRenderedDir, renderErr)
 	}
 
-	return []string{"-config-dir", env.RenderedDir}, renderErr
+	return []string{"-config-dir", env.RenderedDir}, errors.Join(renderErr, noteServiceSet(env))
+}
+
+// noteServiceSet compares the service files Consul is about to load with the ones of its previous start. Consul
+// numbers the ports of the sidecars in registration order, so a different set (or the first start from the
+// rendered directory, where the services came from the packages before) gives some of the running sidecars another
+// port than the one they listen on: the synchronization restarts all of them when it finds the marker.
+func noteServiceSet(env *Env) error {
+	entries, err := os.ReadDir(env.RenderedDir)
+	if err != nil {
+		return err
+	}
+
+	var names []string
+
+	for _, entry := range entries {
+		if !entry.IsDir() && isConfigFile(entry.Name()) {
+			names = append(names, entry.Name())
+		}
+	}
+
+	list := strings.Join(names, "\n") + "\n"
+
+	previous, err := os.ReadFile(env.servicesList())
+	if err == nil && string(previous) == list {
+		return nil
+	}
+
+	err = os.WriteFile(env.servicesList(), []byte(list), tokenFileMode)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(env.sidecarsMarker(), nil, tokenFileMode)
 }
 
 var errNoRenderedDir = errors.New("the directory of the rendered service definitions is not available")

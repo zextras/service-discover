@@ -91,6 +91,10 @@ func (f *fakeCluster) BindingRuleUpdate(rule *api.ACLBindingRule) error {
 	return nil
 }
 
+func (f *fakeCluster) ConfigEntry(kind, name string) (api.ConfigEntry, error) {
+	return f.entries[kind+"/"+name], nil
+}
+
 func (f *fakeCluster) SetConfigEntry(entry api.ConfigEntry) error {
 	if entry.GetKind() == f.failKind {
 		return errCluster
@@ -175,8 +179,8 @@ func TestApply_isIdempotent(t *testing.T) {
 
 	require.NoError(t, Apply(cluster, defs, opts))
 	assert.Equal(t, writes, cluster.writes, "nothing is rewritten when the cluster is up to date")
-	assert.NotContains(t, out.String(), "created")
-	assert.NotContains(t, out.String(), "updated")
+	assert.NotRegexp(t, `[1-9]\d* (created|updated)|policy .* (created|updated)`, out.String())
+	assert.Regexp(t, `config entries: 0 created, 0 updated, [1-9]\d* unchanged\n$`, out.String())
 }
 
 func TestApply_repairsDrift(t *testing.T) {
