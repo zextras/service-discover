@@ -38,6 +38,9 @@ var (
 	spireStartTimeout = 60 * time.Second
 )
 
+// spireNameLookupFactor multiplies spireStartTimeout when the SPIRE agent connects to a name instead of an address.
+const spireNameLookupFactor = 3
+
 type autoConfigClient struct {
 	Enabled         bool     `json:"enabled"`
 	IntroTokenFile  string   `json:"intro_token_file"`
@@ -302,8 +305,19 @@ func (s *Setup) attestAndFetchToken(
 		return "", errors.Errorf("unable to enable %s unit: %s", spire.AgentUnit, err)
 	}
 
+	timeout := spireStartTimeout
+
+	if serverAddress == spireServersAlias {
+		// The SPIRE agent resolves the name through the gRPC DNS resolver, that looks up SRV records in DNS even for
+		// the names of /etc/hosts: a DNS server that does not answer delays each of its connections by 30 seconds.
+		timeout *= spireNameLookupFactor
+
+		fmt.Fprintf(os.Stderr, "Waiting up to %s for the SPIRE agent to connect to %s: a DNS server not answering "+
+			"for this name makes it slow\n", timeout, serverAddress)
+	}
+
 	token, err := spire.NewAgentCLI(deps.CreateCommand).WaitJWTSVID(
-		spire.AudienceAutoConfig, spire.ConsulID(bundle.NodeName), spireStartTimeout, spirePollInterval)
+		spire.AudienceAutoConfig, spire.ConsulID(bundle.NodeName), timeout, spirePollInterval)
 	if err != nil {
 		return "", errors.WithMessage(err, "the join token is valid only once: if it has been consumed generate "+
 			"a new bundle with 'service-discover join-token' before retrying")

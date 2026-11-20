@@ -523,7 +523,7 @@ func TestSetup_join_spireServersHighAvailability(t *testing.T) {
 		"# END service-discover spire servers\n", string(hosts))
 }
 
-func TestSetup_join_singleSpireServerKeepsTheBundleHost(t *testing.T) {
+func TestSetup_join_singleSpireServerUsesItsAddress(t *testing.T) {
 	f := newJoinFixture(t, nil)
 	writeJoinBundle(t, f)
 
@@ -540,11 +540,26 @@ func TestSetup_join_singleSpireServerKeepsTheBundleHost(t *testing.T) {
 
 	agentConf, err := os.ReadFile(filepath.Join(f.dirs.spire, spire.AgentConfFile))
 	require.NoError(t, err)
-	assert.Contains(t, string(agentConf), `server_address = "mail.example.com"`)
+	// the address, not the name: the gRPC DNS resolver of the SPIRE agent looks the name up in DNS
+	assert.Contains(t, string(agentConf), `server_address = "10.0.0.1"`)
 
 	hosts, err := os.ReadFile(f.dirs.hosts)
 	require.NoError(t, err)
 	assert.Equal(t, "127.0.0.1 localhost\n", string(hosts))
+}
+
+func TestSetup_join_noSpireServerAnsweringKeepsTheBundleHost(t *testing.T) {
+	f := newJoinFixture(t, nil)
+	writeJoinBundle(t, f)
+
+	dialSpireServer = func(string) error { return errors.New("connection refused") }
+
+	_, err := f.setup.join(f.deps)
+	require.NoError(t, err)
+
+	agentConf, err := os.ReadFile(filepath.Join(f.dirs.spire, spire.AgentConfFile))
+	require.NoError(t, err)
+	assert.Contains(t, string(agentConf), `server_address = "mail.example.com"`)
 }
 
 func TestHostsBlock(t *testing.T) {

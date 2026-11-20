@@ -38,8 +38,11 @@ var dialSpireServer = func(address string) error {
 
 // spireServerAddress returns the server_address of the SPIRE agent. The SPIRE servers of a high availability cluster
 // run on the Consul servers, so the candidates are the host in the join bundle and the Consul servers it lists: those
-// answering on the SPIRE port are the ones to use. With a single one, the host of the bundle is used as it is. With
-// more, they are given a common name in /etc/hosts, so that the agent survives the loss of any of them.
+// answering on the SPIRE port are the ones to use. With a single one, its address is used: the SPIRE agent dials a
+// name through the gRPC DNS resolver, which looks up SRV records of the name in DNS even when /etc/hosts has it, and a
+// DNS server not answering for it delays every connection of the agent by about 30 seconds. With more, they are given
+// a common name in /etc/hosts, so that the agent survives the loss of any of them. If none answers, the host of the
+// bundle is used as it is.
 func (s *Setup) spireServerAddress(
 	deps businessDependencies, spireHost string, spirePort int, consulServers []string,
 ) (string, error) {
@@ -57,8 +60,11 @@ func (s *Setup) spireServerAddress(
 
 	reachable := reachableSpireServers(deps, candidates, spirePort)
 
-	if len(reachable) < 2 {
+	switch len(reachable) {
+	case 0:
 		return spireHost, nil
+	case 1:
+		return reachable[0], nil
 	}
 
 	err := writeHostsBlock(s.HostsFile, spireServersAlias, reachable)
