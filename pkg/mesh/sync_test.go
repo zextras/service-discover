@@ -279,7 +279,7 @@ func TestSync_issuesTheTokenAsTheServiceUser(t *testing.T) {
 
 	info, err := os.Stat(tokenPath)
 	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	assert.Equal(t, os.FileMode(0o640), info.Mode().Perm(), "the group of the service, e.g. zextras, reads it")
 	assert.Equal(t, Account{UID: 1001, GID: 1001}, machine.chowns[filepath.Dir(tokenPath)])
 
 	rendered := filepath.Join(machine.env.RenderedDir, "carbonio-files.hcl")

@@ -34,7 +34,9 @@ const (
 	// ConsulUser is the user the Consul agent runs as.
 	ConsulUser = "service-discover"
 
-	tokenFileMode   = 0o600
+	// tokenFileMode lets the group of the service read its token, as the setup of the packages did: the services
+	// running inside the mailbox (advanced, license, authz...) are read by the zextras user, member of that group.
+	tokenFileMode   = 0o640
 	renderedMode    = 0o600
 	dropInMode      = 0o600
 	directoryMode   = 0o755
