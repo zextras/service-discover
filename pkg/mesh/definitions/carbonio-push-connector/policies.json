@@ -1,0 +1,29 @@
+{
+  "key_prefix": [
+    {
+      "carbonio-push-connector/": {
+        "policy": "write"
+      },
+      "carbonio-ws-collaboration-db/": {
+        "policy": "read"
+      }
+    }
+  ],
+  "node_prefix": [
+    {
+      "": {
+        "policy": "read"
+      }
+    }
+  ],
+  "service": [
+    {
+      "carbonio-push-connector": {
+        "policy": "write"
+      },
+      "carbonio-push-connector-sidecar-proxy": {
+        "policy": "write"
+      }
+    }
+  ]
+}

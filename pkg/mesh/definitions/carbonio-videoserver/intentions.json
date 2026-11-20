@@ -1,0 +1,10 @@
+{
+  "Kind": "service-intentions",
+  "Name": "carbonio-videoserver",
+  "Sources": [
+    {
+      "Name": "carbonio-ws-collaboration",
+      "Action": "allow"
+    }
+  ]
+}

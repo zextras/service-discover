@@ -1,0 +1,26 @@
+{
+  "key_prefix": [
+    {
+      "carbonio-tasks/": {
+        "policy": "read"
+      }
+    }
+  ],
+  "node_prefix": [
+    {
+      "": {
+        "policy": "read"
+      }
+    }
+  ],
+  "service": [
+    {
+      "carbonio-tasks": {
+        "policy": "write"
+      },
+      "carbonio-tasks-sidecar-proxy": {
+        "policy": "write"
+      }
+    }
+  ]
+}

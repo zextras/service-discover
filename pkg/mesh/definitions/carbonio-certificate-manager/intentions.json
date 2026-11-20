@@ -1,0 +1,30 @@
+{
+  "Kind": "service-intentions",
+  "Name": "carbonio-certificate-manager",
+  "Sources": [
+    {
+      "Name": "carbonio-proxy",
+      "Permissions": [
+        {
+          "Action": "allow",
+          "HTTP": {
+            "PathPrefix": "/certificates",
+            "Methods": [ "PUT", "GET" ]
+          }
+        }
+      ]
+    },
+    {
+      "Name": "carbonio-smime-milter",
+      "Permissions": [
+        {
+          "Action": "allow",
+          "HTTP": {
+            "PathPrefix": "/smime",
+            "Methods": [ "PUT" ]
+          }
+        }
+      ]
+    }
+  ]
+}

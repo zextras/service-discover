@@ -1,0 +1,22 @@
+{
+  "Kind": "service-intentions",
+  "Name": "carbonio-message-dispatcher-db",
+  "Sources": [
+    {
+      "Name": "carbonio-message-dispatcher-http",
+      "Action": "allow"
+    },
+    {
+      "Name": "carbonio-message-dispatcher-xmpp",
+      "Action": "allow"
+    },
+    {
+      "Name": "carbonio-message-dispatcher-auth",
+      "Action": "allow"
+    },
+    {
+      "Name": "carbonio-ws-collaboration",
+      "Action": "allow"
+    }
+  ]
+}

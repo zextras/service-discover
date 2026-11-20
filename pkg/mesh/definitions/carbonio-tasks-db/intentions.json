@@ -1,0 +1,10 @@
+{
+  "Kind": "service-intentions",
+  "Name": "carbonio-tasks-db",
+  "Sources": [
+    {
+      "Name": "carbonio-tasks",
+      "Action": "allow"
+    }
+  ]
+}

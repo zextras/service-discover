@@ -1,0 +1,13 @@
+{
+  "Kind": "service-intentions",
+  "Name": "carbonio-mta",
+  "Sources": [
+    {
+      "Name": "carbonio-mailbox",
+      "Action": "allow"
+    },
+    {
+      "Name": "carbonio-files",
+      "Action": "allow"
+    }]
+}

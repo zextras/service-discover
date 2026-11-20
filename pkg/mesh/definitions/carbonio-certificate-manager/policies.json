@@ -1,0 +1,32 @@
+{
+  "key_prefix": [
+    {
+      "carbonio-certificate-manager/": {
+        "policy": "read"
+      }, 
+      "carbonio-mailbox/": {
+        "policy": "read"
+      }, 
+      "carbonio-smime-milter/": {
+        "policy": "read"
+      }
+    }
+  ],
+  "node_prefix": [
+    {
+      "": {
+        "policy": "read"
+      }
+    }
+  ],
+  "service": [
+    {
+      "carbonio-certificate-manager": {
+      "policy": "write"
+      }, 
+      "carbonio-certificate-manager-sidecar-proxy": {
+      "policy": "write"
+      }
+    }
+  ]
+}

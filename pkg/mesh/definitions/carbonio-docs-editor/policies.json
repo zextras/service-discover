@@ -1,0 +1,26 @@
+{
+  "key_prefix": [
+    {
+      "carbonio-docs-editor/": {
+        "policy": "read"
+      }
+    }
+  ],
+  "node_prefix": [
+    {
+      "": {
+        "policy": "read"
+      }
+    }
+  ],
+  "service": [
+    {
+      "carbonio-docs-editor": {
+        "policy": "write"
+      },
+      "carbonio-docs-editor-sidecar-proxy": {
+        "policy": "write"
+      }
+    }
+  ]
+}

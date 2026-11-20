@@ -1,0 +1,14 @@
+{
+  "Kind": "service-intentions",
+  "Name": "carbonio-message-dispatcher-http",
+  "Sources": [
+    {
+      "Name": "carbonio-ws-collaboration",
+      "Action": "allow"
+    },
+    {
+      "Name": "carbonio-proxy",
+      "Action": "allow"
+    }
+  ]
+}

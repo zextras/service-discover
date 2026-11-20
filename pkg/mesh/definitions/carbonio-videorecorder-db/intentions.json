@@ -1,0 +1,10 @@
+{
+  "Kind": "service-intentions",
+  "Name": "carbonio-videorecorder-db",
+  "Sources": [
+    {
+      "Name": "carbonio-videorecorder",
+      "Action": "allow"
+    }
+  ]
+}

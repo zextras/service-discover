@@ -1,0 +1,39 @@
+{
+  "key_prefix": [
+    {
+      "carbonio-message-broker/": {
+        "policy": "write"
+      },
+      "carbonio-message-broker-clustered/": {
+        "policy": "write"
+      }
+    }
+  ],
+  "node_prefix": [
+    {
+      "": {
+        "policy": "read"
+      }
+    }
+  ],
+  "service": [
+    {
+      "carbonio-message-broker-sidecar-proxy": {
+        "policy": "write"
+      },
+      "carbonio-message-broker": {
+        "policy": "write"
+      },
+      "carbonio-message-broker-clustered": {
+        "policy": "write"
+      }
+    }
+  ],
+  "session_prefix": [
+    {
+      "": {
+        "policy": "write"
+      }
+    }
+  ]
+}

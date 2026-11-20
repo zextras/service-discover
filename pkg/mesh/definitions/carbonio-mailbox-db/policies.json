@@ -1,0 +1,66 @@
+{
+  "key_prefix": [
+    {
+      "carbonio-mailbox/": {
+        "policy": "write"
+      }
+    },
+    {
+      "carbonio-powerstore/": {
+        "policy": "write"
+      }
+    },
+    {
+      "carbonio-abq/": {
+        "policy": "write"
+      }
+    },
+    {
+      "carbonio-activesync/": {
+        "policy": "write"
+      }
+    },
+    {
+      "carbonio-auth/": {
+        "policy": "write"
+      }
+    },
+    {
+      "carbonio-core/": {
+        "policy": "write"
+      }
+    },
+    {
+      "carbonio-ha/": {
+        "policy": "write"
+      }
+    },
+    {
+      "carbonio-backup/": {
+        "policy": "write"
+      }
+    },
+    {
+      "carbonio-subscription/": {
+        "policy": "write"
+      }
+    }
+  ],
+  "node_prefix": [
+    {
+      "": {
+        "policy": "read"
+      }
+    }
+  ],
+  "service": [
+    {
+      "carbonio-mailbox-db": {
+        "policy": "write"
+      },
+      "carbonio-mailbox-db-sidecar-proxy": {
+        "policy": "write"
+      }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "Kind": "service-intentions",
+  "Name": "carbonio-clamav",
+  "Sources": [
+    {
+      "Name": "carbonio-mta",
+      "Action": "allow"
+    },
+    {
+      "Name": "carbonio-mailbox",
+      "Action": "allow"
+    }
+  ]
+}
