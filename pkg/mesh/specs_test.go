@@ -209,3 +209,16 @@ func TestLoad_readsTheOverrideWithoutTheChecksOfThePackage(t *testing.T) { //nol
 	_, err = Load()
 	require.ErrorIs(t, err, ErrSpecsMissing)
 }
+
+func TestLoad_theInstalledPackageIsRequiredWithoutTheOverride(t *testing.T) { //nolint:paralleltest // changes the environment
+	if _, err := os.Stat(DefaultSpecsDir); err == nil {
+		t.Skip("the service-discover-specs package is installed on this machine")
+	}
+
+	t.Setenv(SpecsDirEnv, "")
+
+	_, err := Load()
+
+	require.ErrorIs(t, err, ErrSpecsMissing)
+	assert.Contains(t, err.Error(), "service-discover-specs")
+}

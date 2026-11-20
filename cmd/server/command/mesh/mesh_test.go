@@ -8,6 +8,8 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 
@@ -255,4 +257,20 @@ func TestApply_revokeLegacyReportsTheFailure(t *testing.T) {
 
 	require.ErrorIs(t, run(t, cmd), errApply)
 	assert.NotContains(t, fix.out.String(), "Legacy ACL tokens:")
+}
+
+func TestInstalledManifest_readsTheManifestOfTheSpecsDirectory(t *testing.T) { //nolint:paralleltest // changes the environment
+	dir := t.TempDir()
+	t.Setenv(mesh.SpecsDirEnv, dir)
+
+	_, err := installedManifest()
+	require.ErrorIs(t, err, mesh.ErrSpecsMissing)
+
+	require.NoError(t, os.WriteFile(filepath.Join(dir, mesh.ManifestFile),
+		[]byte(`{"name":"service-discover-specs","version":"1.2.3-1","services":2,"tree_sha256":"abc"}`), 0o600))
+
+	manifest, err := installedManifest()
+
+	require.NoError(t, err)
+	assert.Equal(t, "1.2.3-1", manifest.Version)
 }
