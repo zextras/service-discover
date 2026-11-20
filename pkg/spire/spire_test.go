@@ -95,20 +95,22 @@ func TestIdentities(t *testing.T) {
 	assert.Equal(t, "spiffe://carbonio/node/mail.example.com", spire.NodeID("mail.example.com"))
 	assert.Equal(t, "spiffe://carbonio/consul/agent-mail-example-com", spire.ConsulID("agent-mail-example-com"))
 	assert.Equal(t, "spiffe://carbonio/service/carbonio-files", spire.ServiceID("carbonio-files"))
-	assert.Equal(t, "https://mail.example.com:8082", spire.OIDCURL("mail.example.com"))
+	assert.Equal(t, "https://mail.example.com:8082/keys", spire.JWKSURL("mail.example.com"))
+	assert.Equal(t, "https://127.0.0.1:8082/keys", spire.LocalJWKSURL)
+	assert.Equal(t, "spiffe://carbonio", spire.Issuer)
 }
 
 func TestConfigs(t *testing.T) {
 	t.Parallel()
 
-	server := spire.ServerConf("10.0.0.1", "mail.example.com")
+	server := spire.ServerConf("10.0.0.1", "")
 	for _, want := range []string{
 		`bind_address = "10.0.0.1"`,
 		`bind_port = "8081"`,
 		`socket_path = "/run/spire/server/api.sock"`,
 		`trust_domain = "carbonio"`,
 		`data_dir = "/var/lib/spire/server"`,
-		`jwt_issuer = "https://mail.example.com:8082"`,
+		`jwt_issuer = "spiffe://carbonio"`,
 		`default_jwt_svid_ttl = "5m"`,
 		`NodeAttestor "join_token"`,
 		`KeyManager "disk"`,
@@ -117,9 +119,15 @@ func TestConfigs(t *testing.T) {
 		assert.Contains(t, server, want)
 	}
 
+	ha := spire.ServerConf("10.0.0.1", testDSN)
+	assert.Contains(t, ha, `database_type = "postgres"`)
+	assert.Contains(t, ha, `connection_string = "`+testDSN+`"`)
+	assert.NotContains(t, ha, "sqlite3")
+	assert.Contains(t, ha, `jwt_issuer = "spiffe://carbonio"`, "the issuer is the same on every server")
+
 	oidc := spire.OIDCConf("/etc/zextras/spire", "10.0.0.1", "mail.example.com")
 	for _, want := range []string{
-		`domains = ["mail.example.com", "10.0.0.1"]`,
+		`domains = ["mail.example.com", "10.0.0.1", "127.0.0.1"]`,
 		`serving_cert_source "cert_file"`,
 		`cert_file_path = "/etc/zextras/spire/oidc-cert.pem"`,
 		`key_file_path = "/etc/zextras/spire/oidc-key.pem"`,
@@ -200,6 +208,9 @@ func TestSignServingCert(t *testing.T) {
 	_, err = leaf.Verify(x509.VerifyOptions{DNSName: "10.0.0.1", Roots: pool})
 	require.NoError(t, err)
 
+	_, err = leaf.Verify(x509.VerifyOptions{DNSName: "127.0.0.1", Roots: pool})
+	require.NoError(t, err, "Consul validates the JWT-SVIDs through the loopback address")
+
 	_, err = leaf.Verify(x509.VerifyOptions{DNSName: "other.example.com", Roots: pool})
 	require.Error(t, err)
 
@@ -210,7 +221,7 @@ func TestSignServingCert(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestWaitOIDCDiscovery(t *testing.T) {
+func TestWaitJWKS(t *testing.T) {
 	t.Parallel()
 
 	caPEM, caKeyPEM := newCA(t)
@@ -224,8 +235,8 @@ func TestWaitOIDCDiscovery(t *testing.T) {
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-ready:
-			if r.URL.Path == "/.well-known/openid-configuration" {
-				_, _ = w.Write([]byte("{}"))
+			if r.URL.Path == "/keys" {
+				_, _ = w.Write([]byte(`{"keys":[{"kty":"EC","kid":"k"}]}`))
 
 				return
 			}
@@ -239,9 +250,9 @@ func TestWaitOIDCDiscovery(t *testing.T) {
 
 	defer server.Close()
 
-	url := strings.Replace(server.URL, "127.0.0.1", "localhost", 1)
+	url := strings.Replace(server.URL, "127.0.0.1", "localhost", 1) + "/keys"
 
-	err = spire.WaitOIDCDiscovery(url, caPEM, 200*time.Millisecond, 20*time.Millisecond)
+	err = spire.WaitJWKS(url, caPEM, 200*time.Millisecond, 20*time.Millisecond)
 	require.Error(t, err, "not ready yet")
 
 	go func() {
@@ -249,12 +260,12 @@ func TestWaitOIDCDiscovery(t *testing.T) {
 		close(ready)
 	}()
 
-	require.NoError(t, spire.WaitOIDCDiscovery(url, caPEM, 5*time.Second, 20*time.Millisecond))
+	require.NoError(t, spire.WaitJWKS(url, caPEM, 5*time.Second, 20*time.Millisecond))
 
 	otherCA, _ := newCA(t)
-	require.Error(t, spire.WaitOIDCDiscovery(url, otherCA, 100*time.Millisecond, 20*time.Millisecond),
+	require.Error(t, spire.WaitJWKS(url, otherCA, 100*time.Millisecond, 20*time.Millisecond),
 		"a server not signed by the given CA must not be trusted")
-	require.Error(t, spire.WaitOIDCDiscovery(url, []byte("junk"), time.Second, 20*time.Millisecond))
+	require.Error(t, spire.WaitJWKS(url, []byte("junk"), time.Second, 20*time.Millisecond))
 }
 
 // cmdFor returns a command factory answering every spire-server invocation with the response registered for the
@@ -401,13 +412,17 @@ func TestEnsureAuthMethod(t *testing.T) {
 				cmd.On("Output").Return(nil, readErr)
 			} else {
 				assert.Contains(t, args, "-config")
+				cfg := args[len(args)-1]
+				assert.Contains(t, cfg, `"JWKSURL":"https://h:8082/keys"`)
+				assert.Contains(t, cfg, `"BoundIssuer":"spiffe://carbonio"`)
+				assert.NotContains(t, cfg, "OIDCDiscovery")
 				cmd.On("Output").Return([]byte("ok"), nil)
 			}
 
 			return cmd
 		}
 
-		require.NoError(t, spire.EnsureAuthMethod(creator, "root-token", "https://h:8082", "CA"))
+		require.NoError(t, spire.EnsureAuthMethod(creator, "root-token", "https://h:8082/keys", "CA"))
 		assert.Equal(t, []string{"acl auth-method read", wantSecond}, calls)
 	}
 
@@ -529,4 +544,34 @@ func TestSignServingCert_pkcs8CAKey(t *testing.T) {
 		"mail.example.com", net.ParseIP("10.0.0.1"), time.Hour)
 
 	require.NoError(t, err)
+}
+
+func TestAuthMethodJWKSURL(t *testing.T) {
+	read := func(out []byte, err error) (string, bool, error) {
+		creator := func(_ string, args ...string) pkgexec.Cmd {
+			assert.Equal(t, []string{"acl", "auth-method", "read", "-name", "spire", "-format", "json"}, args)
+
+			cmd := new(mocks.Cmd)
+			cmd.On("Output").Return(out, err)
+
+			return cmd
+		}
+
+		return spire.AuthMethodJWKSURL(creator, "root-token")
+	}
+
+	url, found, err := read([]byte(`{"Name":"spire","Config":{"JWKSURL":"https://127.0.0.1:8082/keys"}}`), nil)
+	require.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, spire.LocalJWKSURL, url)
+
+	_, found, err = read(nil, &exec.ExitError{Stderr: []byte(`Auth method not found with name "spire"`)})
+	require.NoError(t, err)
+	assert.False(t, found)
+
+	_, _, err = read(nil, &exec.ExitError{Stderr: []byte("connection refused")})
+	require.ErrorContains(t, err, "connection refused")
+
+	_, _, err = read([]byte("junk"), nil)
+	require.Error(t, err)
 }
