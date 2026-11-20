@@ -6,6 +6,7 @@ package setup
 
 import (
 	"os"
+	"slices"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -14,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zextras/service-discover/pkg/command/setup/mocks"
 	mocksexec "github.com/zextras/service-discover/pkg/exec/mocks"
+	"github.com/zextras/service-discover/pkg/spire"
 )
 
 const finalizeNode = "agent-mail2-example-com"
@@ -125,4 +127,76 @@ func TestSetup_finalizeAgent_refusesWhileTheNodeIsNotOnSPIRE(t *testing.T) {
 			func() (clusterSecrets, error) { return clusterSecrets{}, errors.New("bad password") })
 		require.ErrorContains(t, err, "bad password")
 	})
+}
+
+const (
+	serviceToken = `{"AccessorID":"svc-files","Description":"carbonio/carbonio-files/` + finalizeNode +
+		`","Policies":[{"Name":"carbonio-files-policy"}]}`
+	bashToken = `{"AccessorID":"svc-catalog","Description":"Token for\n  carbonio-catalog/mail2.example.com ",` +
+		`"Policies":[{"Name":"carbonio-catalog-policy"}]}`
+	otherServiceToken = `{"AccessorID":"svc-other","Description":"carbonio/carbonio-files/agent-someone-else",` +
+		`"Policies":[{"Name":"carbonio-files-policy"}]}`
+	filesLogin   = `{"AccessorID":"login-files","AuthMethod":"spire","Roles":[{"Name":"carbonio-files-role"}]}`
+	catalogLogin = `{"AccessorID":"login-catalog","AuthMethod":"spire","Roles":[{"Name":"carbonio-catalog-role"}]}`
+)
+
+func (f *finalizeFixture) spireEntries(registered ...string) {
+	for _, service := range []string{"carbonio-files", "carbonio-catalog"} {
+		out := `{"entries":[]}`
+		if slices.Contains(registered, service) {
+			out = `{"entries":[{"id":"1"}]}`
+		}
+
+		cmd := new(mocksexec.Cmd)
+		cmd.On("Output").Return([]byte(out), nil)
+		f.deps.On("CreateCommand", spire.ServerBin, "entry", "show",
+			"-parentID", "spiffe://carbonio/node/mail2.example.com",
+			"-spiffeID", "spiffe://carbonio/service/"+service, "-output", "json", "-socketPath", spire.ServerSocket).
+			Return(cmd)
+	}
+}
+
+func TestSetup_finalizeAgent_revokesTheLegacyServiceTokens(t *testing.T) {
+	f := newFinalizeFixture(t, "["+legacyToken+","+autoToken+","+serviceToken+","+bashToken+","+otherServiceToken+
+		","+filesLogin+","+catalogLogin+"]", policyList,
+		membersHeader+finalizeNode+" 10.0.0.9:8301 alive client 2.1.0 2 dc1 default <default>\n")
+	f.spireEntries("carbonio-files", "carbonio-catalog")
+
+	out, err := (&Setup{}).finalizeAgent(f.deps, "mail2.example.com", finalizeSecrets)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"token:legacy-1", "policy:" + finalizeNode, "token:svc-files", "token:svc-catalog"},
+		*f.deleted, "the service tokens of the host, not the ones of other hosts nor the logins")
+
+	plain, err := out.PlainRender()
+	require.NoError(t, err)
+	assert.Contains(t, plain, "svc-files")
+	assert.Contains(t, plain, "svc-catalog")
+}
+
+func TestSetup_finalizeAgent_keepsTheServiceTokensWithoutReplacement(t *testing.T) {
+	// carbonio-files did not log in, carbonio-catalog is not registered in SPIRE for the host
+	f := newFinalizeFixture(t, "["+legacyToken+","+autoToken+","+serviceToken+","+bashToken+","+catalogLogin+"]",
+		policyList, membersHeader+finalizeNode+" 10.0.0.9:8301 alive client 2.1.0 2 dc1 default <default>\n")
+	f.spireEntries()
+
+	out, err := (&Setup{}).finalizeAgent(f.deps, "mail2.example.com", finalizeSecrets)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"token:legacy-1", "policy:" + finalizeNode}, *f.deleted)
+
+	plain, err := out.PlainRender()
+	require.NoError(t, err)
+	assert.Contains(t, plain, "Kept the legacy ACL token svc-files")
+	assert.Contains(t, plain, "Kept the legacy ACL token svc-catalog")
+}
+
+func TestSetup_finalizeAgent_revokesOnlyTheServiceTokensWhenTheNodeIsDone(t *testing.T) {
+	f := newFinalizeFixture(t, "["+autoToken+","+serviceToken+","+filesLogin+"]", `[{"Name":"global-management"}]`,
+		membersHeader+finalizeNode+" 10.0.0.9:8301 alive client 2.1.0 2 dc1 default <default>\n")
+	f.spireEntries("carbonio-files")
+
+	_, err := (&Setup{}).finalizeAgent(f.deps, "mail2.example.com", finalizeSecrets)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"token:svc-files"}, *f.deleted)
 }

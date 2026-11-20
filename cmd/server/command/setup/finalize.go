@@ -9,14 +9,18 @@ import (
 	"os"
 	"strings"
 
+	"github.com/hashicorp/consul/api/v2"
 	"github.com/pkg/errors"
 	"github.com/zextras/service-discover/pkg/command"
 	"github.com/zextras/service-discover/pkg/exec"
 	"github.com/zextras/service-discover/pkg/formatter"
+	"github.com/zextras/service-discover/pkg/legacytoken"
+	"github.com/zextras/service-discover/pkg/spire"
 )
 
 // Finalize revokes what the setup with the cluster credentials created in Consul for an agent that was migrated to
-// SPIRE (setup --join --migrate on the agent). It is idempotent.
+// SPIRE (setup --join --migrate on the agent), including the per-service tokens of the host that the services
+// replaced with the tokens they get by logging in with SPIRE. It is idempotent.
 type Finalize struct {
 	setup Setup `kong:"-"`
 
@@ -64,7 +68,8 @@ func (f *Finalize) Run(commonFlags *command.GlobalCommonFlags) error {
 }
 
 // finalizeAgent deletes the ACL tokens carrying the policy of the node (the ones the tarball setup creates with
-// CreateACLToken) and the policy itself. Before that it checks that the node is alive in the cluster and owns the
+// CreateACLToken), the policy itself and the legacy per-service tokens of the host that SPIRE replaced (see
+// legacytoken.Find for the conditions). Before that it checks that the node is alive in the cluster and owns the
 // token issued by auto_config, so that the node is not left without a working token. When there is nothing left to
 // delete it succeeds without touching anything.
 //
@@ -109,8 +114,19 @@ func (s *Setup) finalizeAgent(
 		policyExists = policyExists || policy.Name == node
 	}
 
-	if len(legacy) == 0 && !policyExists {
-		out.add("Nothing to revoke for " + node + ": the legacy token and policy are already gone")
+	serviceTokens := &cliTokenACL{deps: deps}
+
+	plan, err := legacytoken.Find(serviceTokens, legacytoken.NewSelector(command.Agent, host,
+		func(service string) (bool, error) {
+			return spire.NewServerCLI(deps.CreateCommand).HasEntry(spire.NodeID(host), spire.ServiceID(service))
+		}))
+	if err != nil {
+		return nil, err
+	}
+
+	if len(legacy) == 0 && !policyExists && len(plan.Revocable) == 0 {
+		out.add("Nothing to revoke for " + node + ": the legacy tokens and policy are already gone")
+		addKeptServiceTokens(out, plan.Kept)
 
 		return out, nil
 	}
@@ -147,7 +163,42 @@ func (s *Setup) finalizeAgent(
 		out.add("Deleted the ACL policy " + node)
 	}
 
+	revoked, err := plan.Revoke(serviceTokens)
+	for _, token := range revoked {
+		out.add("Deleted the legacy ACL token " + token.AccessorID + " of " + token.Service)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	addKeptServiceTokens(out, plan.Kept)
+
 	return out, nil
+}
+
+func addKeptServiceTokens(out *enableOutput, kept []legacytoken.Kept) {
+	for _, entry := range kept {
+		out.add("Kept the legacy ACL token " + entry.Token.AccessorID + " of " + entry.Token.Service + ": " + entry.Reason)
+	}
+}
+
+// cliTokenACL implements legacytoken.ACL with the consul binary and the token in CONSUL_HTTP_TOKEN.
+type cliTokenACL struct {
+	deps businessDependencies
+}
+
+func (c *cliTokenACL) TokenList() ([]*api.ACLTokenListEntry, error) {
+	return consulJSON[[]*api.ACLTokenListEntry](c.deps, "acl", "token", "list", "-format", "json")
+}
+
+func (c *cliTokenACL) TokenDelete(accessorID string) error {
+	_, err := c.deps.CreateCommand(command.ConsulBin, "acl", "token", "delete", "-id", accessorID).Output()
+	if err != nil {
+		return exec.ErrorFromStderr(err, "unable to delete the ACL token "+accessorID)
+	}
+
+	return nil
 }
 
 // classifyAgentTokens returns the accessors of the tokens bound to the policy named as the node, and whether the node
