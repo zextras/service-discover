@@ -796,6 +796,15 @@
       "post_setup": [
         "carbonio-message-broker-setup-users"
       ],
+      "extra_rules": {
+        "key_prefix": [
+          {
+            "rabbitmq/": {
+              "policy": "write"
+            }
+          }
+        ]
+      },
       "pending_setup": "replace",
       "consumer_only": false,
       "repo": "zextras/carbonio-message-broker",

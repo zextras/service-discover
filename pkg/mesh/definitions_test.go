@@ -195,3 +195,16 @@ func TestReadsAllServices(t *testing.T) {
 	assert.False(t, readsAllServices(Rules{"service": {read}}))
 	assert.False(t, readsAllServices(Rules{}))
 }
+
+// RabbitMQ registers its own node in Consul and takes the lock of the cluster formation under rabbitmq/, with the
+// token of the service: without it the node registers once, at its first start, and never again.
+func TestDefinitions_messageBrokerTakesTheClusterFormationLock(t *testing.T) {
+	t.Parallel()
+
+	broker, found := Find(loadDefs(t), "carbonio-message-broker")
+	require.True(t, found)
+
+	rules, err := broker.ExtraPolicy()
+	require.NoError(t, err)
+	assert.Contains(t, rules, `"rabbitmq/"`)
+}
