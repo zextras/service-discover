@@ -106,7 +106,7 @@ postinst__apt() {
     if [ "$1" = "configure" ]; then
       systemctl enable service-discover.service &>/dev/null || :
       systemctl enable --now service-discover-spire-refresh.timer &>/dev/null || :
-      systemctl enable service-discover-sync.path &>/dev/null || :
+      systemctl enable --now service-discover-sync.path &>/dev/null || :
     fi
   fi
 
@@ -121,7 +121,7 @@ postinst__yum() {
     if [ $1 -ge 1 ]; then
       systemctl enable service-discover.service &>/dev/null || :
       systemctl enable --now service-discover-spire-refresh.timer &>/dev/null || :
-      systemctl enable service-discover-sync.path &>/dev/null || :
+      systemctl enable --now service-discover-sync.path &>/dev/null || :
     fi
   fi
 
@@ -138,6 +138,7 @@ prerm__apt() {
   if [ -d /run/systemd/system ]; then
     case "$1" in
       remove)
+        systemctl --no-reload disable --now service-discover-sync.path &>/dev/null || :
         systemctl --no-reload disable --now service-discover-spire-refresh.timer &>/dev/null || :
         systemctl --no-reload disable --now service-discover.service &>/dev/null || :
         ;;
@@ -151,6 +152,7 @@ prerm__apt() {
 prerm__yum() {
   if [ -d /run/systemd/system ]; then
     if [ $1 -eq 0 ]; then
+      systemctl --no-reload disable --now service-discover-sync.path &>/dev/null || :
       systemctl --no-reload disable --now service-discover-spire-refresh.timer &>/dev/null || :
       systemctl --no-reload disable --now service-discover.service &>/dev/null || :
     else

@@ -91,7 +91,7 @@ postinst__apt() {
     # symlink is always reconciled against the current unit (self-healing).
     if [ "$1" = "configure" ]; then
       systemctl enable service-discover.service &>/dev/null || :
-      systemctl enable service-discover-sync.path &>/dev/null || :
+      systemctl enable --now service-discover-sync.path &>/dev/null || :
     fi
   fi
 
@@ -105,7 +105,7 @@ postinst__yum() {
     # [Install] WantedBy= symlink is always reconciled (self-healing).
     if [ $1 -ge 1 ]; then
       systemctl enable service-discover.service &>/dev/null || :
-      systemctl enable service-discover-sync.path &>/dev/null || :
+      systemctl enable --now service-discover-sync.path &>/dev/null || :
     fi
   fi
 
@@ -122,6 +122,7 @@ prerm__apt() {
   if [ -d /run/systemd/system ]; then
     case "$1" in
       remove)
+        systemctl --no-reload disable --now service-discover-sync.path &>/dev/null || :
         systemctl --no-reload disable --now service-discover.service &>/dev/null || :
         ;;
       upgrade)
@@ -134,6 +135,7 @@ prerm__apt() {
 prerm__yum() {
   if [ -d /run/systemd/system ]; then
     if [ $1 -eq 0 ]; then
+      systemctl --no-reload disable --now service-discover-sync.path &>/dev/null || :
       systemctl --no-reload disable --now service-discover.service &>/dev/null || :
     else
       systemctl --no-reload stop service-discover.service &>/dev/null || :
