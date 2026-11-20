@@ -19,6 +19,8 @@ import (
 const (
 	// spiffeIDFlag is the spire-server flag carrying the SPIFFE ID of the entry or of the join token.
 	spiffeIDFlag = "-spiffeID"
+	// outputFlag is the spire-server flag choosing the format of the output of a command.
+	outputFlag = "-output"
 	// nodePathPrefix starts the path of the SPIFFE ID of a node, see NodeID.
 	nodePathPrefix = "/node/"
 )
@@ -63,7 +65,7 @@ func (s *ServerCLI) GenerateJoinToken(spiffeID string, ttl time.Duration) (strin
 	seconds := max(int64((ttl+time.Second-1)/time.Second), 1)
 
 	out, err := s.run("unable to generate a SPIRE join token", "token", "generate",
-		spiffeIDFlag, spiffeID, "-ttl", strconv.FormatInt(seconds, 10), "-output", "json")
+		spiffeIDFlag, spiffeID, "-ttl", strconv.FormatInt(seconds, 10), outputFlag, "json")
 	if err != nil {
 		return "", err
 	}
@@ -87,7 +89,7 @@ func (s *ServerCLI) GenerateJoinToken(spiffeID string, ttl time.Duration) (strin
 // HasEntry reports whether a registration entry binding spiffeID under parentID exists.
 func (s *ServerCLI) HasEntry(parentID, spiffeID string) (bool, error) {
 	out, err := s.run("unable to list the SPIRE entries", "entry", "show",
-		"-parentID", parentID, spiffeIDFlag, spiffeID, "-output", "json")
+		"-parentID", parentID, spiffeIDFlag, spiffeID, outputFlag, "json")
 	if err != nil {
 		return false, err
 	}
@@ -137,7 +139,7 @@ func (s *ServerCLI) EnsureEntry(parentID, spiffeID string, selectors ...string) 
 // NodeHosts returns the names of the hosts of the nodes known to the SPIRE server, sorted: the ones whose join token
 // has been generated for a node SPIFFE ID (see NodeID). The services of every one of them need their identities.
 func (s *ServerCLI) NodeHosts() ([]string, error) {
-	out, err := s.run("unable to list the SPIRE entries", "entry", "show", "-output", "json")
+	out, err := s.run("unable to list the SPIRE entries", "entry", "show", outputFlag, "json")
 	if err != nil {
 		return nil, err
 	}

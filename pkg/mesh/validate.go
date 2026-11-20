@@ -49,50 +49,78 @@ func ValidateDir(dir string) ([]Definition, error) {
 func (d *Definition) check(defs []Definition) []error {
 	var problems []error
 
-	fail := func(err error) { problems = append(problems, err) }
-
 	if d.Repo == "" {
-		fail(errNoRepo)
+		problems = append(problems, errNoRepo)
 	}
 
+	problems = append(problems, d.checkConfigEntries()...)
+	problems = append(problems, d.checkUnits()...)
+	problems = append(problems, d.checkCompanions(defs)...)
+	problems = append(problems, d.checkCommands()...)
+
+	return append(problems, d.checkExtraPolicy()...)
+}
+
+func (d *Definition) checkConfigEntries() []error {
 	entries, err := d.ConfigEntries()
 	if err != nil {
-		fail(err)
+		return []error{err}
 	}
+
+	var problems []error
 
 	for _, entry := range entries {
 		if entry.GetName() == "" {
-			fail(errNoName)
+			problems = append(problems, errNoName)
 		}
 	}
 
+	return problems
+}
+
+// checkUnits checks what the units and the hcl files of the definition say of the kind of service it is.
+func (d *Definition) checkUnits() []error {
+	var problems []error
+
 	for _, unit := range d.Sidecars {
 		if !strings.HasSuffix(unit, "-sidecar.service") {
-			fail(fmt.Errorf("%w: %s", errBadSidecar, unit))
+			problems = append(problems, fmt.Errorf("%w: %s", errBadSidecar, unit))
 		}
 	}
 
 	if d.ConsumerOnly && len(d.HCL) > 0 {
-		fail(errConsumerHCL)
+		problems = append(problems, errConsumerHCL)
 	}
 
 	if d.Generated && len(d.HCL) == 0 {
-		fail(errGeneratedHCL)
+		problems = append(problems, errGeneratedHCL)
 	}
+
+	return problems
+}
+
+func (d *Definition) checkCompanions(defs []Definition) []error {
+	var problems []error
 
 	for _, companion := range d.Companions {
 		if _, found := Find(defs, companion); !found {
-			fail(fmt.Errorf("%w: %s", errNoCompanion, companion))
+			problems = append(problems, fmt.Errorf("%w: %s", errNoCompanion, companion))
 		}
 	}
+
+	return problems
+}
+
+func (d *Definition) checkCommands() []error {
+	var problems []error
 
 	for _, command := range slices.Concat(d.Configure, d.Routing, d.PostSetup) {
 		if len(strings.Fields(command)) == 0 {
-			fail(errEmptyCommand)
+			problems = append(problems, errEmptyCommand)
 		}
 	}
 
-	return append(problems, d.checkExtraPolicy()...)
+	return problems
 }
 
 // checkExtraPolicy checks the rules of the policy linked to the role of the service: a service registering something
