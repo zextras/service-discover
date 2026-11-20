@@ -129,7 +129,7 @@ func TestConfigs(t *testing.T) {
 		assert.Contains(t, oidc, want)
 	}
 
-	agent := spire.AgentConf("/etc/zextras/spire", "mail.example.com", "tok")
+	agent := spire.AgentConf("/etc/zextras/spire", "mail.example.com", 8081, "tok")
 	for _, want := range []string{
 		`server_address = "mail.example.com"`,
 		`server_port = "8081"`,

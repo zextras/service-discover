@@ -164,7 +164,8 @@ func (s *Setup) setupSpireAgent(deps businessDependencies, hostname, bindAddress
 	}
 
 	_, err = spire.WriteFile(deps, s.SpireConfigDir, spire.AgentConfFile,
-		[]byte(spire.AgentConf(s.SpireConfigDir, listenIP.String(), token)), spire.AgentUser, spireSecretMode)
+		[]byte(spire.AgentConf(s.SpireConfigDir, listenIP.String(), spire.ServerPort, token)),
+		spire.AgentUser, spireSecretMode)
 	if err != nil {
 		return err
 	}
