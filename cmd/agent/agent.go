@@ -13,6 +13,7 @@ import (
 	"github.com/zextras/service-discover/cmd/agent/command/setup"
 	"github.com/zextras/service-discover/cmd/agent/config"
 	"github.com/zextras/service-discover/pkg/command"
+	"github.com/zextras/service-discover/pkg/meshcmd"
 	"github.com/zextras/service-discover/pkg/parser"
 )
 
@@ -26,6 +27,8 @@ type CLI struct {
 	Config         command.Config         `cmd:"" help:"Manage service-discover configuration"`
 	BootstrapToken command.BootstrapToken `cmd:"" help:"Print the bootstrap-token" name:"bootstrap-token"`
 	ServiceToken   command.ServiceToken   `cmd:"" help:"Manage the Consul ACL token of a mesh service" name:"service-token"` //nolint:lll
+
+	Service meshcmd.Service `cmd:"" help:"Manage the credentials of the services installed on this node"`
 
 	Version command.Version `cmd:"" help:"Show the version of this CLI and of the agent running in the host"`
 	Help    command.Help    `cmd:"" help:"Print the program help"`
@@ -49,6 +52,7 @@ func main() {
 			os.Stdout,
 			config.AgentName,
 		),
+		Service: meshcmd.New(os.Stdout),
 		Version: cmd.Version(
 			os.Stdout,
 			config.AgentName,

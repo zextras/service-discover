@@ -410,6 +410,11 @@ func (s *Setup) setupSpireIntegration(
 		return errors.WithMessage(err, "unable to set up the SPIRE agent of this server")
 	}
 
+	err = registerMesh(deps, hostname, rootToken)
+	if err != nil {
+		return errors.WithMessage(err, "unable to register the services in the mesh")
+	}
+
 	return nil
 }
 

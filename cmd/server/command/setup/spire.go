@@ -13,6 +13,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/zextras/service-discover/pkg/command"
+	"github.com/zextras/service-discover/pkg/mesh"
 	"github.com/zextras/service-discover/pkg/spire"
 	"github.com/zextras/service-discover/pkg/systemd"
 )
@@ -44,6 +45,25 @@ func bindIP(bindAddress string) (net.IP, error) {
 // by the setup when it runs inside a container.
 func manageSpireUnits() bool {
 	return !command.CheckDockerContainer() || testingMode
+}
+
+// registerMesh registers the services defined by service-discover in the cluster, with the bootstrap token: the ACL
+// policies, the roles, the binding rules of the "spire" auth method, the service protocols and the intentions. Then it
+// creates the SPIRE entries of the services of this server. The other nodes get theirs from the join token.
+func registerMesh(deps businessDependencies, hostname, rootToken string) error {
+	err := mesh.ApplyEmbedded(rootToken, spire.TrustDomain, nil, os.Stdout)
+	if err != nil {
+		return err
+	}
+
+	defs, err := mesh.Load()
+	if err != nil {
+		return err
+	}
+
+	_, err = mesh.EnsureEntries(spire.NewServerCLI(deps.CreateCommand), defs, spire.TrustDomain, hostname)
+
+	return err
 }
 
 func startAndEnableUnit(deps businessDependencies, unit string) error {

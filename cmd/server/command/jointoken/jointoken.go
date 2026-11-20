@@ -22,6 +22,7 @@ import (
 	"github.com/zextras/service-discover/pkg/command"
 	"github.com/zextras/service-discover/pkg/exec"
 	"github.com/zextras/service-discover/pkg/formatter"
+	"github.com/zextras/service-discover/pkg/mesh"
 	"github.com/zextras/service-discover/pkg/spire"
 )
 
@@ -159,6 +160,18 @@ func (j *JoinToken) generate() (*output, error) {
 	// The entry allows the node, once attested with the token, to get the JWT-SVID to join Consul. It does not
 	// depend on the token, so it is created first and a failure does not burn a token.
 	_, err = cli.EnsureEntry(spire.NodeID(j.Host), spire.ConsulID(nodeName), rootSelector)
+	if err != nil {
+		return nil, err
+	}
+
+	// The services of the node get their identity from the SPIRE agent of the node, whichever package is installed
+	// there now or later: the entries are the ones of every service defined by service-discover.
+	defs, err := mesh.Load()
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = mesh.EnsureEntries(cli, defs, spire.TrustDomain, j.Host)
 	if err != nil {
 		return nil, err
 	}

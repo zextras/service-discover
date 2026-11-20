@@ -22,6 +22,7 @@ import (
 	"github.com/zextras/service-discover/pkg/exec"
 	"github.com/zextras/service-discover/pkg/exec/mocks"
 	"github.com/zextras/service-discover/pkg/formatter"
+	"github.com/zextras/service-discover/pkg/mesh"
 	"github.com/zextras/service-discover/pkg/spire"
 )
 
@@ -29,16 +30,32 @@ type fakeDeps struct {
 	uid      int
 	commands map[string]string
 	calls    []string
+	entries  []string // SPIFFE IDs of the entries created
 }
 
 func (f *fakeDeps) CreateCommand(_ string, args ...string) exec.Cmd {
 	key := args[0] + " " + args[1]
 	f.calls = append(f.calls, key)
 
+	if key == "entry create" {
+		f.entries = append(f.entries, args[spiffeIDArgument(args)])
+	}
+
 	cmd := new(mocks.Cmd)
 	cmd.On("Output").Return([]byte(f.commands[key]), nil)
 
 	return cmd
+}
+
+// spiffeIDArgument finds the SPIFFE ID of the entry in the arguments of "spire-server entry create".
+func spiffeIDArgument(args []string) int {
+	for i, arg := range args {
+		if arg == "-spiffeID" {
+			return i + 1
+		}
+	}
+
+	return -1
 }
 
 func (f *fakeDeps) GetuidSyscall() int { return f.uid }
@@ -88,7 +105,20 @@ func TestJoinToken_plainOutputIsTheBundle(t *testing.T) {
 		NodeName:      "agent-mail2-example-com",
 	}, bundle)
 
-	assert.Equal(t, []string{"entry show", "entry create", "token generate", "bundle show"}, deps.calls)
+	defs, err := mesh.Load()
+	require.NoError(t, err)
+
+	// the entry of the Consul agent, one for each service of the mesh, then the token and the bundle
+	want := []string{"entry show", "entry create"}
+	for range defs {
+		want = append(want, "entry show", "entry create")
+	}
+
+	want = append(want, "token generate", "bundle show")
+
+	assert.Equal(t, want, deps.calls)
+	assert.Contains(t, deps.entries, "spiffe://carbonio/service/carbonio-files")
+	assert.Len(t, deps.entries, len(defs)+1)
 }
 
 func TestJoinToken_jsonOutput(t *testing.T) {
