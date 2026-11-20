@@ -15,6 +15,9 @@ import (
 	"github.com/zextras/service-discover/pkg/exec"
 )
 
+// spiffeIDFlag is the spire-server flag carrying the SPIFFE ID of the entry or of the join token.
+const spiffeIDFlag = "-spiffeID"
+
 var (
 	errTokenNotFound = errors.New("spire-server did not return a join token")
 	errNotHealthy    = errors.New("spire-server is not healthy")
@@ -55,7 +58,7 @@ func (s *ServerCLI) GenerateJoinToken(spiffeID string, ttl time.Duration) (strin
 	seconds := max(int64((ttl+time.Second-1)/time.Second), 1)
 
 	out, err := s.run("unable to generate a SPIRE join token", "token", "generate",
-		"-spiffeID", spiffeID, "-ttl", strconv.FormatInt(seconds, 10), "-output", "json")
+		spiffeIDFlag, spiffeID, "-ttl", strconv.FormatInt(seconds, 10), "-output", "json")
 	if err != nil {
 		return "", err
 	}
@@ -80,7 +83,7 @@ func (s *ServerCLI) GenerateJoinToken(spiffeID string, ttl time.Duration) (strin
 // entry with the same parent and SPIFFE ID already exists. It reports whether the entry has been created.
 func (s *ServerCLI) EnsureEntry(parentID, spiffeID string, selectors ...string) (bool, error) {
 	out, err := s.run("unable to list the SPIRE entries", "entry", "show",
-		"-parentID", parentID, "-spiffeID", spiffeID, "-output", "json")
+		"-parentID", parentID, spiffeIDFlag, spiffeID, "-output", "json")
 	if err != nil {
 		return false, err
 	}
@@ -98,7 +101,7 @@ func (s *ServerCLI) EnsureEntry(parentID, spiffeID string, selectors ...string) 
 		return false, nil
 	}
 
-	args := []string{"entry", "create", "-parentID", parentID, "-spiffeID", spiffeID}
+	args := []string{"entry", "create", "-parentID", parentID, spiffeIDFlag, spiffeID}
 	for _, selector := range selectors {
 		args = append(args, "-selector", selector)
 	}

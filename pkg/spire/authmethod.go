@@ -14,7 +14,10 @@ import (
 	"github.com/zextras/service-discover/pkg/exec"
 )
 
-const authMethodNotFound = "not found"
+const (
+	authMethodNotFound = "not found"
+	authMethodCmd      = "auth-method"
+)
 
 // authMethodConfig is the configuration of the Consul jwt auth method validating the JWT-SVIDs issued by SPIRE.
 type authMethodConfig struct {
@@ -47,9 +50,9 @@ func EnsureAuthMethod(
 		return err
 	}
 
-	_, err = commandCreator(command.ConsulBin, "acl", "auth-method", "read", "-name", AuthMethodName).Output()
+	_, err = commandCreator(command.ConsulBin, "acl", authMethodCmd, "read", "-name", AuthMethodName).Output()
 	if err == nil {
-		_, err = commandCreator(command.ConsulBin, "acl", "auth-method", "update",
+		_, err = commandCreator(command.ConsulBin, "acl", authMethodCmd, "update",
 			"-name", AuthMethodName, "-config", string(cfg)).Output()
 		if err != nil {
 			return exec.ErrorFromStderr(err, "unable to update the Consul auth method "+AuthMethodName)
@@ -62,7 +65,7 @@ func EnsureAuthMethod(
 		return exec.ErrorFromStderr(err, "unable to read the Consul auth method "+AuthMethodName)
 	}
 
-	_, err = commandCreator(command.ConsulBin, "acl", "auth-method", "create",
+	_, err = commandCreator(command.ConsulBin, "acl", authMethodCmd, "create",
 		"-type", "jwt", "-name", AuthMethodName, "-token-locality", "local", "-config", string(cfg)).Output()
 	if err != nil {
 		return exec.ErrorFromStderr(err, "unable to create the Consul auth method "+AuthMethodName)

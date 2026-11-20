@@ -7,6 +7,7 @@ package setup
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -306,6 +307,64 @@ func addrsToSingleString(addrs *[]net.Addr, sep string) string {
 	}
 
 	return strings.Join(strAddrs, sep)
+}
+
+// resolveServerIdentity loads the localconfig, then returns the LDAP handler and the hostname of the Carbonio
+// installation after verifying that the hostname resolves to an address of this machine.
+//
+//nolint:misspell // Zimbra is the name of the product the localconfig belongs to
+func (s *Setup) resolveServerIdentity(deps businessDependencies) (carbonio.LdapHandler, string, error) {
+	zimbraLocalConfig, err := carbonio.LoadLocalConfig(s.LocalConfigPath)
+	if err != nil {
+		return nil, "", err
+	}
+
+	ldapHandler := deps.LdapHandler(zimbraLocalConfig)
+
+	zimbraHostname, err := command.RetrieveZimbraHostname(zimbraLocalConfig, ldapHandler)
+	if err != nil {
+		return nil, "", err
+	}
+
+	err = command.CheckHostnameAddress(deps, zimbraHostname)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return ldapHandler, zimbraHostname, nil
+}
+
+// writeConsulConfiguration generates the Consul certificates and writes the Consul configuration file and the
+// mutable configuration holding the bind address, giving both the strict permissions.
+func (s *Setup) writeConsulConfiguration(
+	deps businessDependencies, hostname, gossipKey, oidcURL, bindAddress string,
+) error {
+	consulConfigFile, err := s.generateCertificateAndConfig(deps, hostname, gossipKey, oidcURL)
+	if err != nil {
+		return err
+	}
+
+	consulFileBytes, err := json.MarshalIndent(consulConfigFile, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	err = os.WriteFile(s.ConsulFileConfig, consulFileBytes, os.FileMode(0600))
+	if err != nil {
+		return errors.Errorf("unable to save generated configuration file in %s: %s", s.ConsulHome, err)
+	}
+
+	err = permissions.SetStrictPermissions(deps, s.ConsulFileConfig)
+	if err != nil {
+		return err
+	}
+
+	err = command.SaveBindAddressConfiguration(s.MutableConfigFile, bindAddress)
+	if err != nil {
+		return err
+	}
+
+	return permissions.SetStrictPermissions(deps, s.MutableConfigFile)
 }
 
 // generateGossipKey is directly taken from the way Consul generates it.

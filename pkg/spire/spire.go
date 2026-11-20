@@ -48,24 +48,26 @@ const (
 	ClusterOIDCURLFile = "spire-oidc-url"
 )
 
+const spiffeScheme = "spiffe://"
+
 // NodeID returns the SPIFFE ID of the SPIRE agent running on the given host.
 func NodeID(host string) string {
-	return "spiffe://" + TrustDomain + "/node/" + host
+	return spiffeScheme + TrustDomain + "/node/" + host
 }
 
 // ConsulID returns the SPIFFE ID a Consul agent presents to join the cluster. The name is the Consul node name.
 func ConsulID(consulNodeName string) string {
-	return "spiffe://" + TrustDomain + "/consul/" + consulNodeName
+	return spiffeScheme + TrustDomain + "/consul/" + consulNodeName
 }
 
 // ServiceID returns the SPIFFE ID of a service running in the mesh.
 func ServiceID(service string) string {
-	return "spiffe://" + TrustDomain + "/service/" + service
+	return spiffeScheme + TrustDomain + "/service/" + service
 }
 
 // ClaimAssertion is the Consul auto_config claim assertion binding the JWT subject to the joining node name. The
 // ${node} placeholder is expanded by Consul.
-const ClaimAssertion = `value.spiffe_id == "spiffe://` + TrustDomain + `/consul/${node}"`
+const ClaimAssertion = `value.spiffe_id == "` + spiffeScheme + TrustDomain + `/consul/${node}"`
 
 // OIDCURL returns the issuer and OIDC discovery URL served by the first server of the cluster.
 func OIDCURL(host string) string {
