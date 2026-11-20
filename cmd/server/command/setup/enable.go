@@ -27,12 +27,13 @@ import (
 
 // Spire groups the commands managing SPIRE on a server.
 type Spire struct {
-	Enable Enable `cmd:"" help:"Set up SPIRE on a Consul server that was installed without it, so that agents can join with a SPIRE join bundle. Run it once on every server, one at a time"` //nolint:lll
+	Finalize Finalize `cmd:"" help:"Revoke the legacy ACL token and policy of an agent migrated to SPIRE with setup --join --migrate, after checking that it rejoined with auto_config. Run it with the cluster credentials, on a server"` //nolint:lll
+	Enable   Enable   `cmd:"" help:"Set up SPIRE on a Consul server that was installed without it, so that agents can join with a SPIRE join bundle. Run it once on every server, one at a time"`                                          //nolint:lll
 }
 
 // NewSpire returns the spire command with the real paths of the installation.
 func NewSpire() Spire {
-	return Spire{Enable: Enable{setup: NewSetup()}}
+	return Spire{Enable: Enable{setup: NewSetup()}, Finalize: Finalize{setup: NewSetup()}}
 }
 
 // Enable brings SPIRE to an existing Consul server. It is idempotent.
@@ -107,6 +108,10 @@ func (e *Enable) askPassword() (string, error) {
 		return "", errors.New("stdin carries the datastore connection string: give the password with --password")
 	}
 
+	return askClusterPassword()
+}
+
+func askClusterPassword() (string, error) {
 	terminal, err := term.New(os.Stdin, os.Stdout, term.DefaultTermPrompt)
 	if err != nil {
 		return "", err

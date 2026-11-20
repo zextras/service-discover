@@ -100,6 +100,7 @@ func TestSetup_migrate(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, plain, "migrated to SPIRE")
 	assert.Contains(t, plain, "still valid in Consul")
+	assert.Contains(t, plain, "service-discover spire finalize --host")
 
 	kind, _, err := f.setup.existingConfig()
 	require.NoError(t, err)

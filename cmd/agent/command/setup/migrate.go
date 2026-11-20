@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/zextras/service-discover/pkg/carbonio"
 	"github.com/zextras/service-discover/pkg/command"
 	"github.com/zextras/service-discover/pkg/formatter"
 	"github.com/zextras/service-discover/pkg/spire"
@@ -216,10 +217,24 @@ func (s *Setup) migrate(deps businessDependencies) (formatter.Formatter, error) 
 	out.add("Node " + nodeName + " migrated to SPIRE: the agent joined the cluster with auto_config")
 	out.add("Removed the cluster credentials copy, the agent certificate and the CA key remnants")
 	out.add("The old ACL token of this agent was removed from this host, but it is still valid in Consul: " +
-		"revoke it from a server (the token of an agent cannot delete tokens), where join-token cleans up the " +
-		"node " + nodeName)
+		"revoke it from a Consul server, as root with the cluster credentials password:\n    " +
+		"service-discover spire finalize --host " + s.hostnameForFinalize())
 
 	return out, nil
+}
+
+// hostnameForFinalize is the host to give to 'spire finalize': the hostname of the local configuration, as the node
+// name replaces its dots.
+func (s *Setup) hostnameForFinalize() string {
+	localConfig, err := carbonio.LoadLocalConfig(s.LocalConfigPath)
+	if err == nil {
+		hostname := localConfig.Value(carbonio.LocalConfigServerHostname)
+		if hostname != "" {
+			return hostname
+		}
+	}
+
+	return "<hostname of this node>"
 }
 
 func (o *migrateOutput) add(step string) { o.Steps = append(o.Steps, step) }
