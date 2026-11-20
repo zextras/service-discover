@@ -4,12 +4,15 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
 )
+
+var errUnexpectedStatus = errors.New("unexpected HTTP status")
 
 const (
 	// The JWKS endpoint of the SPIRE OIDC discovery provider may not be serving yet when Consul starts at boot:
@@ -101,7 +104,7 @@ func waitForJWKS(deps deps, configPath string, window, interval time.Duration) {
 // newJWKSClient builds an HTTP client verifying the endpoint against the CA Consul is configured with, as Consul does.
 // Without a CA the system roots are used.
 func newJWKSClient(caPEM string) *http.Client {
-	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12} //nolint:gosec // false positive: TLS 1.2 is the minimum
+	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12}
 
 	if caPEM != "" {
 		pool := x509.NewCertPool()
@@ -125,7 +128,7 @@ func fetchJWKS(client *http.Client, url string) error {
 	defer func() { _ = response.Body.Close() }()
 
 	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("get keys: %s", response.Status)
+		return fmt.Errorf("get keys: %w: %s", errUnexpectedStatus, response.Status)
 	}
 
 	return nil

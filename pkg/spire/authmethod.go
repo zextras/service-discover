@@ -86,7 +86,7 @@ func AuthMethodJWKSURL(
 	}
 	defer os.Unsetenv(command.ConsulHTTPToken)
 
-	out, err := commandCreator(command.ConsulBin, "acl", "auth-method", "read",
+	out, err := commandCreator(command.ConsulBin, "acl", authMethodCmd, "read",
 		"-name", AuthMethodName, "-format", "json").Output()
 	if err != nil {
 		if strings.Contains(exec.ErrorFromStderr(err, "").Error(), authMethodNotFound) {

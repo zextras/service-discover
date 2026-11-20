@@ -53,7 +53,7 @@ func (t *lineTerminal) ReadLine() (string, error) {
 		}
 
 		if err != nil {
-			if err == io.EOF && line.Len() > 0 { //nolint:errorlint // io.EOF is returned as it is
+			if err == io.EOF && line.Len() > 0 {
 				return line.String(), nil
 			}
 

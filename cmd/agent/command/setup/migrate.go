@@ -7,6 +7,7 @@ package setup
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -46,9 +47,7 @@ func (o *migrateOutput) PlainRender() (string, error) { return strings.Join(o.St
 
 func (o *migrateOutput) JSONRender() (string, error) { return formatter.DefaultJSONRender(o) }
 
-func (s *Setup) runMigrate(commonFlags *command.GlobalCommonFlags) error {
-	deps := realDependencies{}
-
+func (s *Setup) runMigrate(commonFlags *command.GlobalCommonFlags, deps businessDependencies, writer io.Writer) error {
 	err := deps.CreateCommand(command.ConsulBin, "version").Run()
 	if err != nil {
 		return errors.Errorf("unable to execute consul binary: %s", err)
@@ -58,7 +57,7 @@ func (s *Setup) runMigrate(commonFlags *command.GlobalCommonFlags) error {
 		return errors.New("this command must be executed as root")
 	}
 
-	out, err := s.migrate(&deps)
+	out, err := s.migrate(deps)
 	if err != nil {
 		return err
 	}
@@ -68,7 +67,7 @@ func (s *Setup) runMigrate(commonFlags *command.GlobalCommonFlags) error {
 		return err
 	}
 
-	_, err = fmt.Fprint(os.Stdout, render)
+	_, err = fmt.Fprint(writer, render)
 
 	return err
 }

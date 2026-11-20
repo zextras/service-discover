@@ -575,3 +575,57 @@ func TestAuthMethodJWKSURL(t *testing.T) {
 	_, _, err = read([]byte("junk"), nil)
 	require.Error(t, err)
 }
+
+func TestAuthMethodJWKSURL_invalidToken(t *testing.T) {
+	creator := func(string, ...string) pkgexec.Cmd {
+		t.Fatal("the auth method must not be read when the token cannot be set")
+
+		return nil
+	}
+
+	_, _, err := spire.AuthMethodJWKSURL(creator, "bad\x00token")
+	require.ErrorContains(t, err, "unable to set the Consul token")
+}
+
+func TestServerCLI_undecodableEntries(t *testing.T) {
+	t.Parallel()
+
+	var calls [][]string
+
+	cli := spire.NewServerCLI(cmdFor(t, map[string]string{"entry show": "not json"}, &calls))
+
+	_, err := cli.HasEntry(spire.NodeID("h"), spire.ConsulID("agent-h"))
+	require.ErrorContains(t, err, "unable to decode the SPIRE entries")
+
+	_, err = cli.EnsureEntry(spire.NodeID("h"), spire.ConsulID("agent-h"), "unix:uid:0")
+	require.ErrorContains(t, err, "unable to decode the SPIRE entries")
+}
+
+func TestWaitJWKS_invalidKeySets(t *testing.T) {
+	t.Parallel()
+
+	caPEM, caKeyPEM := newCA(t)
+	certPEM, keyPEM, err := spire.SignServingCert(caPEM, caKeyPEM, "localhost", net.ParseIP("127.0.0.1"), time.Hour)
+	require.NoError(t, err)
+
+	pair, err := tls.X509KeyPair(certPEM, keyPEM)
+	require.NoError(t, err)
+
+	for name, body := range map[string]string{"not json": "<html>", "no keys": `{"keys":[]}`} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = w.Write([]byte(body))
+			}))
+			server.TLS = &tls.Config{Certificates: []tls.Certificate{pair}, MinVersion: tls.VersionTLS12}
+			server.StartTLS()
+
+			defer server.Close()
+
+			url := strings.Replace(server.URL, "127.0.0.1", "localhost", 1) + "/keys"
+
+			require.Error(t, spire.WaitJWKS(url, caPEM, 100*time.Millisecond, 20*time.Millisecond))
+		})
+	}
+}

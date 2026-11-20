@@ -89,19 +89,32 @@ func (s *Setup) importSetup(deps businessDependencies) (formatter.Formatter, err
 		return nil, err
 	}
 
-	err = os.WriteFile(s.ConsulHome+"/password", []byte(s.Password), 0400)
+	err = s.savePasswordAndEnableService(deps, isContainer)
 	if err != nil {
 		return nil, err
 	}
 
-	if !isContainer {
-		err = systemd.EnableSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
-		if err != nil {
-			return nil, errors.Errorf("unable to enable %s unit: %s", serviceDiscoverUnit, err)
-		}
+	return &formatter.EmptyFormatter{}, nil
+}
+
+// savePasswordAndEnableService stores the cluster credentials password and enables the service at boot, unless
+// running in a container.
+func (s *Setup) savePasswordAndEnableService(deps businessDependencies, isContainer bool) error {
+	err := os.WriteFile(s.ConsulHome+"/password", []byte(s.Password), 0400)
+	if err != nil {
+		return err
 	}
 
-	return &formatter.EmptyFormatter{}, nil
+	if isContainer {
+		return nil
+	}
+
+	err = systemd.EnableSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
+	if err != nil {
+		return errors.Errorf("unable to enable %s unit: %s", serviceDiscoverUnit, err)
+	}
+
+	return nil
 }
 
 // extractClusterCredentials reads the cluster credentials downloaded from LDAP and installs the cluster CA and its key

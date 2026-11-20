@@ -18,6 +18,9 @@ import (
 	"github.com/zextras/service-discover/pkg/spire"
 )
 
+// formatFlag is the Consul CLI flag selecting the output format.
+const formatFlag = "-format"
+
 // Finalize revokes what the setup with the cluster credentials created in Consul for an agent that was migrated to
 // SPIRE (setup --join --migrate on the agent), including the per-service tokens of the host that the services
 // replaced with the tokens they get by logging in with SPIRE. It is idempotent.
@@ -95,14 +98,14 @@ func (s *Setup) finalizeAgent(
 	}
 	defer os.Unsetenv(command.ConsulHTTPToken)
 
-	tokens, err := consulJSON[[]aclTokenEntry](deps, "acl", "token", "list", "-format", "json")
+	tokens, err := consulJSON[[]aclTokenEntry](deps, "acl", "token", "list", formatFlag, "json")
 	if err != nil {
 		return nil, err
 	}
 
 	policies, err := consulJSON[[]struct {
 		Name string `json:"Name"`
-	}](deps, "acl", "policy", "list", "-format", "json")
+	}](deps, "acl", "policy", "list", formatFlag, "json")
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +192,7 @@ type cliTokenACL struct {
 }
 
 func (c *cliTokenACL) TokenList() ([]*api.ACLTokenListEntry, error) {
-	return consulJSON[[]*api.ACLTokenListEntry](c.deps, "acl", "token", "list", "-format", "json")
+	return consulJSON[[]*api.ACLTokenListEntry](c.deps, "acl", "token", "list", formatFlag, "json")
 }
 
 func (c *cliTokenACL) TokenDelete(accessorID string) error {

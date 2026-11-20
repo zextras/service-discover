@@ -73,7 +73,7 @@ const ClaimAssertion = `value.spiffe_id == "` + spiffeScheme + TrustDomain + `/c
 
 // Issuer is the issuer of every JWT-SVID, whichever SPIRE server of the cluster signs it. Consul binds a single
 // issuer, so it cannot be the URL of one server.
-const Issuer = "spiffe://" + TrustDomain
+const Issuer = spiffeScheme + TrustDomain
 
 // LocalJWKSURL is where a Consul server fetches the keys validating the JWT-SVIDs when every Consul server runs its
 // own SPIRE server and OIDC discovery provider (high availability).

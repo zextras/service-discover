@@ -51,11 +51,7 @@ func (s *Wizard) Run(commonFlags *command.GlobalCommonFlags) error {
 		return err
 	}
 
-	if s.SpireDatastoreFile == "-" {
-		return errors.New("the wizard reads its input from the terminal: give the datastore connection string in a file")
-	}
-
-	s.originalSetup.spireDSN, err = spire.ReadDatastoreDSN(s.SpireDatastoreFile, nil)
+	err = s.readSpireDatastore()
 	if err != nil {
 		return err
 	}
@@ -102,4 +98,18 @@ func (s *Wizard) Run(commonFlags *command.GlobalCommonFlags) error {
 	}
 
 	return nil
+}
+
+// readSpireDatastore reads the connection string of the SPIRE datastore, that cannot come from stdin: the wizard
+// reads its answers from there.
+func (s *Wizard) readSpireDatastore() error {
+	if s.SpireDatastoreFile == "-" {
+		return errors.New("the wizard reads its input from the terminal: give the datastore connection string in a file")
+	}
+
+	var err error
+
+	s.originalSetup.spireDSN, err = spire.ReadDatastoreDSN(s.SpireDatastoreFile, nil)
+
+	return err
 }

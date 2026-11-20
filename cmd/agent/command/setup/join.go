@@ -82,7 +82,7 @@ func (s *Setup) runJoinWith(commonFlags *command.GlobalCommonFlags, deps busines
 	}
 
 	if s.Migrate {
-		return s.runMigrate(commonFlags)
+		return s.runMigrate(commonFlags, deps, writer)
 	}
 
 	if s.BindAddress == "" {

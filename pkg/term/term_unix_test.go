@@ -51,3 +51,20 @@ func Test_New_pipedInput(t *testing.T) {
 	require.NoError(t, terminal.Close())
 	assert.Empty(t, out.String(), "no prompt is printed on piped input")
 }
+
+func Test_lineTerminal_writes(t *testing.T) {
+	var out bytes.Buffer
+
+	terminal := newLineTerminal(bytes.NewReader(nil), &out)
+
+	count, err := terminal.Write([]byte("abc"))
+	require.NoError(t, err)
+	assert.Equal(t, 3, count)
+
+	count, err = terminal.WriteString("def")
+	require.NoError(t, err)
+	assert.Equal(t, 3, count)
+
+	assert.Equal(t, "abcdef", out.String())
+	require.NoError(t, terminal.Close())
+}

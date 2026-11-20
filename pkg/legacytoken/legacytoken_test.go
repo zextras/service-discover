@@ -77,6 +77,9 @@ func TestRevokeLegacyServiceTokens(t *testing.T) {
 		legacy("anonymous", "Anonymous Token"),
 		// the description names another service than the policy
 		legacy("mismatch", "carbonio/carbonio-auth/server-mail-example-com", "carbonio-files-policy"),
+		// the description of a legacy token has to name this service for this host
+		legacy("no-host", "Token for carbonio-files", "carbonio-files-policy"),
+		legacy("other-service", "Token for carbonio-auth/mail.example.com", "carbonio-files-policy"),
 		// more than the service policy
 		legacy("extra-policy", "carbonio/carbonio-files/server-mail-example-com", "carbonio-files-policy", "global-management"),
 	}}

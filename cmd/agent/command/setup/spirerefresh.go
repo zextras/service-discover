@@ -6,6 +6,7 @@ package setup
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -48,8 +49,10 @@ func (o *refreshOutput) PlainRender() (string, error) { return strings.Join(o.St
 func (o *refreshOutput) JSONRender() (string, error) { return formatter.DefaultJSONRender(o) }
 
 func (r *Refresh) Run(commonFlags *command.GlobalCommonFlags) error {
-	deps := realDependencies{}
+	return r.run(commonFlags, realDependencies{}, os.Stdout)
+}
 
+func (r *Refresh) run(commonFlags *command.GlobalCommonFlags, deps businessDependencies, writer io.Writer) error {
 	if deps.GetuidSyscall() != rootUID {
 		return errors.New("this command must be executed as root")
 	}
@@ -64,7 +67,7 @@ func (r *Refresh) Run(commonFlags *command.GlobalCommonFlags) error {
 		return err
 	}
 
-	_, err = fmt.Fprint(os.Stdout, render)
+	_, err = fmt.Fprint(writer, render)
 
 	return err
 }
