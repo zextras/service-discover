@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 Zextras <https://www.zextras.com>
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
+[Unit]
+Description=Zextras Service Discover: refresh the SPIRE servers of the agent
+Documentation=https://docs.zextras.com/
+After=service-discover.service
+# only agents joined through SPIRE; it does nothing where the servers are not
+# listed in the managed block of /etc/hosts
+ConditionPathExists=/etc/zextras/spire/agent.conf
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/service-discover spire servers refresh
