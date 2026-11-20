@@ -39,12 +39,40 @@ var (
 	errUnknownService = errors.New("unknown service")
 	errNoLeader       = errors.New("the cluster has no leader")
 
-	errUnattendedRevoke = errors.New("--revoke-legacy needs the bootstrap token typed in: it cannot be --unattended")
+	errUnattendedRevoke = errors.New(
+		"--revoke-legacy cannot be --unattended: it deletes the legacy tokens, the way back, " +
+			"and is an operator's decision after looking at 'service sync'")
 )
 
 // Mesh groups the commands registering the services in the mesh.
 type Mesh struct {
-	Apply Apply `cmd:"" help:"Register in Consul the ACL policies, the roles, the SPIRE binding rules, the service protocols and the intentions of the Carbonio services"` //nolint:lll
+	Apply    Apply    `cmd:"" help:"Register in Consul the ACL policies, the roles, the SPIRE binding rules, the service protocols and the intentions of the Carbonio services"` //nolint:lll
+	Validate Validate `cmd:"" help:"Check the service definitions of a directory without Consul: the rules their files have to follow"`                                          //nolint:lll
+}
+
+// Validate is the "mesh validate" command, run by the CI of the service-discover-specs repository: the same checks the
+// loader makes, and the rules across the files of a definition. It needs neither root nor Consul.
+type Validate struct {
+	Dir string `arg:"" optional:"" help:"The directory of the definitions (index.json and a directory per service), by default the specs directory of the installed package"` //nolint:lll
+
+	writer io.Writer `kong:"-"`
+}
+
+// Run implements the command.
+func (v *Validate) Run(_ *command.GlobalCommonFlags) error {
+	dir := v.Dir
+	if dir == "" {
+		dir, _ = mesh.SpecsDir()
+	}
+
+	defs, err := mesh.ValidateDir(dir)
+	if err != nil {
+		return fmt.Errorf("the service definitions in %s are not valid:\n%w", dir, err)
+	}
+
+	_, err = fmt.Fprintf(v.writer, "OK: %d service definitions in %s\n", len(defs), dir)
+
+	return err
 }
 
 // revokeFunc deletes the legacy tokens of the services the selector accepts, and returns the ones it deleted and the
@@ -97,7 +125,7 @@ type Apply struct {
 // New returns the Mesh commands, asking the bootstrap token as the bootstrap-token command does, and writing on
 // writer.
 func New(bootstrap *command.BootstrapToken, writer io.Writer) Mesh {
-	return Mesh{Apply: Apply{
+	return Mesh{Validate: Validate{writer: writer}, Apply: Apply{
 		bootstrap:    bootstrap,
 		writer:       writer,
 		getuid:       os.Getuid,

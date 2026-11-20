@@ -41,7 +41,13 @@ service is added there, and needs no release of service-discover.
   password the setup stored in `/var/lib/service-discover/password`; a leader without it logs that it did nothing.
 - On the nodes, `service-discover-sync.path` runs `service sync` when `manifest.json` changes. A service whose
   definition the servers have not applied yet (the package reached the node first) makes it end with the status 75,
-  and the unit runs it again after a minute.
+  and the unit runs it again after a minute. `service pending-setup` (the setup at the installation of a package) ends
+  with the same status 75 and a message, keeping the setup pending: it is not an error.
+- `service-discover mesh validate <dir>` checks a directory of definitions without Consul: the checks of the loader
+  and the rules across the files of a definition. The CI of `service-discover-specs` runs it.
+- `mesh apply --unattended` refuses `--revoke-legacy` on purpose: the revocation deletes the legacy token of each
+  service, the way back if a node did not really switch to its SPIRE login, and a package upgrade must not do it
+  without an operator having looked at the result of `service sync`. Run `mesh apply --revoke-legacy` by hand.
 - The tests use the subset of the definitions in `pkg/mesh/testdata/specs`.
 
 ## Prerequisites

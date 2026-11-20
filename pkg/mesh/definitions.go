@@ -221,7 +221,7 @@ func (d *Definition) ExtraPolicy() (string, error) {
 	}
 
 	if len(d.HCL) > 0 && !readsAllServices(rules) {
-		rules["service_prefix"] = append(rules["service_prefix"], map[string]Rule{"": {Policy: "read"}})
+		rules["service_prefix"] = append(rules["service_prefix"], map[string]Rule{"": {Policy: policyRead}})
 	}
 
 	for _, key := range d.Migrations.Keys() {
@@ -237,6 +237,9 @@ func (d *Definition) ExtraPolicy() (string, error) {
 	return string(raw), err
 }
 
+// policyRead is the ACL access that reads without changing.
+const policyRead = "read"
+
 // Rules are ACL rules in the JSON format of the policies: for each resource kind, a list of maps from the resource to
 // the rule.
 type Rules map[string][]map[string]Rule
@@ -249,7 +252,7 @@ type Rule struct {
 // readsAllServices tells whether the rules already give at least the read access to every service.
 func readsAllServices(rules Rules) bool {
 	for _, list := range rules["service_prefix"] {
-		if rule, found := list[""]; found && (rule.Policy == "read" || rule.Policy == "write") {
+		if rule, found := list[""]; found && (rule.Policy == policyRead || rule.Policy == "write") {
 			return true
 		}
 	}

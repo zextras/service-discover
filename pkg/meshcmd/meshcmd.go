@@ -25,8 +25,9 @@ const (
 	// itself, because this node or this script is not handled by the central registration.
 	ExitRunScript = 10
 
-	// ExitPending is the exit status of "service sync" when what it waits for is on the servers: they have not applied
-	// the definition of a service installed on this node yet (EX_TEMPFAIL). The unit running it starts it again.
+	// ExitPending is the exit status of "service sync" and "service pending-setup" when what they wait for is on the
+	// servers: they have not applied the definition of a service installed on this node yet (EX_TEMPFAIL). The unit
+	// running the sync starts it again, the pending setup stays to be done.
 	ExitPending = 75
 
 	defaultWait = 30 * time.Second
@@ -179,7 +180,9 @@ func (s *Sync) syncServices(services []string, setup bool) error {
 //
 // For the services whose script does nothing else the command is the whole setup. For the ones running other
 // commands too, that only need the token of the service, those commands are run after the synchronization. In every
-// other case the exit status is ExitRunScript and the caller runs the script.
+// other case the exit status is ExitRunScript and the caller runs the script. A service the servers have not registered
+// yet (they did not get the specs package yet) ends with ExitPending: the setup is not an error, it has to be done
+// again later.
 type PendingSetup struct {
 	Script      string        `arg:"" help:"Name of the pending setup script, e.g. 511-carbonio-files.sh"`
 	Wait        time.Duration `default:"30s" help:"How long to wait for SPIRE to issue the identity of the service"`
@@ -225,6 +228,18 @@ func (p *PendingSetup) Run(_ *command.GlobalCommonFlags) error {
 
 	// The script restarted the units, so the setup does too, and it sets up the services its package has besides.
 	err = p.sync(append([]string{def.Name}, def.Companions...), true)
+	if errors.Is(err, mesh.ErrPending) {
+		// The servers got the specs package after this node: the setup has to be done again once they applied it, and
+		// the caller keeps the script pending for that. The commands after the synchronization need the token, so they
+		// wait too.
+		_, _ = fmt.Fprintf(p.writer, "%s: the servers have not registered %s yet, the setup stays pending: run it again "+
+			"later (exit status %d): %v\n", p.Script, def.Name, ExitPending, err)
+
+		p.exit(ExitPending)
+
+		return nil
+	}
+
 	if err != nil {
 		return err
 	}

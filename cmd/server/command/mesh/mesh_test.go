@@ -274,3 +274,35 @@ func TestInstalledManifest_readsTheManifestOfTheSpecsDirectory(t *testing.T) { /
 	require.NoError(t, err)
 	assert.Equal(t, "1.2.3-1", manifest.Version)
 }
+
+func TestValidate_acceptsTheFixtureAndRejectsAMissingDirectory(t *testing.T) { //nolint:paralleltest // reads the environment
+	out := &bytes.Buffer{}
+	cmd := &Validate{writer: out}
+
+	require.NoError(t, cmd.Run(nil))
+	assert.Contains(t, out.String(), "OK: ")
+
+	out.Reset()
+	cmd.Dir = filepath.Join(t.TempDir(), "nope")
+
+	err := cmd.Run(nil)
+
+	require.ErrorIs(t, err, mesh.ErrSpecsMissing)
+	assert.Contains(t, err.Error(), "are not valid")
+	assert.Empty(t, out.String())
+}
+
+func TestValidate_listsTheProblemsOfTheDefinitions(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "carbonio-a"), 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "index.json"),
+		[]byte(`{"services":[{"name":"carbonio-a","dir":"a","user":"zextras","pending_setup":"replace","repo":""}]}`), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "carbonio-a", "policies.json"), []byte(`{}`), 0o600))
+
+	err := (&Validate{Dir: dir, writer: io.Discard}).Run(nil)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "carbonio-a: the repository the files come from is required")
+}

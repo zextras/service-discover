@@ -172,3 +172,16 @@ func TestSync_aServiceTheServersHaveNotRegisteredIsRetriedLater(t *testing.T) {
 	require.ErrorIs(t, cmd.Run(&command.GlobalCommonFlags{}), errSync, "another failure is one")
 	assert.Empty(t, exits)
 }
+
+// The servers did not register the service yet: the install-time setup is not an error, it stays to be done and says so.
+func TestPendingSetup_aServiceTheServersHaveNotRegisteredStaysPending(t *testing.T) {
+	t.Parallel()
+
+	rec := &recorder{syncErr: fmt.Errorf("%w: carbonio-message-broker: denied", mesh.ErrPending)}
+	cmd, out := rec.command("720-carbonio-message-broker.sh", true, 0)
+
+	require.NoError(t, cmd.Run(&command.GlobalCommonFlags{}))
+	assert.Equal(t, []int{ExitPending}, rec.exits)
+	assert.Empty(t, rec.commands, "the post setup needs the token")
+	assert.Contains(t, out.String(), "the servers have not registered carbonio-message-broker yet, the setup stays pending")
+}
