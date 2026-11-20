@@ -1,6 +1,0 @@
-{
-  "Kind": "service-defaults",
-  "Name": "carbonio-ws-collaboration",
-  "Protocol": "tcp",
-  "MaxInboundConnections": 65536
-}

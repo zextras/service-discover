@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLoad_embeddedDefinitionsAreConsistent(t *testing.T) {
+func TestLoad_fixtureDefinitionsAreConsistent(t *testing.T) {
 	t.Parallel()
 
 	defs, err := Load()

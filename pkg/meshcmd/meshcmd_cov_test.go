@@ -6,6 +6,7 @@ package meshcmd
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -41,6 +42,7 @@ func TestNew_wiresTheCommandsToTheMachine(t *testing.T) {
 	assert.Same(t, out, svc.PendingSetup.writer)
 	assert.NotNil(t, svc.PendingSetup.run)
 	assert.NotNil(t, svc.PendingSetup.exit)
+	assert.NotNil(t, svc.Sync.exit)
 }
 
 func TestRunCommand(t *testing.T) {
@@ -140,4 +142,33 @@ func TestSync_syncServicesRejectsAnUnknownService(t *testing.T) {
 
 	require.ErrorContains(t, err, "unknown service: no-such-service")
 	assert.Empty(t, out.String(), "nothing was synchronized")
+}
+
+// The specs package reached the node before the servers: the sync ends with the status asking to run it again, which the
+// unit does after a while, instead of failing.
+func TestSync_aServiceTheServersHaveNotRegisteredIsRetriedLater(t *testing.T) {
+	t.Parallel()
+
+	var (
+		exits []int
+		out   bytes.Buffer
+	)
+
+	cmd := settling(t.TempDir(), func([]string, bool) error {
+		return fmt.Errorf("%w: carbonio-new: denied", mesh.ErrPending)
+	})
+	cmd.Settle = 0
+	cmd.writer = &out
+	cmd.exit = func(code int) { exits = append(exits, code) }
+
+	require.NoError(t, cmd.Run(&command.GlobalCommonFlags{}))
+	assert.Equal(t, []int{ExitPending}, exits)
+	assert.Contains(t, out.String(), "Waiting for the servers to register the services of this node")
+	assert.Contains(t, out.String(), "carbonio-new: denied")
+
+	exits = nil
+	cmd.sync = func([]string, bool) error { return errSync }
+
+	require.ErrorIs(t, cmd.Run(&command.GlobalCommonFlags{}), errSync, "another failure is one")
+	assert.Empty(t, exits)
 }

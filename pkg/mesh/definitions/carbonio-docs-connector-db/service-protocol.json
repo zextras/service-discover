@@ -1,5 +1,0 @@
-{
-  "kind": "service-defaults",
-  "name": "carbonio-docs-connector-db",
-  "protocol": "tcp"
-}

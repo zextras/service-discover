@@ -1,5 +1,0 @@
-{
-  "kind": "service-defaults",
-  "name": "carbonio-ws-collaboration-db",
-  "protocol": "tcp"
-}

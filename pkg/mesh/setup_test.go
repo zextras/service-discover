@@ -529,5 +529,5 @@ func TestExporterDefinitions(t *testing.T) {
 		assert.NotContains(t, policy, "service_prefix", "and no other")
 	}
 
-	assert.Equal(t, 12, exporters, "alertmanager and the 11 exporters, the one of the broker is not here")
+	assert.Equal(t, 2, exporters, "alertmanager and the OpenLDAP exporter, the ones of the fixture")
 }

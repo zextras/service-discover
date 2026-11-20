@@ -20,6 +20,7 @@ depends=(
   "envoyproxy"
   "service-discover-base"
   "service-discover-daemon"
+  "service-discover-specs"
   "service-discover-template"
 )
 conflicts=(
@@ -38,8 +39,8 @@ sha256sums=(
   '2893941c73ebae7fbe0e8e955df370a58a9e5360b28193e361b93f3a8e1e6c15'
   '9de5a63e4eb2ddfbed997f87a752b5777ca043883e3a0521b186f11d42ccb58c'
   'a53e8e205b392bf9755eaccd92237a6af42330cc6a5096ef4ebbd8f7c484a97d'
-  '7debb191099235bbeb722565951bf7b4aa57ff84d72d816fa452b7be59a84806'
-  'f894864a912eba0a5aee7cd5c89c5db074715665b98f6b26a738fb9494106c97'
+  'e45b7e4107b2cb73f0b142f533279cf7e5a38727a3a4e54d9162f168ff98e192'
+  '45190d637f96c08c652d5ee01c6c04342dfe510eacedbfe79074579d4a33f41e'
 )
 
 _install_refresh_timer() {

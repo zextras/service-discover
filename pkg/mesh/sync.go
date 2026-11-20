@@ -114,6 +114,12 @@ type SyncOptions struct {
 
 const fetchInterval = 2 * time.Second
 
+// ErrPending is returned by Sync when what is missing is on the servers: this node has the definition of a service
+// (its package and the specs package are newer than the servers' ones) that the servers did not register yet, in SPIRE
+// or in Consul. It is not a failure: the servers apply the definitions when they get the specs package, and the sync
+// has to be run again.
+var ErrPending = errors.New("the servers have not registered the service yet")
+
 // outcome of the synchronization of one service.
 type outcome struct {
 	def         *Definition
@@ -240,7 +246,29 @@ func Sync(env *Env, defs []Definition, opts SyncOptions) error {
 		failures = append(failures, restartAndFinish(env, defs, outcomes, opts, mirrored || len(removed) > 0, log)...)
 	}
 
-	return errors.Join(failures...)
+	return joinFailures(failures)
+}
+
+// waitingError is the failure of a service the servers have not registered yet.
+type waitingError struct{ cause error }
+
+func (e *waitingError) Error() string { return e.cause.Error() }
+func (e *waitingError) Unwrap() error { return e.cause }
+
+// joinFailures returns the failures together. When all of them are services waiting for the servers to register
+// them the result is ErrPending: the caller tries again later, instead of reporting a failure.
+func joinFailures(failures []error) error {
+	if len(failures) == 0 {
+		return nil
+	}
+
+	for _, failure := range failures {
+		if _, waiting := errors.AsType[*waitingError](failure); !waiting {
+			return errors.Join(failures...)
+		}
+	}
+
+	return fmt.Errorf("%w: %w", ErrPending, errors.Join(failures...))
 }
 
 // restartAndFinish reloads Consul and restarts the units depending on a changed file, then finishes the setup.
@@ -426,14 +454,30 @@ func ensureToken(
 		}
 	}
 
+	// A service that never had a token is a new one: what it cannot get is then not yet registered by the servers,
+	// that apply the definitions when they get the specs package.
+	fresh := current == ""
+
 	jwt, err := fetchJWT(env, account, def.SpiffeID(env.TrustDomain), deadline)
 	if err != nil {
+		if fresh {
+			err = &waitingError{fmt.Errorf("no SPIRE identity: %w", err)}
+			log("%s: waiting for the servers to register it: %v", def.Name, err)
+		}
+
 		return "", false, "", err
 	}
 
-	token, err := env.Login(jwt)
+	token, err := login(env, jwt, deadline)
 	if err != nil {
-		return "", false, "", fmt.Errorf("unable to log in Consul: %w", err)
+		err = fmt.Errorf("unable to log in Consul: %w", err)
+
+		if fresh && isDenied(err) {
+			err = &waitingError{err}
+			log("%s: waiting for the servers to register it: %v", def.Name, err)
+		}
+
+		return "", false, "", err
 	}
 
 	err = writeFile(env, path, []byte(token), tokenFileMode, account)
@@ -444,6 +488,19 @@ func ensureToken(
 	log("%s: new token written to %s", def.Name, path)
 
 	return token, true, superseded, nil
+}
+
+// login exchanges the JWT-SVID with a token, again until the deadline passes while Consul denies it: the binding rule
+// of a service that was just registered by a server takes some seconds to reach the others.
+func login(env *Env, jwt string, deadline time.Time) (string, error) {
+	for {
+		token, err := env.Login(jwt)
+		if err == nil || !isDenied(err) || !env.Now().Before(deadline) {
+			return token, err
+		}
+
+		env.Sleep(fetchInterval)
+	}
 }
 
 // readsToken tells if the token file of the service is read by processes that keep what they read: the units

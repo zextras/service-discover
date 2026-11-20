@@ -25,6 +25,10 @@ const (
 	// itself, because this node or this script is not handled by the central registration.
 	ExitRunScript = 10
 
+	// ExitPending is the exit status of "service sync" when what it waits for is on the servers: they have not applied
+	// the definition of a service installed on this node yet (EX_TEMPFAIL). The unit running it starts it again.
+	ExitPending = 75
+
 	defaultWait = 30 * time.Second
 	rootUID     = 0
 )
@@ -40,7 +44,9 @@ type Service struct {
 // New returns the Service commands writing on writer.
 func New(writer io.Writer) Service {
 	return Service{
-		Sync: Sync{writer: writer, getuid: os.Getuid, spireMode: mesh.SPIREMode, servicesDir: mesh.ServicesDir},
+		Sync: Sync{
+			writer: writer, getuid: os.Getuid, exit: os.Exit, spireMode: mesh.SPIREMode, servicesDir: mesh.ServicesDir,
+		},
 		PendingSetup: PendingSetup{
 			writer: writer, getuid: os.Getuid, exit: os.Exit, run: runCommand, spireMode: mesh.SPIREMode,
 		},
@@ -59,14 +65,31 @@ type Sync struct {
 
 	writer    io.Writer   `kong:"-"`
 	getuid    func() int  `kong:"-"`
+	exit      func(int)   `kong:"-"`
 	spireMode func() bool `kong:"-"`
 
 	servicesDir string                                    `kong:"-"`
 	sync        func(services []string, setup bool) error `kong:"-"`
 }
 
-// Run implements the command.
-func (s *Sync) Run(_ *command.GlobalCommonFlags) error {
+// Run implements the command. A service the servers have not registered yet (the specs package reached this node
+// before the servers) is not an error: it ends with ExitPending, to be run again later, as the servers apply the
+// definitions as soon as they get the package.
+func (s *Sync) Run(flags *command.GlobalCommonFlags) error {
+	err := s.run(flags)
+	if errors.Is(err, mesh.ErrPending) {
+		_, _ = fmt.Fprintf(s.writer,
+			"Waiting for the servers to register the services of this node, run again later: %v\n", err)
+
+		s.exit(ExitPending)
+
+		return nil
+	}
+
+	return err
+}
+
+func (s *Sync) run(_ *command.GlobalCommonFlags) error {
 	if !s.spireMode() {
 		_, err := fmt.Fprintln(s.writer, "This node does not use SPIRE: the services keep the token of the agent.")
 
@@ -227,7 +250,7 @@ func (p *PendingSetup) Run(_ *command.GlobalCommonFlags) error {
 }
 
 func runCommand(name string, args ...string) error {
-	cmd := exec.Command(name, args...) //nolint:noctx // command of a package, named by the embedded definitions
+	cmd := exec.Command(name, args...) //nolint:noctx // command named by the definitions of the specs package
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 

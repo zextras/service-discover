@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 Zextras <https://www.zextras.com>
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
+[Unit]
+Description=Zextras Service Discover watch of the service definitions package
+Documentation=https://docs.zextras.com/
+PartOf=service-discover.target
+
+[Path]
+# The manifest of the service-discover-specs package, the last thing that changes when it is installed or upgraded:
+# the definitions of the services come only from that package, installed by root.
+PathChanged=/usr/share/service-discover/specs/manifest.json
+Unit=service-discover-mesh-apply.service
+
+[Install]
+WantedBy=service-discover.target

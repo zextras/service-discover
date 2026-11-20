@@ -10,6 +10,8 @@ PartOf=service-discover.target
 [Path]
 # A package installed after service-discover started puts its service definition here.
 PathChanged=/etc/zextras/service-discover
+# The definitions of the services changed: a new service is registered, a user or a command changed.
+PathChanged=/usr/share/service-discover/specs/manifest.json
 Unit=service-discover-sync.service
 
 [Install]

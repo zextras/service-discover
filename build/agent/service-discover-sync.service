@@ -15,3 +15,8 @@ Type=oneshot
 # On a node using SPIRE: obtain the credentials of the services installed since the last run and register them. It does
 # nothing elsewhere, and nothing when nothing changed.
 ExecStart=/usr/bin/service-discover service sync --no-block --wait 10s --settle 2s
+# The status 75 (EX_TEMPFAIL) is a service whose definition the servers have not applied yet: they do when they get the
+# service-discover-specs package, and the run is started again until they did. Any other failure is not run again.
+Restart=no
+RestartForceExitStatus=75
+RestartSec=60

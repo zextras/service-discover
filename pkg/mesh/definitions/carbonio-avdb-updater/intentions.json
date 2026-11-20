@@ -1,1 +1,0 @@
-{"Kind": "service-intentions", "Name": "carbonio-avdb-updater", "Sources": [{"Name": "carbonio-clamav", "Action": "allow"}]}

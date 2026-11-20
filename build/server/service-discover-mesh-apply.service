@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 Zextras <https://www.zextras.com>
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
+[Unit]
+Description=Zextras Service Discover registration of the service definitions in the cluster
+Documentation=https://docs.zextras.com/
+After=service-discover.service
+# Started by the path unit for every change of the specs package; --settle waits for the end of the installation.
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+# Every server runs it, only the Raft leader applies the definitions (policies, roles, binding rules, configuration
+# entries): the others register the SPIRE entries when they run the SPIRE server. The bootstrap token is the one of the
+# cluster credentials, decrypted with the password the setup stored: a server without it logs that it did nothing.
+ExecStart=/usr/bin/service-discover mesh apply --unattended --settle 2s --wait 60s

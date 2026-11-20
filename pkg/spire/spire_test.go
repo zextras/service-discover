@@ -629,3 +629,52 @@ func TestWaitJWKS_invalidKeySets(t *testing.T) {
 		})
 	}
 }
+
+func TestServerCLI_NodeHosts(t *testing.T) {
+	t.Parallel()
+
+	var calls [][]string
+
+	entries := `{"entries":[
+	  {"spiffe_id":{"trust_domain":"carbonio","path":"/node/rocky9.example.com"}},
+	  {"spiffe_id":{"trust_domain":"carbonio","path":"/node/rocky9.example.com"}},
+	  {"spiffe_id":{"trust_domain":"carbonio","path":"/node/mail.example.com"}},
+	  {"spiffe_id":{"trust_domain":"carbonio","path":"/service/carbonio-files"}},
+	  {"spiffe_id":{"trust_domain":"carbonio","path":"/consul/mail"}}]}`
+
+	cli := spire.NewServerCLI(cmdFor(t, map[string]string{"entry show": entries}, &calls))
+
+	hosts, err := cli.NodeHosts()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"mail.example.com", "rocky9.example.com"}, hosts)
+	assert.Equal(t, []string{"entry", "show", "-output", "json", "-socketPath", spire.ServerSocket}, calls[0])
+
+	cli = spire.NewServerCLI(cmdFor(t, map[string]string{"entry show": "{"}, &calls))
+	_, err = cli.NodeHosts()
+	require.ErrorContains(t, err, "unable to decode the SPIRE entries")
+
+	cli = spire.NewServerCLI(cmdFor(t, map[string]string{}, &calls))
+	_, err = cli.NodeHosts()
+	require.ErrorContains(t, err, "unable to list the SPIRE entries")
+}
+
+func TestServerCLI_EnsureEntry_anEntryCreatedByAnotherServerExists(t *testing.T) {
+	t.Parallel()
+
+	creator := func(_ string, args ...string) pkgexec.Cmd {
+		cmd := new(mocks.Cmd)
+
+		switch args[1] {
+		case "show":
+			cmd.On("Output").Return([]byte(`{"entries":[]}`), nil)
+		default:
+			cmd.On("Output").Return(nil, &exec.ExitError{Stderr: []byte("rpc error: code = AlreadyExists desc = similar entry already exists")})
+		}
+
+		return cmd
+	}
+
+	created, err := spire.NewServerCLI(creator).EnsureEntry("spiffe://carbonio/node/a", "spiffe://carbonio/service/b", "unix:user:b")
+	require.NoError(t, err)
+	assert.False(t, created, "it was created by somebody else")
+}
