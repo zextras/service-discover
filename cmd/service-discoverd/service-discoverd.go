@@ -191,6 +191,8 @@ func runServiceDiscoverDaemon(deps deps, args []string) {
 		return
 	}
 
+	waitForJWKS(deps, mainJSONPath, jwksWaitWindow, jwksPollInterval)
+
 	err = startConsul(deps, isServer, servers, localServer)
 	if err != nil {
 		deps.Log(err.Log)

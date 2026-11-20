@@ -7,8 +7,6 @@
 // the cluster without the cluster credentials tarball.
 package spire
 
-import "strconv"
-
 const (
 	// TrustDomain is the SPIFFE trust domain of the whole mesh.
 	TrustDomain = "carbonio"
@@ -25,27 +23,31 @@ const (
 	ServerPort = 8081
 	// OIDCPort is the HTTPS port of the SPIRE OIDC discovery provider, exposed on the bind address of the server.
 	OIDCPort = 8082
+	// OIDCPortString is OIDCPort as it appears in URLs.
+	OIDCPortString = "8082"
 
-	ConfigDir          = "/etc/zextras/spire"
-	ServerConfFile     = "server.conf"
-	OIDCConfFile       = "oidc-discovery-provider.conf"
-	AgentConfFile      = "agent.conf"
-	BundleFile         = "bundle.pem"
-	OIDCCertFile       = "oidc-cert.pem"
-	OIDCKeyFile        = "oidc-key.pem"
-	ServerSocket       = "/run/spire/server/api.sock"
-	AgentSocket        = "/run/spire/agent/api.sock"
-	ServerDataDir      = "/var/lib/spire/server"
-	AgentDataDir       = "/var/lib/spire/agent"
-	ServerBin          = "/usr/bin/spire-server"
-	AgentBin           = "/usr/bin/spire-agent"
-	ServerUnit         = "spire-server.service"
-	OIDCUnit           = "spire-oidc-discovery-provider.service"
-	AgentUnit          = "spire-agent.service"
-	ServerUser         = "spire-server"
-	AgentUser          = "spire-agent"
-	JWTSVIDTTL         = "5m"
-	ClusterOIDCURLFile = "spire-oidc-url"
+	ConfigDir      = "/etc/zextras/spire"
+	ServerConfFile = "server.conf"
+	OIDCConfFile   = "oidc-discovery-provider.conf"
+	AgentConfFile  = "agent.conf"
+	BundleFile     = "bundle.pem"
+	OIDCCertFile   = "oidc-cert.pem"
+	OIDCKeyFile    = "oidc-key.pem"
+	ServerSocket   = "/run/spire/server/api.sock"
+	AgentSocket    = "/run/spire/agent/api.sock"
+	ServerDataDir  = "/var/lib/spire/server"
+	AgentDataDir   = "/var/lib/spire/agent"
+	ServerBin      = "/usr/bin/spire-server"
+	AgentBin       = "/usr/bin/spire-agent"
+	ServerUnit     = "spire-server.service"
+	OIDCUnit       = "spire-oidc-discovery-provider.service"
+	AgentUnit      = "spire-agent.service"
+	ServerUser     = "spire-server"
+	AgentUser      = "spire-agent"
+	JWTSVIDTTL     = "5m"
+	// ClusterJWKSURLFile is the optional file of the cluster credentials telling where the Consul servers fetch the
+	// keys validating the JWT-SVIDs from.
+	ClusterJWKSURLFile = "spire-jwks-url"
 )
 
 const spiffeScheme = "spiffe://"
@@ -69,7 +71,15 @@ func ServiceID(service string) string {
 // ${node} placeholder is expanded by Consul.
 const ClaimAssertion = `value.spiffe_id == "` + spiffeScheme + TrustDomain + `/consul/${node}"`
 
-// OIDCURL returns the issuer and OIDC discovery URL served by the first server of the cluster.
-func OIDCURL(host string) string {
-	return "https://" + host + ":" + strconv.Itoa(OIDCPort)
+// Issuer is the issuer of every JWT-SVID, whichever SPIRE server of the cluster signs it. Consul binds a single
+// issuer, so it cannot be the URL of one server.
+const Issuer = spiffeScheme + TrustDomain
+
+// LocalJWKSURL is where a Consul server fetches the keys validating the JWT-SVIDs when every Consul server runs its
+// own SPIRE server and OIDC discovery provider (high availability).
+const LocalJWKSURL = "https://127.0.0.1:" + OIDCPortString + "/keys"
+
+// JWKSURL returns the keys endpoint of the OIDC discovery provider of host, used when only one server runs SPIRE.
+func JWKSURL(host string) string {
+	return "https://" + host + ":" + OIDCPortString + "/keys"
 }

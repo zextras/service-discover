@@ -11,9 +11,15 @@ import (
 	"strconv"
 )
 
-// ServerConf renders the configuration of the SPIRE server listening on bindAddress. hostname is the name of the
-// server as it is reachable by the other nodes: it becomes the host part of the JWT issuer.
-func ServerConf(bindAddress, hostname string) string {
+// ServerConf renders the configuration of the SPIRE server listening on bindAddress. The JWT issuer is the same for
+// every server of the cluster. An empty datastoreDSN selects a local SQLite database (a single SPIRE server), a
+// PostgreSQL connection string selects the database shared by all the SPIRE servers of a high availability setup.
+func ServerConf(bindAddress, datastoreDSN string) string {
+	databaseType, connectionString := "sqlite3", filepath.Join(ServerDataDir, "datastore.sqlite3")
+	if datastoreDSN != "" {
+		databaseType, connectionString = "postgres", datastoreDSN
+	}
+
 	return fmt.Sprintf(`server {
   bind_address = %q
   bind_port = "%d"
@@ -28,7 +34,7 @@ func ServerConf(bindAddress, hostname string) string {
 plugins {
   DataStore "sql" {
     plugin_data {
-      database_type = "sqlite3"
+      database_type = %q
       connection_string = %q
     }
   }
@@ -42,16 +48,17 @@ plugins {
   }
 }
 `,
-		bindAddress, ServerPort, ServerSocket, TrustDomain, ServerDataDir, OIDCURL(hostname), JWTSVIDTTL,
-		filepath.Join(ServerDataDir, "datastore.sqlite3"),
+		bindAddress, ServerPort, ServerSocket, TrustDomain, ServerDataDir, Issuer, JWTSVIDTTL,
+		databaseType, connectionString,
 		filepath.Join(ServerDataDir, "keys.json"),
 	)
 }
 
 // OIDCConf renders the configuration of the SPIRE OIDC discovery provider. The HTTPS endpoint listens on
-// bindAddress and is served with the certificate and key found in configDir.
+// bindAddress and is served with the certificate and key found in configDir. It also answers to 127.0.0.1: every
+// Consul server validates the JWT-SVIDs against the provider running on the same host.
 func OIDCConf(configDir, bindAddress, hostname string) string {
-	return fmt.Sprintf(`domains = [%q, %q]
+	return fmt.Sprintf(`domains = [%q, %q, "127.0.0.1"]
 log_level = "INFO"
 
 serving_cert_source "cert_file" {

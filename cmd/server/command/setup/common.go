@@ -49,10 +49,13 @@ type Setup struct {
 	ClusterCredential string `kong:"-"`
 	MutableConfigFile string `kong:"-"`
 	SpireConfigDir    string `kong:"-"`
+	spireDSN          string // connection string of the PostgreSQL database shared by the SPIRE servers (HA)
 
 	Password      string `help:"Set a custom password for the encrypted secret files. If none is set, a random one will be generated and printed"` //nolint:lll
 	BindAddress   string `arg:"" optional:"" help:"The binding address to bind service-discoverd daemon"`
 	FirstInstance bool   `optional:"" default:"false" help:"Force the setup to behave as this was the first server setup"`
+
+	SpireDatastoreFile string `optional:"" help:"File (or - for stdin) with the PostgreSQL connection string of the datastore shared by the SPIRE servers of all the Consul servers (high availability). Without it a single SPIRE server with a local SQLite database is set up"` //nolint:lll
 }
 
 func NewSetup() Setup {
@@ -110,15 +113,15 @@ type tlsConfig struct {
 	InternalRPC tlsInternalRPC `json:"internal_rpc"`
 }
 
-// autoConfigStatic validates the JWT-SVIDs presented by the agents joining through auto_config against the OIDC
-// discovery provider of SPIRE.
+// autoConfigStatic validates the JWT-SVIDs presented by the agents joining through auto_config against the keys
+// served by the OIDC discovery provider of SPIRE.
 type autoConfigStatic struct {
-	OIDCDiscoveryURL    string            `json:"oidc_discovery_url"`
-	OIDCDiscoveryCACert string            `json:"oidc_discovery_ca_cert"`
-	BoundIssuer         string            `json:"bound_issuer"`
-	BoundAudiences      []string          `json:"bound_audiences"`
-	ClaimMappings       map[string]string `json:"claim_mappings"`
-	ClaimAssertions     []string          `json:"claim_assertions"`
+	JWKSURL         string            `json:"jwks_url"`
+	JWKSCACert      string            `json:"jwks_ca_cert"`
+	BoundIssuer     string            `json:"bound_issuer"`
+	BoundAudiences  []string          `json:"bound_audiences"`
+	ClaimMappings   map[string]string `json:"claim_mappings"`
+	ClaimAssertions []string          `json:"claim_assertions"`
 }
 
 type autoConfigAuthorization struct {
@@ -131,18 +134,18 @@ type autoConfig struct {
 }
 
 // newAutoConfig builds the auto_config block of a server. An agent can join only with a JWT-SVID issued by the SPIRE
-// server behind oidcURL for the Consul node name it declares.
-func newAutoConfig(oidcURL, caPEM string) *autoConfig {
+// server whose keys are served at jwksURL for the Consul node name it declares.
+func newAutoConfig(jwksURL, caPEM string) *autoConfig {
 	return &autoConfig{
 		Authorization: autoConfigAuthorization{
 			Enabled: true,
 			Static: autoConfigStatic{
-				OIDCDiscoveryURL:    oidcURL,
-				OIDCDiscoveryCACert: caPEM,
-				BoundIssuer:         oidcURL,
-				BoundAudiences:      []string{spire.AudienceAutoConfig},
-				ClaimMappings:       map[string]string{"sub": "spiffe_id"},
-				ClaimAssertions:     []string{spire.ClaimAssertion},
+				JWKSURL:         jwksURL,
+				JWKSCACert:      caPEM,
+				BoundIssuer:     spire.Issuer,
+				BoundAudiences:  []string{spire.AudienceAutoConfig},
+				ClaimMappings:   map[string]string{"sub": "spiffe_id"},
+				ClaimAssertions: []string{spire.ClaimAssertion},
 			},
 		},
 	}
@@ -206,15 +209,26 @@ func gatherInputs(deps interactiveDependencies, firstInstance bool) (*setupConfi
 
 // Run method runs the Setup command with the flags and settings passed by Kong.
 func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
-	userInterface, err := term.New(os.Stdin, os.Stdout, term.DefaultTermPrompt)
-	if err != nil {
-		return err
+	var err error
+
+	// The terminal is not needed by this command and cannot be created when stdin carries the datastore connection
+	// string.
+	dependency := realDependencies{}
+
+	if s.SpireDatastoreFile != "-" {
+		userInterface, termErr := term.New(os.Stdin, os.Stdout, term.DefaultTermPrompt)
+		if termErr != nil {
+			return termErr
+		}
+
+		defer userInterface.Close()
+
+		dependency.ui = &userInterface
 	}
 
-	defer userInterface.Close()
-
-	dependency := realDependencies{
-		ui: &userInterface,
+	s.spireDSN, err = spire.ReadDatastoreDSN(s.SpireDatastoreFile, os.Stdin)
+	if err != nil {
+		return err
 	}
 
 	err = preRun(dependency)
@@ -337,9 +351,9 @@ func (s *Setup) resolveServerIdentity(deps businessDependencies) (carbonio.LdapH
 // writeConsulConfiguration generates the Consul certificates and writes the Consul configuration file and the
 // mutable configuration holding the bind address, giving both the strict permissions.
 func (s *Setup) writeConsulConfiguration(
-	deps businessDependencies, hostname, gossipKey, oidcURL, bindAddress string,
+	deps businessDependencies, hostname, gossipKey, jwksURL, bindAddress string,
 ) error {
-	consulConfigFile, err := s.generateCertificateAndConfig(deps, hostname, gossipKey, oidcURL)
+	consulConfigFile, err := s.generateCertificateAndConfig(deps, hostname, gossipKey, jwksURL)
 	if err != nil {
 		return err
 	}
@@ -415,9 +429,9 @@ func wizardBindAddressSelection(deps interactiveDependencies) (string, error) {
 
 // generateCertificateAndConfig creates the TLS certificates for consul and
 // finally it generates the gossip key. This ensure secure communications
-// inside Consul. A non-empty oidcURL enables auto_config authorization with the SPIRE server behind it.
+// inside Consul. A non-empty jwksURL enables auto_config authorization with the keys served there.
 func (s *Setup) generateCertificateAndConfig(deps businessDependencies,
-	zimbraHostname string, gossipKey string, oidcURL string) (*setupConfig, error) {
+	zimbraHostname string, gossipKey string, jwksURL string) (*setupConfig, error) {
 	certificateDaysFlag := fmt.Sprintf("-days=%d", certificateExpiration)
 
 	err := exec.InPath(
@@ -474,13 +488,13 @@ func (s *Setup) generateCertificateAndConfig(deps businessDependencies,
 		},
 	}
 
-	if oidcURL != "" {
+	if jwksURL != "" {
 		caPEM, err := os.ReadFile(filepath.Join(s.ConsulHome, command.ConsulCA)) // #nosec
 		if err != nil {
 			return nil, errors.WithMessage(err, "unable to read the Consul CA")
 		}
 
-		consulConfigFile.AutoConfig = newAutoConfig(oidcURL, string(caPEM))
+		consulConfigFile.AutoConfig = newAutoConfig(jwksURL, string(caPEM))
 	}
 
 	return consulConfigFile, nil

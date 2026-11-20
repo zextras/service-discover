@@ -66,6 +66,8 @@ pipeline {
                             modules['spire'] = 'pkg/spire'
                             modules['permissions'] = 'pkg/permissions'
                             modules['service-discoverd'] = 'cmd/service-discoverd'
+                            modules['legacytoken'] = 'pkg/legacytoken'
+                            modules['term'] = 'pkg/term'
                             modules.each { key, value ->
                                 builds[key] = {
                                     dir(value) {

@@ -52,13 +52,18 @@ func (s *Setup) importSetup(deps businessDependencies) (formatter.Formatter, err
 
 	defer os.Remove(caKeyPath)
 
-	oidcURL, err := s.clusterOIDCURL()
+	jwksURL, err := s.clusterJWKSURL()
+	if err != nil {
+		return nil, err
+	}
+
+	runSpire, err := s.importSpireServer(deps, zimbraHostname, jwksURL)
 	if err != nil {
 		return nil, err
 	}
 
 	err = s.writeConsulConfiguration(
-		deps, zimbraHostname, string(extractedFiles[command.GossipKey]), oidcURL, s.BindAddress,
+		deps, zimbraHostname, string(extractedFiles[command.GossipKey]), jwksURL, s.BindAddress,
 	)
 	if err != nil {
 		return nil, err
@@ -79,19 +84,37 @@ func (s *Setup) importSetup(deps businessDependencies) (formatter.Formatter, err
 		return nil, err
 	}
 
-	err = os.WriteFile(s.ConsulHome+"/password", []byte(s.Password), 0400)
+	err = s.importSpireAgent(deps, zimbraHostname, runSpire)
 	if err != nil {
 		return nil, err
 	}
 
-	if !isContainer {
-		err = systemd.EnableSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
-		if err != nil {
-			return nil, errors.Errorf("unable to enable %s unit: %s", serviceDiscoverUnit, err)
-		}
+	err = s.savePasswordAndEnableService(deps, isContainer)
+	if err != nil {
+		return nil, err
 	}
 
 	return &formatter.EmptyFormatter{}, nil
+}
+
+// savePasswordAndEnableService stores the cluster credentials password and enables the service at boot, unless
+// running in a container.
+func (s *Setup) savePasswordAndEnableService(deps businessDependencies, isContainer bool) error {
+	err := os.WriteFile(s.ConsulHome+"/password", []byte(s.Password), 0400)
+	if err != nil {
+		return err
+	}
+
+	if isContainer {
+		return nil
+	}
+
+	err = systemd.EnableSystemdUnit(deps.SystemdUnitHandler, serviceDiscoverUnit)
+	if err != nil {
+		return errors.Errorf("unable to enable %s unit: %s", serviceDiscoverUnit, err)
+	}
+
+	return nil
 }
 
 // extractClusterCredentials reads the cluster credentials downloaded from LDAP and installs the cluster CA and its key
@@ -175,10 +198,11 @@ func (s *Setup) createServerToken(deps businessDependencies, hostname string, ac
 	return command.SetACLToken(deps.CreateCommand, token, aclBootstrapToken.SecretID)
 }
 
-// clusterOIDCURL returns the OIDC discovery URL of the SPIRE server of the cluster, as recorded in the cluster
-// credentials by the first server. It is empty for clusters set up before SPIRE was introduced: their servers keep
-// working, but cannot authorize agents joining with a SPIRE join bundle.
-func (s *Setup) clusterOIDCURL() (string, error) {
+// clusterJWKSURL returns the URL where the Consul servers fetch the keys validating the JWT-SVIDs from, as recorded
+// in the cluster credentials by the first server: the loopback URL when every server runs SPIRE (high availability),
+// the URL of the first server otherwise. It is empty for clusters set up before SPIRE was introduced: their servers
+// keep working, but cannot authorize agents joining with a SPIRE join bundle.
+func (s *Setup) clusterJWKSURL() (string, error) {
 	clusterCredential, err := command.OpenClusterCredential(s.ClusterCredential)
 	if err != nil {
 		return "", err
@@ -191,10 +215,60 @@ func (s *Setup) clusterOIDCURL() (string, error) {
 		return "", errors.Errorf("unable to open %s: %s", clusterCredential.Name(), err)
 	}
 
-	files, err := encrypter.ReadOptionalFiles(credReader, spire.ClusterOIDCURLFile)
+	files, err := encrypter.ReadOptionalFiles(credReader, spire.ClusterJWKSURLFile)
 	if err != nil {
 		return "", err
 	}
 
-	return strings.TrimSpace(string(files[spire.ClusterOIDCURLFile])), nil
+	return strings.TrimSpace(string(files[spire.ClusterJWKSURLFile])), nil
+}
+
+// importSpireMode tells whether this server has to run its own SPIRE server: in a high availability cluster (the keys
+// are served on the loopback address) every Consul server does, on the shared datastore. In a cluster with a single
+// SPIRE server, or without SPIRE, it does not.
+func (s *Setup) importSpireMode(jwksURL string) (bool, error) {
+	runSpire := jwksURL == spire.LocalJWKSURL
+
+	switch {
+	case runSpire && !s.highAvailability():
+		return false, errors.New("the SPIRE servers of this cluster share a PostgreSQL datastore: " +
+			"give its connection string with --spire-datastore-file")
+	case !runSpire && s.highAvailability():
+		return false, errors.New("this cluster runs a single SPIRE server, or none: " +
+			"--spire-datastore-file cannot be used")
+	}
+
+	return runSpire, nil
+}
+
+// importSpireServer runs the SPIRE server of this Consul server when the cluster is in high availability. It tells
+// whether SPIRE runs on this server.
+func (s *Setup) importSpireServer(deps businessDependencies, hostname, jwksURL string) (bool, error) {
+	runSpire, err := s.importSpireMode(jwksURL)
+	if err != nil {
+		return false, err
+	}
+
+	if runSpire {
+		_, err = s.setupSpireServer(deps, hostname, s.BindAddress, true)
+		if err != nil {
+			return false, errors.WithMessage(err, "unable to set up the SPIRE server")
+		}
+	}
+
+	return runSpire, nil
+}
+
+// importSpireAgent sets up the SPIRE agent of this server, once its SPIRE server runs.
+func (s *Setup) importSpireAgent(deps businessDependencies, hostname string, runSpire bool) error {
+	if !runSpire || !manageSpireUnits() {
+		return nil
+	}
+
+	err := s.setupSpireAgent(deps, hostname, s.BindAddress)
+	if err != nil {
+		return errors.WithMessage(err, "unable to set up the SPIRE agent of this server")
+	}
+
+	return nil
 }

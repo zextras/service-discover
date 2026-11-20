@@ -130,14 +130,14 @@ func newFlowEnv(t *testing.T) *flowEnv {
 
 	previousTesting := testingMode
 	testingMode = true
-	previousOIDC := waitOIDCDiscovery
+	previousJWKS := waitJWKS
 	previousPoll, previousTimeout := spirePollInterval, spireStartTimeout
 	spirePollInterval, spireStartTimeout = time.Millisecond, 20*time.Millisecond
-	waitOIDCDiscovery = func(string, []byte, time.Duration, time.Duration) error { return nil }
+	waitJWKS = func(string, []byte, time.Duration, time.Duration) error { return nil }
 
 	t.Cleanup(func() {
 		testingMode = previousTesting
-		waitOIDCDiscovery = previousOIDC
+		waitJWKS = previousJWKS
 		spirePollInterval, spireStartTimeout = previousPoll, previousTimeout
 	})
 
@@ -259,10 +259,10 @@ func TestSetup_firstSetup(t *testing.T) {
 		require.NoError(t, err)
 
 		files, err := encrypter.ReadFiles(reader,
-			spire.ClusterOIDCURLFile, command.GossipKey, command.ConsulACLBootstrap,
+			spire.ClusterJWKSURLFile, command.GossipKey, command.ConsulACLBootstrap,
 		)
 		require.NoError(t, err)
-		assert.Equal(t, "https://mail.example.com:8082", string(files[spire.ClusterOIDCURLFile]))
+		assert.Equal(t, "https://mail.example.com:8082/keys", string(files[spire.ClusterJWKSURLFile]))
 		assert.JSONEq(t, `{"SecretID": "root-token"}`, string(files[command.ConsulACLBootstrap]))
 		assert.NotEmpty(t, files[command.GossipKey])
 	})
@@ -339,7 +339,7 @@ func credentialsTarball(t *testing.T, password string, files map[string]string) 
 	return out.Bytes()
 }
 
-func clusterFiles(t *testing.T, oidcURL string) map[string]string {
+func clusterFiles(t *testing.T, jwksURL string) map[string]string {
 	t.Helper()
 
 	rel := func(name string) string {
@@ -365,8 +365,8 @@ func clusterFiles(t *testing.T, oidcURL string) map[string]string {
 		command.GossipKey:          "gossip",
 	}
 
-	if oidcURL != "" {
-		files[spire.ClusterOIDCURLFile] = oidcURL
+	if jwksURL != "" {
+		files[spire.ClusterJWKSURLFile] = jwksURL
 	}
 
 	return files
@@ -455,8 +455,8 @@ func TestSetup_createClusterCredentials(t *testing.T) {
 	env := newFlowEnv(t)
 	env.writeCA()
 
-	err := env.setup.createClusterCredentials(clusterSecrets{
-		aclBootstrapJSON: []byte(`{"SecretID":"s"}`), gossipKey: "k", oidcURL: "https://h:8082",
+	err := env.setup.createClusterCredentials(sharedSecrets{
+		aclBootstrapJSON: []byte(`{"SecretID":"s"}`), gossipKey: "k", jwksURL: "https://h:8082",
 	}, "pw")
 	require.NoError(t, err)
 
@@ -469,18 +469,18 @@ func TestSetup_createClusterCredentials(t *testing.T) {
 	require.NoError(t, err)
 
 	files, err := encrypter.ReadFiles(reader,
-		spire.ClusterOIDCURLFile, command.GossipKey, command.ConsulACLBootstrap,
+		spire.ClusterJWKSURLFile, command.GossipKey, command.ConsulACLBootstrap,
 		strings.TrimPrefix(env.setup.ConsulHome+"/"+command.ConsulCA, "/"),
 		strings.TrimPrefix(env.setup.ConsulHome+"/"+command.ConsulCAKey, "/"),
 	)
 	require.NoError(t, err)
 	assert.Equal(t, "k", string(files[command.GossipKey]))
-	assert.Equal(t, "https://h:8082", string(files[spire.ClusterOIDCURLFile]))
+	assert.Equal(t, "https://h:8082", string(files[spire.ClusterJWKSURLFile]))
 
 	t.Run("fails when the CA is missing", func(t *testing.T) {
 		env := newFlowEnv(t)
 
-		err := env.setup.createClusterCredentials(clusterSecrets{}, "pw")
+		err := env.setup.createClusterCredentials(sharedSecrets{}, "pw")
 
 		assert.ErrorContains(t, err, "unable to open")
 	})
@@ -559,7 +559,7 @@ func TestSetup_setupSpireServer_failures(t *testing.T) {
 		}, wantErr: "unable to enable " + spire.ServerUnit},
 		{name: "server never gets healthy", failOn: "healthcheck", wantErr: "spire-server is not healthy"},
 		{name: "OIDC discovery never gets ready", prepare: func(*flowEnv) {
-			waitOIDCDiscovery = func(string, []byte, time.Duration, time.Duration) error {
+			waitJWKS = func(string, []byte, time.Duration, time.Duration) error {
 				return errors.New("discovery timeout")
 			}
 		}, wantErr: "discovery timeout"},
@@ -580,7 +580,7 @@ func TestSetup_setupSpireServer_failures(t *testing.T) {
 				bind = tt.bind
 			}
 
-			_, err := env.setup.setupSpireServer(env.deps, flowHostname, bind)
+			_, err := env.setup.setupSpireServer(env.deps, flowHostname, bind, false)
 
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.wantErr)

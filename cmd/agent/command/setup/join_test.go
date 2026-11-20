@@ -56,7 +56,7 @@ type joinFixture struct {
 	setup *Setup
 	deps  *mocks.BusinessDependencies
 	unit  *mockssystemd.UnitManager
-	dirs  struct{ consul, spire string }
+	dirs  struct{ consul, spire, spireData, hosts string }
 }
 
 func newJoinFixture(t *testing.T, jwtErr error) *joinFixture {
@@ -72,7 +72,18 @@ func newJoinFixture(t *testing.T, jwtErr error) *joinFixture {
 	fixture := &joinFixture{}
 	fixture.dirs.consul = t.TempDir()
 	fixture.dirs.spire = filepath.Join(t.TempDir(), "spire")
+	fixture.dirs.spireData = filepath.Join(t.TempDir(), "agent-data")
+	fixture.dirs.hosts = filepath.Join(t.TempDir(), "hosts")
+	require.NoError(t, os.WriteFile(fixture.dirs.hosts, []byte("127.0.0.1 localhost\n"), 0644))
+
+	previousDial := dialSpireServer
+	dialSpireServer = func(string) error { return errors.New("connection refused") }
+
+	t.Cleanup(func() { dialSpireServer = previousDial })
+
 	fixture.setup = &Setup{
+		SpireDataDir:      fixture.dirs.spireData,
+		HostsFile:         fixture.dirs.hosts,
 		ConsulHome:        fixture.dirs.consul,
 		ConsulData:        filepath.Join(fixture.dirs.consul, "data"),
 		ConsulFileConfig:  filepath.Join(fixture.dirs.consul, "main.json"),
@@ -86,6 +97,9 @@ func newJoinFixture(t *testing.T, jwtErr error) *joinFixture {
 		args.Get(2).(chan<- string) <- "done"
 	}).Return(0, nil)
 	fixture.unit.On("EnableUnitFiles", mock.Anything, false, false).Return(false, nil, nil)
+	fixture.unit.On("StopUnit", mock.Anything, "replace", mock.Anything).Run(func(args mock.Arguments) {
+		args.Get(2).(chan<- string) <- "done"
+	}).Return(0, nil)
 	fixture.unit.On("Close").Return()
 
 	selected := net.Interface{Name: "eth0"}
@@ -102,6 +116,9 @@ func newJoinFixture(t *testing.T, jwtErr error) *joinFixture {
 	fixture.deps.On("NetInterfaces").Return([]net.Interface{selected, {Name: "lo"}}, nil).
 		On("AddrResolver", selected).Return([]net.Addr{&addrStub{ip: "192.168.1.1"}}, nil).
 		On("SystemdUnitHandler").Return(fixture.unit, nil).
+		On("LookupIP", "mail.example.com").Return([]net.IP{net.ParseIP("10.0.0.1")}, nil).
+		On("GetuidSyscall").Return(0).
+		On("CreateCommand", command.ConsulBin, "version").Return(okCommand()).
 		On("LookupUser", mock.Anything).Return(&user.User{Uid: "10", Gid: "20"}, nil).
 		On("LookupGroup", mock.Anything).Return(&user.Group{Gid: "20"}, nil).
 		On("Chown", mock.AnythingOfType("string"), 10, 20).Return(nil).
@@ -294,6 +311,9 @@ func (f *joinFixture) failUnit(operation, unit string) {
 	}
 
 	f.unit.On("EnableUnitFiles", mock.Anything, false, false).Return(false, nil, nil)
+	f.unit.On("StopUnit", mock.Anything, "replace", mock.Anything).Run(func(args mock.Arguments) {
+		args.Get(2).(chan<- string) <- "done"
+	}).Return(0, nil)
 	f.unit.On("Close").Return()
 }
 
@@ -316,8 +336,9 @@ func TestSetup_joinFailures(t *testing.T) {
 
 			return encoded
 		}, wantErr: "invalid SPIRE server address"},
-		{name: "Consul CA cannot be written", prepare: func(_ *testing.T, f *joinFixture) {
-			f.setup.ConsulHome = filepath.Join(f.setup.ConsulHome, "missing")
+		{name: "Consul CA cannot be written", prepare: func(t *testing.T, f *joinFixture) {
+			t.Helper()
+			require.NoError(t, os.Mkdir(filepath.Join(f.setup.ConsulHome, "consul-agent-ca.pem"), 0o700))
 		}, wantErr: "unable to write"},
 		{name: "bind address cannot be saved", prepare: func(_ *testing.T, f *joinFixture) {
 			f.setup.MutableConfigFile = filepath.Join(f.setup.ConsulHome, "missing", "config.json")
@@ -382,6 +403,17 @@ func TestSetup_runJoinWith(t *testing.T) {
 		version := new(mocksexec.Cmd)
 		version.On("Run").Return(consulErr)
 
+		kept := fixture.deps.ExpectedCalls[:0]
+
+		for _, call := range fixture.deps.ExpectedCalls {
+			if call.Method == "GetuidSyscall" || (call.Method == "CreateCommand" && call.Arguments[0] == command.ConsulBin) {
+				continue
+			}
+
+			kept = append(kept, call)
+		}
+
+		fixture.deps.ExpectedCalls = kept
 		fixture.deps.On("CreateCommand", command.ConsulBin, "version").Return(version).
 			On("GetuidSyscall").Return(uid)
 
@@ -438,4 +470,204 @@ func TestNew_wiresTheJoinInputs(t *testing.T) {
 
 	assert.Equal(t, spire.ConfigDir, setup.SpireConfigDir)
 	assert.Equal(t, os.Stdin, setup.Stdin)
+}
+
+func okCommand() *mocksexec.Cmd {
+	cmd := new(mocksexec.Cmd)
+	cmd.On("Run").Return(nil)
+
+	return cmd
+}
+
+func writeJoinBundle(t *testing.T, f *joinFixture) {
+	t.Helper()
+
+	f.setup.Join = "-"
+	f.setup.Stdin = strings.NewReader(testBundle(t))
+}
+
+func TestSetup_join_spireServersHighAvailability(t *testing.T) {
+	f := newJoinFixture(t, nil)
+	writeJoinBundle(t, f)
+
+	dialled := map[string]bool{}
+
+	dialSpireServer = func(address string) error {
+		dialled[address] = true
+
+		if address == "10.0.0.3:8081" {
+			return errors.New("connection refused")
+		}
+
+		return nil
+	}
+
+	// the SPIRE servers run on the Consul servers: the third, in the bundle, does not answer
+	f.deps.On("LookupIP", "mail.example.com").Return([]net.IP{net.ParseIP("10.0.0.1")}, nil).Maybe()
+
+	_, err := f.setup.join(f.deps)
+	require.NoError(t, err)
+
+	assert.True(t, dialled["10.0.0.1:8081"] && dialled["10.0.0.2:8081"])
+
+	agentConf, err := os.ReadFile(filepath.Join(f.dirs.spire, spire.AgentConfFile))
+	require.NoError(t, err)
+	assert.Contains(t, string(agentConf), `server_address = "spire-server.carbonio"`)
+
+	hosts, err := os.ReadFile(f.dirs.hosts)
+	require.NoError(t, err)
+	assert.Equal(t, "127.0.0.1 localhost\n"+
+		"# BEGIN service-discover spire servers\n"+
+		"10.0.0.1 spire-server.carbonio\n"+
+		"10.0.0.2 spire-server.carbonio\n"+
+		"# END service-discover spire servers\n", string(hosts))
+}
+
+func TestSetup_join_singleSpireServerUsesItsAddress(t *testing.T) {
+	f := newJoinFixture(t, nil)
+	writeJoinBundle(t, f)
+
+	dialSpireServer = func(address string) error {
+		if address == "10.0.0.1:8081" {
+			return nil
+		}
+
+		return errors.New("connection refused")
+	}
+
+	_, err := f.setup.join(f.deps)
+	require.NoError(t, err)
+
+	agentConf, err := os.ReadFile(filepath.Join(f.dirs.spire, spire.AgentConfFile))
+	require.NoError(t, err)
+	// the address, not the name: the gRPC DNS resolver of the SPIRE agent looks the name up in DNS
+	assert.Contains(t, string(agentConf), `server_address = "10.0.0.1"`)
+
+	hosts, err := os.ReadFile(f.dirs.hosts)
+	require.NoError(t, err)
+	assert.Equal(t, "127.0.0.1 localhost\n", string(hosts))
+}
+
+func TestSetup_join_noSpireServerAnsweringKeepsTheBundleHost(t *testing.T) {
+	f := newJoinFixture(t, nil)
+	writeJoinBundle(t, f)
+
+	dialSpireServer = func(string) error { return errors.New("connection refused") }
+
+	_, err := f.setup.join(f.deps)
+	require.NoError(t, err)
+
+	agentConf, err := os.ReadFile(filepath.Join(f.dirs.spire, spire.AgentConfFile))
+	require.NoError(t, err)
+	assert.Contains(t, string(agentConf), `server_address = "mail.example.com"`)
+}
+
+func TestHostsBlock(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "hosts")
+	require.NoError(t, os.WriteFile(path, []byte("127.0.0.1 localhost\n::1 localhost"), 0644))
+
+	require.NoError(t, writeHostsBlock(path, "alias", []string{"10.0.0.1", "10.0.0.2"}))
+	require.NoError(t, writeHostsBlock(path, "alias", []string{"10.0.0.3", "10.0.0.4"}), "replaces the block")
+
+	hosts, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, "127.0.0.1 localhost\n::1 localhost\n"+hostsBegin+"\n10.0.0.3 alias\n10.0.0.4 alias\n"+hostsEnd+"\n",
+		string(hosts))
+
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0644), info.Mode().Perm())
+
+	require.NoError(t, removeHostsBlock(path))
+
+	hosts, err = os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, "127.0.0.1 localhost\n::1 localhost\n", string(hosts))
+
+	require.NoError(t, removeHostsBlock(filepath.Join(t.TempDir(), "missing")))
+}
+
+func TestSetup_join_recoversFromAFailedAttempt(t *testing.T) {
+	failed := newJoinFixture(t, errors.New("connection refused"))
+	writeJoinBundle(t, failed)
+
+	dialSpireServer = func(string) error { return nil }
+
+	_, err := failed.setup.join(failed.deps)
+	require.ErrorContains(t, err, "valid only once")
+
+	// nothing of the attempt is left behind
+	for _, path := range []string{
+		filepath.Join(failed.dirs.spire, spire.AgentConfFile),
+		filepath.Join(failed.dirs.spire, spire.BundleFile),
+		filepath.Join(failed.dirs.consul, "consul-agent-ca.pem"),
+		failed.setup.joinPendingPath(),
+	} {
+		assert.NoFileExists(t, path)
+	}
+
+	hosts, err := os.ReadFile(failed.dirs.hosts)
+	require.NoError(t, err)
+	assert.Equal(t, "127.0.0.1 localhost\n", string(hosts))
+
+	failed.unit.AssertCalled(t, "StopUnit", spire.AgentUnit, "replace", mock.Anything)
+
+	// new bundle, same host
+	retry := newJoinFixture(t, nil)
+	retry.setup.ConsulHome, retry.setup.ConsulData = failed.dirs.consul, failed.setup.ConsulData
+	retry.setup.ConsulFileConfig, retry.setup.MutableConfigFile = failed.setup.ConsulFileConfig, failed.setup.MutableConfigFile
+	retry.setup.SpireConfigDir, retry.setup.SpireDataDir = failed.dirs.spire, failed.dirs.spireData
+	retry.setup.HostsFile = failed.dirs.hosts
+	writeJoinBundle(t, retry)
+
+	_, err = retry.setup.join(retry.deps)
+	require.NoError(t, err)
+	assert.FileExists(t, retry.setup.ConsulFileConfig)
+	assert.NoFileExists(t, retry.setup.joinPendingPath())
+}
+
+func TestSetup_join_cleansWhatAnInterruptedAttemptLeft(t *testing.T) {
+	f := newJoinFixture(t, nil)
+	writeJoinBundle(t, f)
+
+	// an attempt killed half way: the Consul client configuration was written, Consul started, agent state exists
+	require.NoError(t, os.MkdirAll(f.setup.ConsulData, 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(f.dirs.spireData, "svid"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(f.dirs.spireData, "svid", "old"), []byte("x"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(f.setup.ConsulData, "node-id"), []byte("old"), 0600))
+	require.NoError(t, os.WriteFile(f.setup.ConsulFileConfig, []byte(`{"auto_config":{"enabled":true}}`), 0600))
+	require.NoError(t, os.WriteFile(f.setup.joinPendingPath(), nil, 0600))
+	require.NoError(t, writeHostsBlock(f.dirs.hosts, "old", []string{"10.9.9.9"}))
+
+	require.NoError(t, f.setup.joinPreRun(f.deps), "the half-written join must not block the retry")
+
+	_, err := f.setup.join(f.deps)
+	require.NoError(t, err)
+
+	assert.NoFileExists(t, filepath.Join(f.dirs.spireData, "svid", "old"))
+	assert.NoFileExists(t, filepath.Join(f.setup.ConsulData, "node-id"))
+
+	hosts, err := os.ReadFile(f.dirs.hosts)
+	require.NoError(t, err)
+	assert.Equal(t, "127.0.0.1 localhost\n", string(hosts))
+	assert.NotContains(t, string(hosts), "10.9.9.9")
+}
+
+func TestSetup_join_neverTouchesAClusterCredentialsSetup(t *testing.T) {
+	f := newJoinFixture(t, nil)
+	writeJoinBundle(t, f)
+
+	tarballConfig := `{"encrypt":"gossip","node_name":"agent-mail2"}`
+	require.NoError(t, os.WriteFile(f.setup.ConsulFileConfig, []byte(tarballConfig), 0600))
+
+	// no marker: refused
+	require.ErrorContains(t, f.setup.joinPreRun(f.deps), "already performed")
+
+	// a stale marker next to a configuration that is not a join one: still refused, nothing deleted
+	require.NoError(t, os.WriteFile(f.setup.joinPendingPath(), nil, 0600))
+	require.ErrorContains(t, f.setup.joinPreRun(f.deps), "already performed")
+
+	content, err := os.ReadFile(f.setup.ConsulFileConfig)
+	require.NoError(t, err)
+	assert.Equal(t, tarballConfig, string(content))
 }
