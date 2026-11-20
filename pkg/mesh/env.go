@@ -95,6 +95,11 @@ func lookupUser(name string) (Account, error) {
 		return Account{}, err
 	}
 
+	return accountOf(found)
+}
+
+// accountOf converts the numeric ids of a user of the system.
+func accountOf(found *user.User) (Account, error) {
 	uid, err := strconv.Atoi(found.Uid)
 	if err != nil {
 		return Account{}, err
@@ -112,18 +117,23 @@ func lookupUser(name string) (Account, error) {
 // the processes of its user, so the identity cannot be requested by root on its behalf and root never impersonates
 // another user beyond starting a process as it.
 func fetchJWTAs(account Account, spiffeID string) (string, error) {
+	//nolint:gosec // ids of /etc/passwd
+	credential := &syscall.Credential{Uid: uint32(account.UID), Gid: uint32(account.GID)}
+
+	return runAgentFetch(spire.AgentBin, credential, spiffeID)
+}
+
+// runAgentFetch runs the SPIRE agent client binary, as the given credential, and returns the JWT-SVID it prints.
+func runAgentFetch(binary string, credential *syscall.Credential, spiffeID string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
 	defer cancel()
 
 	//nolint:gosec // fixed binary, the SPIFFE ID comes from the embedded definitions
-	cmd := exec.CommandContext(ctx, spire.AgentBin, "api", "fetch", "jwt",
+	cmd := exec.CommandContext(ctx, binary, "api", "fetch", "jwt",
 		"-audience", spire.AudienceLogin, "-spiffeID", spiffeID, "-socketPath", spire.AgentSocket)
 	cmd.Dir = "/"
 	cmd.Env = []string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin"}
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		//nolint:gosec // ids of /etc/passwd
-		Credential: &syscall.Credential{Uid: uint32(account.UID), Gid: uint32(account.GID)},
-	}
+	cmd.SysProcAttr = &syscall.SysProcAttr{Credential: credential}
 
 	var stderr bytes.Buffer
 

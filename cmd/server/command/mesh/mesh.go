@@ -25,6 +25,12 @@ import (
 
 const rootUID = 0
 
+// Locations read by the commands, variables for the tests.
+var (
+	spireServerConf = filepath.Join(spire.ConfigDir, spire.ServerConfFile)
+	localConfigPath = config.LocalConfigPath
+)
+
 var (
 	errNotRoot        = errors.New("this command must be executed as root")
 	errUnknownService = errors.New("unknown service")
@@ -34,6 +40,10 @@ var (
 type Mesh struct {
 	Apply Apply `cmd:"" help:"Register in Consul the ACL policies, the roles, the SPIRE binding rules, the service protocols and the intentions of the Carbonio services"` //nolint:lll
 }
+
+// revokeFunc deletes the legacy tokens of the services the selector accepts, and returns the ones it deleted and the
+// ones it kept.
+type revokeFunc func(token string, selector legacytoken.Selector) ([]legacytoken.Token, []legacytoken.Kept, error)
 
 // Apply is the "mesh apply" command. It is idempotent, and safe to run again after an upgrade: it brings the
 // cluster to the definitions embedded in this version. Run it on a server, as root.
@@ -60,9 +70,9 @@ type Apply struct {
 	entries     mesh.EntryEnsurer                                                       `kong:"-"`
 	definitions func() ([]mesh.Definition, error)                                       `kong:"-"`
 
-	hasEntry     func(parentID, spiffeID string) (bool, error)                                                      `kong:"-"`
-	loginInPlace func(trustDomain string) (func(def *mesh.Definition) bool, error)                                  `kong:"-"`
-	revoke       func(token string, selector legacytoken.Selector) ([]legacytoken.Token, []legacytoken.Kept, error) `kong:"-"`
+	hasEntry     func(parentID, spiffeID string) (bool, error)                     `kong:"-"`
+	loginInPlace func(trustDomain string) (func(def *mesh.Definition) bool, error) `kong:"-"`
+	revoke       revokeFunc                                                        `kong:"-"`
 }
 
 // New returns the Mesh commands, asking the bootstrap token as the bootstrap-token command does, and writing on
@@ -109,13 +119,13 @@ func revokeWithToken(token string, selector legacytoken.Selector) ([]legacytoken
 
 // runsSpireServer tells if the SPIRE server of the cluster runs on this server.
 func runsSpireServer() bool {
-	info, err := os.Stat(filepath.Join(spire.ConfigDir, spire.ServerConfFile))
+	info, err := os.Stat(spireServerConf)
 
 	return err == nil && info.Mode().IsRegular()
 }
 
 func serverHostname() (string, error) {
-	localConfig, err := carbonio.LoadLocalConfig(config.LocalConfigPath)
+	localConfig, err := carbonio.LoadLocalConfig(localConfigPath)
 	if err != nil {
 		return "", err
 	}

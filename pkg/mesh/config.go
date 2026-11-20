@@ -102,6 +102,7 @@ func renderOffline(env *Env, defs []Definition) error {
 		return err
 	}
 
+	// The offline rendering reports its failures through the returned error, there is nobody to log the changes to.
 	discard := func(string, ...any) {}
 	failures := []error{}
 

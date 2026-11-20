@@ -145,24 +145,6 @@ func (e *Env) Installed(defs []Definition) []Definition {
 	return installed
 }
 
-func (e *Env) packageInstalled(def *Definition) bool {
-	if len(def.HCL) == 0 || def.Generated {
-		return isDir(e.serviceDirectory(def))
-	}
-
-	return slices.ContainsFunc(def.HCL, func(name string) bool {
-		return isFile(filepath.Join(e.ServicesDir, name))
-	})
-}
-
-func (e *Env) serviceDirectory(def *Definition) string {
-	return filepath.Join(e.CarbonioDir, def.Dir, "service-discover")
-}
-
-func (e *Env) tokenFile(def *Definition) string {
-	return filepath.Join(e.serviceDirectory(def), "token")
-}
-
 // HasLoginToken tells if the token file of the service holds a token that Consul accepts and that was issued by the
 // login of the auth method: the service runs with its SPIRE identity.
 func (e *Env) HasLoginToken(def *Definition) bool {
@@ -179,6 +161,24 @@ func (e *Env) HasLoginToken(def *Definition) bool {
 	login, err := e.IsLogin(token)
 
 	return err == nil && login
+}
+
+func (e *Env) packageInstalled(def *Definition) bool {
+	if len(def.HCL) == 0 || def.Generated {
+		return isDir(e.serviceDirectory(def))
+	}
+
+	return slices.ContainsFunc(def.HCL, func(name string) bool {
+		return isFile(filepath.Join(e.ServicesDir, name))
+	})
+}
+
+func (e *Env) serviceDirectory(def *Definition) string {
+	return filepath.Join(e.CarbonioDir, def.Dir, "service-discover")
+}
+
+func (e *Env) tokenFile(def *Definition) string {
+	return filepath.Join(e.serviceDirectory(def), "token")
 }
 
 // Sync brings the credentials of the services installed on this node up to date. For each one:
@@ -237,34 +237,47 @@ func Sync(env *Env, defs []Definition, opts SyncOptions) error {
 	}
 
 	if !opts.NoRestart {
-		// The agent started with a different set of services than the one the running sidecars were started for:
-		// Consul numbers their ports in registration order, so all of them restart to take the ones it assigned.
-		var restart []string
-
-		restartAll := isFile(env.sidecarsMarker())
-		if restartAll {
-			installed := env.Installed(defs)
-			for i := range installed {
-				restart = appendUnique(restart, installed[i].Sidecars...)
-			}
-		}
-
-		applied := apply(env, outcomes, restart, mirrored || len(removed) > 0, opts.NoBlock, log)
-		failures = append(failures, applied...)
-
-		if restartAll && len(applied) == 0 {
-			err = os.Remove(env.sidecarsMarker())
-			if err != nil && !errors.Is(err, fs.ErrNotExist) {
-				failures = append(failures, err)
-			}
-		}
-
-		if opts.Setup {
-			failures = append(failures, finishSetup(env, outcomes, opts, log)...)
-		}
+		failures = append(failures, restartAndFinish(env, defs, outcomes, opts, mirrored || len(removed) > 0, log)...)
 	}
 
 	return errors.Join(failures...)
+}
+
+// restartAndFinish reloads Consul and restarts the units depending on a changed file, then finishes the setup.
+func restartAndFinish(
+	env *Env,
+	defs []Definition,
+	outcomes []outcome,
+	opts SyncOptions,
+	reload bool,
+	log func(string, ...any),
+) []error {
+	// The agent started with a different set of services than the one the running sidecars were started for:
+	// Consul numbers their ports in registration order, so all of them restart to take the ones it assigned.
+	var restart []string
+
+	restartAll := isFile(env.sidecarsMarker())
+	if restartAll {
+		installed := env.Installed(defs)
+		for i := range installed {
+			restart = appendUnique(restart, installed[i].Sidecars...)
+		}
+	}
+
+	failures := apply(env, outcomes, restart, reload, opts.NoBlock, log)
+
+	if restartAll && len(failures) == 0 {
+		err := os.Remove(env.sidecarsMarker())
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			failures = append(failures, err)
+		}
+	}
+
+	if opts.Setup {
+		failures = append(failures, finishSetup(env, outcomes, opts, log)...)
+	}
+
+	return failures
 }
 
 func selectInstalled(env *Env, defs []Definition, names []string) ([]Definition, error) {

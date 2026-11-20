@@ -47,10 +47,14 @@ func manageSpireUnits() bool {
 	return !command.CheckDockerContainer() || testingMode
 }
 
-// registerMesh registers the services defined by service-discover in the cluster, with the bootstrap token: the ACL
-// policies, the roles, the binding rules of the "spire" auth method, the service protocols and the intentions. Then it
-// creates the SPIRE entries of the services of this server. The other nodes get theirs from the join token.
-func registerMesh(deps businessDependencies, hostname, rootToken string) error {
+// registerMesh is replaced by the tests: it needs a Consul cluster.
+var registerMesh = registerMeshServices
+
+// registerMeshServices registers the services defined by service-discover in the cluster, with the bootstrap token:
+// the ACL policies, the roles, the binding rules of the "spire" auth method, the service protocols and the
+// intentions. Then it creates the SPIRE entries of the services of this server. The other nodes get theirs from the
+// join token.
+func registerMeshServices(deps businessDependencies, hostname, rootToken string) error {
 	err := mesh.ApplyEmbedded(rootToken, spire.TrustDomain, nil, os.Stdout)
 	if err != nil {
 		return err

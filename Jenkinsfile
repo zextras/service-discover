@@ -68,6 +68,8 @@ pipeline {
                             modules['service-discoverd'] = 'cmd/service-discoverd'
                             modules['legacytoken'] = 'pkg/legacytoken'
                             modules['term'] = 'pkg/term'
+                            modules['mesh'] = 'pkg/mesh'
+                            modules['meshcmd'] = 'pkg/meshcmd'
                             modules.each { key, value ->
                                 builds[key] = {
                                     dir(value) {

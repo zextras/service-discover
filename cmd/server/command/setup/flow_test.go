@@ -131,13 +131,16 @@ func newFlowEnv(t *testing.T) *flowEnv {
 	previousTesting := testingMode
 	testingMode = true
 	previousJWKS := waitJWKS
+	previousMesh := registerMesh
 	previousPoll, previousTimeout := spirePollInterval, spireStartTimeout
 	spirePollInterval, spireStartTimeout = time.Millisecond, 20*time.Millisecond
 	waitJWKS = func(string, []byte, time.Duration, time.Duration) error { return nil }
+	registerMesh = func(businessDependencies, string, string) error { return nil }
 
 	t.Cleanup(func() {
 		testingMode = previousTesting
 		waitJWKS = previousJWKS
+		registerMesh = previousMesh
 		spirePollInterval, spireStartTimeout = previousPoll, previousTimeout
 	})
 

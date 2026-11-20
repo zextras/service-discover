@@ -40,7 +40,7 @@ type Service struct {
 // New returns the Service commands writing on writer.
 func New(writer io.Writer) Service {
 	return Service{
-		Sync: Sync{writer: writer, getuid: os.Getuid, spireMode: mesh.SPIREMode},
+		Sync: Sync{writer: writer, getuid: os.Getuid, spireMode: mesh.SPIREMode, servicesDir: mesh.ServicesDir},
 		PendingSetup: PendingSetup{
 			writer: writer, getuid: os.Getuid, exit: os.Exit, run: runCommand, spireMode: mesh.SPIREMode,
 		},
@@ -60,6 +60,9 @@ type Sync struct {
 	writer    io.Writer   `kong:"-"`
 	getuid    func() int  `kong:"-"`
 	spireMode func() bool `kong:"-"`
+
+	servicesDir string                                    `kong:"-"`
+	sync        func(services []string, setup bool) error `kong:"-"`
 }
 
 // Run implements the command.
@@ -74,8 +77,12 @@ func (s *Sync) Run(_ *command.GlobalCommonFlags) error {
 		return errNotRoot
 	}
 
+	if s.sync == nil {
+		s.sync = s.syncServices
+	}
+
 	if s.Settle <= 0 {
-		return s.syncServices(s.Service, false)
+		return s.sync(s.Service, false)
 	}
 
 	// The path unit starts the run at the first file a package unpacks, and the events of the files unpacked while
@@ -83,14 +90,14 @@ func (s *Sync) Run(_ *command.GlobalCommonFlags) error {
 	for {
 		time.Sleep(s.Settle)
 
-		before := servicesFingerprint(mesh.ServicesDir)
+		before := servicesFingerprint(s.servicesDir)
 
-		err := s.syncServices(s.Service, false)
+		err := s.sync(s.Service, false)
 		if err != nil {
 			return err
 		}
 
-		if servicesFingerprint(mesh.ServicesDir) == before {
+		if servicesFingerprint(s.servicesDir) == before {
 			return nil
 		}
 	}

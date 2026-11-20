@@ -135,3 +135,16 @@ func TestInjectToken_errors(t *testing.T) {
 	_, err = InjectToken([]byte(`services {`), "x.hcl", "t")
 	require.Error(t, err)
 }
+
+func TestInjectToken_leavesOtherBlocksAlone(t *testing.T) {
+	t.Parallel()
+
+	src := "check {\n  http = \"http://127.0.0.1/health\"\n}\n\n" + blockService
+
+	got, err := InjectToken([]byte(src), "carbonio-files.hcl", "s3cr3t")
+	require.NoError(t, err)
+
+	parsesAsHCL(t, got)
+	assert.Equal(t, 1, countOccurrences(string(got), `token = "s3cr3t"`), "only the service gets the token")
+	assert.Contains(t, string(got), "check {\n  http = \"http://127.0.0.1/health\"\n}")
+}

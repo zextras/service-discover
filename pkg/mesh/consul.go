@@ -100,7 +100,8 @@ func (c *consulCluster) BindingRuleUpdate(rule *api.ACLBindingRule) error {
 func (c *consulCluster) ConfigEntry(kind, name string) (api.ConfigEntry, error) {
 	entry, _, err := c.entries.Get(kind, name, nil)
 	if err != nil {
-		if statusErr, ok := errors.AsType[api.StatusError](err); ok && statusErr.Code == http.StatusNotFound {
+		statusErr, ok := errors.AsType[api.StatusError](err)
+		if ok && statusErr.Code == http.StatusNotFound {
 			return nil, nil //nolint:nilnil // nil is the documented answer for an entry that does not exist.
 		}
 

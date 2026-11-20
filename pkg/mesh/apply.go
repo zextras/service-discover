@@ -26,12 +26,22 @@ var errUnknownService = errors.New("unknown service")
 // Cluster is the subset of the Consul API needed to register the definitions. Lookups return nil when the object
 // does not exist.
 type Cluster interface {
+	AccessCluster
+	RoutingCluster
+}
+
+// AccessCluster covers the ACL policies and roles of the services.
+type AccessCluster interface {
 	PolicyByName(name string) (*api.ACLPolicy, error)
 	PolicyCreate(policy *api.ACLPolicy) error
 	PolicyUpdate(policy *api.ACLPolicy) error
 	RoleByName(name string) (*api.ACLRole, error)
 	RoleCreate(role *api.ACLRole) error
 	RoleUpdate(role *api.ACLRole) error
+}
+
+// RoutingCluster covers the binding rules issuing the roles and the config entries.
+type RoutingCluster interface {
 	BindingRules(authMethod string) ([]*api.ACLBindingRule, error)
 	BindingRuleCreate(rule *api.ACLBindingRule) error
 	BindingRuleUpdate(rule *api.ACLBindingRule) error
@@ -236,19 +246,7 @@ func sameValue(want, have any) bool {
 			return isEmptyValue(want) && isEmptyValue(have)
 		}
 
-		for field, value := range wanted {
-			if !serverFields[field] && !sameValue(value, stored[field]) {
-				return false
-			}
-		}
-
-		for field, value := range stored {
-			if _, defined := wanted[field]; !defined && !serverFields[field] && !isEmptyValue(value) {
-				return false
-			}
-		}
-
-		return true
+		return sameFields(wanted, stored)
 	case []any:
 		stored, ok := have.([]any)
 		if !ok {
@@ -259,6 +257,24 @@ func sameValue(want, have any) bool {
 	default:
 		return reflect.DeepEqual(want, have) || (isEmptyValue(want) && isEmptyValue(have))
 	}
+}
+
+// sameFields tells if the stored object holds the wanted fields, and nothing else but empty values and the fields set
+// by Consul.
+func sameFields(wanted, stored map[string]any) bool {
+	for field, value := range wanted {
+		if !serverFields[field] && !sameValue(value, stored[field]) {
+			return false
+		}
+	}
+
+	for field, value := range stored {
+		if _, defined := wanted[field]; !defined && !serverFields[field] && !isEmptyValue(value) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // sameItems tells if both lists hold the same items, whatever the order: Consul sorts the sources of an intention by

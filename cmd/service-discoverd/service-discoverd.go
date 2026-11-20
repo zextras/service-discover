@@ -89,9 +89,16 @@ func (r realDependencies) CreateNewHandler(localConfig carbonio.LocalConfig) car
 	return carbonio.CreateNewHandler(localConfig)
 }
 
+// spireMode and offlineEnv are the node mode and the environment preparing the configuration of Consul, variables for
+// the tests.
+var (
+	spireMode  = mesh.SPIREMode
+	offlineEnv = func() *mesh.Env { return mesh.NewOfflineEnv(spire.TrustDomain) }
+)
+
 // ConsulConfigArgs returns the configuration arguments of Consul for a node using SPIRE, nil for the others.
 func (r realDependencies) ConsulConfigArgs() ([]string, error) {
-	if !mesh.SPIREMode() {
+	if !spireMode() {
 		return nil, nil
 	}
 
@@ -100,7 +107,7 @@ func (r realDependencies) ConsulConfigArgs() ([]string, error) {
 		return nil, err
 	}
 
-	return mesh.ConsulConfigArgs(mesh.NewOfflineEnv(spire.TrustDomain), defs)
+	return mesh.ConsulConfigArgs(offlineEnv(), defs)
 }
 
 func (r realDependencies) Now() time.Time {
