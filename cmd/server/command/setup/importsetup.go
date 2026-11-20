@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/zextras/service-discover/cmd/server/config"
@@ -17,6 +18,7 @@ import (
 	"github.com/zextras/service-discover/pkg/encrypter"
 	"github.com/zextras/service-discover/pkg/formatter"
 	"github.com/zextras/service-discover/pkg/permissions"
+	"github.com/zextras/service-discover/pkg/spire"
 	"github.com/zextras/service-discover/pkg/systemd"
 )
 
@@ -117,7 +119,12 @@ func (s *Setup) importSetup(deps businessDependencies) (formatter.Formatter, err
 
 	gossipKey := string(extractedFiles[command.GossipKey])
 
-	consulConfigFile, err := s.generateCertificateAndConfig(deps, zimbraHostname, gossipKey)
+	oidcURL, err := s.clusterOIDCURL()
+	if err != nil {
+		return nil, err
+	}
+
+	consulConfigFile, err := s.generateCertificateAndConfig(deps, zimbraHostname, gossipKey, oidcURL)
 	if err != nil {
 		return nil, err
 	}
@@ -203,4 +210,28 @@ func (s *Setup) importSetup(deps businessDependencies) (formatter.Formatter, err
 	}
 
 	return &formatter.EmptyFormatter{}, nil
+}
+
+// clusterOIDCURL returns the OIDC discovery URL of the SPIRE server of the cluster, as recorded in the cluster
+// credentials by the first server. It is empty for clusters set up before SPIRE was introduced: their servers keep
+// working, but cannot authorize agents joining with a SPIRE join bundle.
+func (s *Setup) clusterOIDCURL() (string, error) {
+	clusterCredential, err := command.OpenClusterCredential(s.ClusterCredential)
+	if err != nil {
+		return "", err
+	}
+
+	defer clusterCredential.Close()
+
+	credReader, err := encrypter.NewReader(clusterCredential, []byte(s.Password))
+	if err != nil {
+		return "", errors.Errorf("unable to open %s: %s", clusterCredential.Name(), err)
+	}
+
+	files, err := encrypter.ReadOptionalFiles(credReader, spire.ClusterOIDCURLFile)
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSpace(string(files[spire.ClusterOIDCURLFile])), nil
 }

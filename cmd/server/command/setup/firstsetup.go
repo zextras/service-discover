@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	exec2 "github.com/zextras/service-discover/pkg/exec"
 	"github.com/zextras/service-discover/pkg/formatter"
 	"github.com/zextras/service-discover/pkg/permissions"
+	"github.com/zextras/service-discover/pkg/spire"
 	"github.com/zextras/service-discover/pkg/systemd"
 )
 
@@ -65,7 +67,7 @@ func (s *Setup) firstSetup(deps businessDependencies) (formatter.Formatter, erro
 // keys for the service discover to work in a secure way to finally write all the configuration in a PGP signed tarball
 // archive
 //
-//nolint:misspell,cyclop // complex setup flow is inherently sequential
+//nolint:misspell,cyclop,gocognit,gocyclo // complex setup flow is inherently sequential
 func (s *Setup) performSetup(deps businessDependencies, inputs *setupConfiguration) error {
 	zimbraLocalConfig, err := carbonio.LoadLocalConfig(s.LocalConfigPath)
 	if err != nil {
@@ -84,9 +86,14 @@ func (s *Setup) performSetup(deps businessDependencies, inputs *setupConfigurati
 		return err
 	}
 
-	err = s.generateCertificationAuthority(deps)
+	err = s.generateCertificationAuthority(deps, zimbraHostname)
 	if err != nil {
 		return err
+	}
+
+	oidcURL, err := s.setupSpireServer(deps, zimbraHostname, inputs.BindAddress)
+	if err != nil {
+		return errors.WithMessage(err, "unable to set up the SPIRE server")
 	}
 
 	gossipKey, err := generateGossipKey()
@@ -94,7 +101,7 @@ func (s *Setup) performSetup(deps businessDependencies, inputs *setupConfigurati
 		return err
 	}
 
-	consulConfigFile, err := s.generateCertificateAndConfig(deps, zimbraHostname, gossipKey)
+	consulConfigFile, err := s.generateCertificateAndConfig(deps, zimbraHostname, gossipKey, oidcURL)
 	if err != nil {
 		return err
 	}
@@ -164,6 +171,11 @@ func (s *Setup) performSetup(deps businessDependencies, inputs *setupConfigurati
 		return err
 	}
 
+	err = s.setupSpireIntegration(deps, zimbraHostname, inputs.BindAddress, oidcURL, aclBootstrapUnmarshal.SecretID)
+	if err != nil {
+		return err
+	}
+
 	aclFile, err := os.CreateTemp("", command.ConsulACLBootstrap)
 	if err != nil {
 		return err
@@ -188,7 +200,20 @@ func (s *Setup) performSetup(deps businessDependencies, inputs *setupConfigurati
 		return err
 	}
 
+	oidcURLFile, err := os.CreateTemp("", spire.ClusterOIDCURLFile)
+	if err != nil {
+		return err
+	}
+
+	defer os.Remove(oidcURLFile.Name())
+
+	err = os.WriteFile(oidcURLFile.Name(), []byte(oidcURL), 0600)
+	if err != nil {
+		return err
+	}
+
 	filesToCompress := map[string]string{
+		spire.ClusterOIDCURLFile:                 oidcURLFile.Name(),
 		command.GossipKey:                        gossipKeyFile.Name(),
 		command.ConsulACLBootstrap:               aclFile.Name(),
 		s.ConsulHome + "/" + command.ConsulCA:    s.ConsulHome + "/" + command.ConsulCA,
@@ -361,7 +386,35 @@ func (s *Setup) createACLBootstrapToken(deps businessDependencies) ([]byte, erro
 	}
 }
 
-func (s *Setup) generateCertificationAuthority(deps businessDependencies) error {
+// setupSpireIntegration completes the SPIRE integration once Consul is running and its ACL system bootstrapped:
+// the "spire" auth method lets the services log in with their JWT-SVID, and the SPIRE agent of this server gets
+// attested so that the services it hosts have an identity.
+func (s *Setup) setupSpireIntegration(
+	deps businessDependencies, hostname, bindAddress, oidcURL, rootToken string,
+) error {
+	caPEM, err := os.ReadFile(filepath.Join(s.ConsulHome, command.ConsulCA)) // #nosec
+	if err != nil {
+		return errors.WithMessage(err, "unable to read the Consul CA")
+	}
+
+	err = spire.EnsureAuthMethod(deps.CreateCommand, rootToken, oidcURL, string(caPEM))
+	if err != nil {
+		return err
+	}
+
+	if !manageSpireUnits() {
+		return nil
+	}
+
+	err = s.setupSpireAgent(deps, hostname, bindAddress)
+	if err != nil {
+		return errors.WithMessage(err, "unable to set up the SPIRE agent of this server")
+	}
+
+	return nil
+}
+
+func (s *Setup) generateCertificationAuthority(deps businessDependencies, hostname string) error {
 	certificateDaysFlag := fmt.Sprintf("-days=%d", certificateExpiration)
 
 	err := exec2.InPath(
@@ -370,7 +423,9 @@ func (s *Setup) generateCertificationAuthority(deps businessDependencies) error 
 			"ca",
 			"create",
 			certificateDaysFlag,
-			"-name-constraint"),
+			"-name-constraint",
+			// The OIDC discovery provider of SPIRE is served with a certificate for the server hostname signed by this CA.
+			"-additional-name-constraint="+hostname),
 		s.ConsulHome,
 	)
 	if err != nil {

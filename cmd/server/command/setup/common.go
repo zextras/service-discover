@@ -20,6 +20,7 @@ import (
 	"github.com/zextras/service-discover/pkg/exec"
 	"github.com/zextras/service-discover/pkg/formatter"
 	"github.com/zextras/service-discover/pkg/permissions"
+	"github.com/zextras/service-discover/pkg/spire"
 	"github.com/zextras/service-discover/pkg/term"
 )
 
@@ -46,6 +47,7 @@ type Setup struct {
 	ConsulFileConfig  string `kong:"-"`
 	ClusterCredential string `kong:"-"`
 	MutableConfigFile string `kong:"-"`
+	SpireConfigDir    string `kong:"-"`
 
 	Password      string `help:"Set a custom password for the encrypted secret files. If none is set, a random one will be generated and printed"` //nolint:lll
 	BindAddress   string `arg:"" optional:"" help:"The binding address to bind service-discoverd daemon"`
@@ -61,6 +63,7 @@ func NewSetup() Setup {
 		ConsulFileConfig:  config.ConsultFileConfig,
 		ClusterCredential: config.ClusterCredential,
 		MutableConfigFile: command.ConsulMutableConfigFile,
+		SpireConfigDir:    spire.ConfigDir,
 	}
 }
 
@@ -106,6 +109,44 @@ type tlsConfig struct {
 	InternalRPC tlsInternalRPC `json:"internal_rpc"`
 }
 
+// autoConfigStatic validates the JWT-SVIDs presented by the agents joining through auto_config against the OIDC
+// discovery provider of SPIRE.
+type autoConfigStatic struct {
+	OIDCDiscoveryURL    string            `json:"oidc_discovery_url"`
+	OIDCDiscoveryCACert string            `json:"oidc_discovery_ca_cert"`
+	BoundIssuer         string            `json:"bound_issuer"`
+	BoundAudiences      []string          `json:"bound_audiences"`
+	ClaimMappings       map[string]string `json:"claim_mappings"`
+	ClaimAssertions     []string          `json:"claim_assertions"`
+}
+
+type autoConfigAuthorization struct {
+	Enabled bool             `json:"enabled"`
+	Static  autoConfigStatic `json:"static"`
+}
+
+type autoConfig struct {
+	Authorization autoConfigAuthorization `json:"authorization"`
+}
+
+// newAutoConfig builds the auto_config block of a server. An agent can join only with a JWT-SVID issued by the SPIRE
+// server behind oidcURL for the Consul node name it declares.
+func newAutoConfig(oidcURL, caPEM string) *autoConfig {
+	return &autoConfig{
+		Authorization: autoConfigAuthorization{
+			Enabled: true,
+			Static: autoConfigStatic{
+				OIDCDiscoveryURL:    oidcURL,
+				OIDCDiscoveryCACert: caPEM,
+				BoundIssuer:         oidcURL,
+				BoundAudiences:      []string{spire.AudienceAutoConfig},
+				ClaimMappings:       map[string]string{"sub": "spiffe_id"},
+				ClaimAssertions:     []string{spire.ClaimAssertion},
+			},
+		},
+	}
+}
+
 type setupConfig struct {
 	ACLConfig               aclConfig     `json:"acl"`
 	AutoEncrypt             autoEncrypt   `json:"auto_encrypt,omitzero"`
@@ -119,6 +160,7 @@ type setupConfig struct {
 	Ports                   portsConfig   `json:"ports"`
 	Connect                 connectConfig `json:"connect"`
 	TLS                     tlsConfig     `json:"tls"`
+	AutoConfig              *autoConfig   `json:"auto_config,omitempty"`
 }
 
 // nonInteractiveOutput is only an internal struct to output the result to the final user in an appropriate way.
@@ -314,9 +356,9 @@ func wizardBindAddressSelection(deps interactiveDependencies) (string, error) {
 
 // generateCertificateAndConfig creates the TLS certificates for consul and
 // finally it generates the gossip key. This ensure secure communications
-// inside Consul.
+// inside Consul. A non-empty oidcURL enables auto_config authorization with the SPIRE server behind it.
 func (s *Setup) generateCertificateAndConfig(deps businessDependencies,
-	zimbraHostname string, gossipKey string) (*setupConfig, error) {
+	zimbraHostname string, gossipKey string, oidcURL string) (*setupConfig, error) {
 	certificateDaysFlag := fmt.Sprintf("-days=%d", certificateExpiration)
 
 	err := exec.InPath(
@@ -371,6 +413,15 @@ func (s *Setup) generateCertificateAndConfig(deps businessDependencies,
 				VerifyServerHostname: true,
 			},
 		},
+	}
+
+	if oidcURL != "" {
+		caPEM, err := os.ReadFile(filepath.Join(s.ConsulHome, command.ConsulCA)) // #nosec
+		if err != nil {
+			return nil, errors.WithMessage(err, "unable to read the Consul CA")
+		}
+
+		consulConfigFile.AutoConfig = newAutoConfig(oidcURL, string(caPEM))
 	}
 
 	return consulConfigFile, nil
