@@ -22,6 +22,7 @@ type CLI struct {
 
 	Setup          setup.Setup            `cmd:"" help:"Run first time setup for an agent node"`
 	SetupWizard    setup.Wizard           `cmd:"" help:"Run first time setup for an agent node in an interactive way" name:"setup-wizard"` //nolint:lll
+	Spire          setup.Spire            `cmd:"" help:"Manage the SPIRE agent of this node"`
 	Config         command.Config         `cmd:"" help:"Manage service-discover configuration"`
 	BootstrapToken command.BootstrapToken `cmd:"" help:"Print the bootstrap-token" name:"bootstrap-token"`
 	ServiceToken   command.ServiceToken   `cmd:"" help:"Manage the Consul ACL token of a mesh service" name:"service-token"` //nolint:lll
@@ -39,6 +40,7 @@ func main() {
 	cli := &CLI{
 		Setup:       s,
 		SetupWizard: setup.NewWizardSetup(&s),
+		Spire:       setup.NewSpire(),
 		Config: cmd.Config(
 			os.Stdout,
 			config.AgentName,

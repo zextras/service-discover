@@ -55,11 +55,28 @@ func (s *Setup) spireServerAddress(
 		candidates = append(candidates, host)
 	}
 
+	reachable := reachableSpireServers(deps, candidates, spirePort)
+
+	if len(reachable) < 2 {
+		return spireHost, nil
+	}
+
+	err := writeHostsBlock(s.HostsFile, spireServersAlias, reachable)
+	if err != nil {
+		return "", errors.WithMessagef(err, "unable to map %s to the SPIRE servers in %s", spireServersAlias, s.HostsFile)
+	}
+
+	return spireServersAlias, nil
+}
+
+// reachableSpireServers resolves the hosts and keeps the addresses accepting connections on the SPIRE port, in the
+// order of the hosts and without duplicates.
+func reachableSpireServers(deps businessDependencies, hosts []string, spirePort int) []string {
 	reachable := []string{}
 	seen := map[string]bool{}
 
-	for _, candidate := range candidates {
-		for _, address := range resolveHost(deps, candidate) {
+	for _, host := range hosts {
+		for _, address := range resolveHost(deps, host) {
 			if seen[address] {
 				continue
 			}
@@ -72,16 +89,7 @@ func (s *Setup) spireServerAddress(
 		}
 	}
 
-	if len(reachable) < 2 {
-		return spireHost, nil
-	}
-
-	err := writeHostsBlock(s.HostsFile, spireServersAlias, reachable)
-	if err != nil {
-		return "", errors.WithMessagef(err, "unable to map %s to the SPIRE servers in %s", spireServersAlias, s.HostsFile)
-	}
-
-	return spireServersAlias, nil
+	return reachable
 }
 
 func resolveHost(deps businessDependencies, host string) []string {
@@ -143,6 +151,10 @@ func writeHostsBlock(path, alias string, ips []string) error {
 	}
 
 	block.WriteString(hostsEnd + "\n")
+
+	if string(content) == rest+block.String() {
+		return nil
+	}
 
 	return replaceFile(path, []byte(rest+block.String()))
 }

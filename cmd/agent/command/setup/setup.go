@@ -202,6 +202,8 @@ type Setup struct {
 	Password    string `help:"Set a custom password for the encrypted secret files. If none is set, a random one will be generated and printed"` //nolint:lll
 	BindAddress string `arg:"" optional:"" help:"The binding address to bind service-discoverd daemon"`
 
+	Migrate bool `help:"With --join, turn an agent set up with the cluster credentials into one joined through SPIRE: the configuration is backed up and switched, the local copy of the cluster credentials, the CA key remnants and the agent certificate and ACL token are removed, Consul is restarted and, if the agent does not rejoin the cluster in time, the previous configuration is restored. The bundle must be the one of this node. It can be run again"` //nolint:lll
+
 	Join string `help:"Join the cluster with the SPIRE join bundle printed by 'service-discover join-token' on a server, read from the given file or from the standard input if '-'. No cluster credential password nor LDAP access are needed" placeholder:"FILE"` //nolint:lll
 }
 
@@ -286,6 +288,10 @@ func preRun(_ string, deps businessDependencies) error {
 }
 
 func (s *Setup) Run(commonFlags *command.GlobalCommonFlags) error {
+	if s.Migrate && s.Join == "" {
+		return errors.New("--migrate needs --join")
+	}
+
 	if s.Join != "" {
 		return s.runJoin(commonFlags)
 	}

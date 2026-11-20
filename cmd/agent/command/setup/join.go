@@ -78,6 +78,10 @@ func (s *Setup) runJoinWith(commonFlags *command.GlobalCommonFlags, deps busines
 		return errors.New("--join cannot be combined with --wizard nor --password")
 	}
 
+	if s.Migrate {
+		return s.runMigrate(commonFlags)
+	}
+
 	if s.BindAddress == "" {
 		return errors.New("missing arguments: the binding address is required")
 	}
@@ -341,7 +345,7 @@ func (s *Setup) writeJoinConfig(deps businessDependencies, bundle *spire.JoinBun
 
 // writeStrict writes a file only readable by the service-discover user.
 func (s *Setup) writeStrict(deps businessDependencies, path string, content []byte) error {
-	err := os.WriteFile(path, content, os.FileMode(spireSecretMode))
+	err := os.WriteFile(path, content, os.FileMode(spireSecretMode)) //nolint:gosec // configured paths
 	if err != nil {
 		return errors.WithMessagef(err, "unable to write %s", path)
 	}

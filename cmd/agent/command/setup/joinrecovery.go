@@ -48,9 +48,33 @@ func (s *Setup) joinPending() bool {
 // and data, and the name of the SPIRE servers. Everything is attempted, the first error is returned. The units are
 // stopped first, so that nothing keeps using what is deleted.
 func (s *Setup) cleanupJoin(deps businessDependencies) error {
-	for _, unit := range []string{serviceDiscoverUnit, spire.AgentUnit} {
-		stopUnit(deps, unit)
+	stopUnit(deps, serviceDiscoverUnit)
+
+	first := s.removeSpireAgent(deps)
+
+	keep := func(err error) {
+		if err != nil && !os.IsNotExist(err) && first == nil {
+			first = err
+		}
 	}
+
+	for _, path := range []string{s.ConsulFileConfig, filepath.Join(s.ConsulHome, command.ConsulCA)} {
+		keep(os.Remove(path))
+	}
+
+	keep(emptyDir(s.ConsulData))
+
+	if first == nil {
+		keep(os.Remove(s.joinPendingPath()))
+	}
+
+	return first
+}
+
+// removeSpireAgent stops the SPIRE agent and removes its configuration and state, the token the Consul agent
+// authenticates with and the name of the SPIRE servers. The first error is returned, after trying everything.
+func (s *Setup) removeSpireAgent(deps businessDependencies) error {
+	stopUnit(deps, spire.AgentUnit)
 
 	var first error
 
@@ -61,22 +85,15 @@ func (s *Setup) cleanupJoin(deps businessDependencies) error {
 	}
 
 	for _, path := range []string{
-		s.ConsulFileConfig,
 		filepath.Join(s.ConsulHome, introTokenFile),
-		filepath.Join(s.ConsulHome, command.ConsulCA),
 		filepath.Join(s.SpireConfigDir, spire.AgentConfFile),
 		filepath.Join(s.SpireConfigDir, spire.BundleFile),
 	} {
 		keep(os.Remove(path))
 	}
 
-	keep(emptyDir(s.ConsulData))
 	keep(emptyDir(s.SpireDataDir))
 	keep(removeHostsBlock(s.HostsFile))
-
-	if first == nil {
-		keep(os.Remove(s.joinPendingPath()))
-	}
 
 	return first
 }
