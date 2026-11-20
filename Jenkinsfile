@@ -63,6 +63,8 @@ pipeline {
                             modules['formatter'] = 'pkg/formatter'
                             modules['parser'] = 'pkg/parser'
                             modules['carbonio'] = 'pkg/carbonio'
+                            modules['spire'] = 'pkg/spire'
+                            modules['permissions'] = 'pkg/permissions'
                             modules.each { key, value ->
                                 builds[key] = {
                                     dir(value) {

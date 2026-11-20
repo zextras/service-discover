@@ -422,3 +422,111 @@ func TestEnsureAuthMethod(t *testing.T) {
 	}
 	require.ErrorContains(t, spire.EnsureAuthMethod(failing, "t", "u", "ca"), "connection refused")
 }
+
+func TestJoinBundle_requiredFields(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		mutate func(b *spire.JoinBundle)
+		want   string
+	}{
+		{"spire server", func(b *spire.JoinBundle) { b.SpireServer = "" }, "missing spire_server"},
+		{"spire bundle", func(b *spire.JoinBundle) { b.SpireBundle = "" }, "missing spire_bundle"},
+		{"join token", func(b *spire.JoinBundle) { b.JoinToken = "" }, "missing join_token"},
+		{"consul CA", func(b *spire.JoinBundle) { b.ConsulCA = "" }, "missing consul_ca"},
+		{"consul servers", func(b *spire.JoinBundle) { b.ConsulServers = nil }, "missing consul_servers"},
+		{"node name", func(b *spire.JoinBundle) { b.NodeName = "" }, "missing node_name"},
+		{"version", func(b *spire.JoinBundle) { b.Version = 99 }, "unsupported version 99"},
+		{"trust domain", func(b *spire.JoinBundle) { b.TrustDomain = "other" }, "unexpected trust domain"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			bundle := validBundle()
+			tt.mutate(bundle)
+
+			_, err := bundle.Encode()
+
+			require.ErrorContains(t, err, tt.want)
+		})
+	}
+}
+
+func TestSignServingCert_caKeyFormats(t *testing.T) {
+	t.Parallel()
+
+	caPEM, _ := newCA(t)
+	ip := net.ParseIP("10.0.0.1")
+
+	ecKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+
+	pkcs8, err := x509.MarshalPKCS8PrivateKey(ecKey)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name    string
+		keyPEM  []byte
+		wantErr string
+	}{
+		{"not PEM", []byte("junk"), "no PEM block found"},
+		{"unknown PEM type", pem.EncodeToMemory(&pem.Block{Type: "DSA PRIVATE KEY", Bytes: []byte{1}}), "unsupported private key type"},
+		{"invalid PKCS8", pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: []byte{1}}), "parse the CA key"},
+		{"invalid RSA", pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: []byte{1}}), "parse the CA key"},
+		// A well formed key that is not the one of the CA is rejected when signing.
+		{"PKCS8 key not matching the CA", pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: pkcs8}),
+			"unable to sign the OIDC serving certificate"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, _, err := spire.SignServingCert(caPEM, tt.keyPEM, "mail.example.com", ip, time.Hour)
+
+			require.ErrorContains(t, err, tt.wantErr)
+		})
+	}
+}
+
+func TestWriteFile_failures(t *testing.T) {
+	t.Parallel()
+
+	deps := &ownershipDeps{chowns: map[string][2]int{}}
+	blocker := filepath.Join(t.TempDir(), "file")
+	require.NoError(t, os.WriteFile(blocker, nil, 0600))
+
+	_, err := spire.WriteFile(deps, filepath.Join(blocker, "dir"), "f", nil, "spire-server", 0640)
+	require.ErrorContains(t, err, "unable to create")
+
+	readOnly := filepath.Join(t.TempDir(), "ro")
+	require.NoError(t, os.Mkdir(readOnly, 0500))
+
+	if os.Getuid() != 0 {
+		_, err = spire.WriteFile(deps, readOnly, "f", nil, "spire-server", 0640)
+		require.ErrorContains(t, err, "unable to write")
+	}
+}
+
+func TestSignServingCert_pkcs8CAKey(t *testing.T) {
+	t.Parallel()
+
+	caPEM, caKeyPEM := newCA(t)
+
+	block, _ := pem.Decode(caKeyPEM)
+	require.NotNil(t, block)
+
+	key, err := x509.ParseECPrivateKey(block.Bytes)
+	require.NoError(t, err)
+
+	pkcs8, err := x509.MarshalPKCS8PrivateKey(key)
+	require.NoError(t, err)
+
+	_, _, err = spire.SignServingCert(caPEM, pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: pkcs8}),
+		"mail.example.com", net.ParseIP("10.0.0.1"), time.Hour)
+
+	require.NoError(t, err)
+}

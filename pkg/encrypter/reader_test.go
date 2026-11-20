@@ -254,3 +254,48 @@ func TestReadFiles(t *testing.T) {
 		assert.EqualError(t, err, "not all files were found in the archive: iDontExists")
 	})
 }
+
+func TestReadOptionalFiles(t *testing.T) {
+	t.Parallel()
+
+	archive := func(files map[string]string) *tar.Reader {
+		buffer := &bytes.Buffer{}
+		writer := tar.NewWriter(buffer)
+
+		for name, content := range files {
+			assert.NoError(t, writer.WriteHeader(&tar.Header{Name: name, Size: int64(len(content)), Mode: 0644}))
+			_, err := writer.Write([]byte(content))
+			assert.NoError(t, err)
+		}
+
+		assert.NoError(t, writer.Close())
+
+		return tar.NewReader(buffer)
+	}
+
+	t.Run("returns only the requested files that are present", func(t *testing.T) {
+		t.Parallel()
+
+		got, err := ReadOptionalFiles(archive(map[string]string{"a": "1", "b": "2", "c": "3"}), "a", "c", "missing")
+
+		assert.NoError(t, err)
+		assert.Equal(t, map[string][]byte{"a": []byte("1"), "c": []byte("3")}, got)
+	})
+
+	t.Run("does not fail when none of the files is present", func(t *testing.T) {
+		t.Parallel()
+
+		got, err := ReadOptionalFiles(archive(map[string]string{"a": "1"}), "missing")
+
+		assert.NoError(t, err)
+		assert.Empty(t, got)
+	})
+
+	t.Run("fails on a corrupted archive", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := ReadOptionalFiles(tar.NewReader(bytes.NewReader(bytes.Repeat([]byte("x"), 1024))), "a")
+
+		assert.Error(t, err)
+	})
+}
