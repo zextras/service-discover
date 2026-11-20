@@ -42,6 +42,7 @@ type fakeMachine struct {
 	systemctl  [][]string
 	inactive   bool // Consul is stopped: it is not active and has no process to signal
 	starting   bool // Consul is activating (ExecStartPost): not active, but running
+	failValid  int  // number of token checks failing before one answers (no cluster leader)
 	failFetch  int  // number of fetches failing before one works
 	failUnit   string
 	now        time.Time
@@ -90,6 +91,8 @@ func (c fakeConsul) SetConfigEntry(entry api.ConfigEntry) error {
 var (
 	errFetch = errors.New("no identity yet")
 	errUnit  = errors.New("unit failed")
+
+	errNoLeader = errors.New("unexpected response code: 500 (no cluster leader)")
 )
 
 func newMachine(t *testing.T) *fakeMachine {
@@ -153,7 +156,15 @@ func newMachine(t *testing.T) *fakeMachine {
 
 			return secret, nil
 		},
-		Valid: func(token string) (bool, error) { return machine.tokens[token], nil },
+		Valid: func(token string) (bool, error) {
+			if machine.failValid > 0 {
+				machine.failValid--
+
+				return false, errNoLeader
+			}
+
+			return machine.tokens[token], nil
+		},
 		Logout: func(token string) error {
 			machine.loggedOut = append(machine.loggedOut, token)
 			delete(machine.tokens, token)
@@ -388,6 +399,30 @@ func TestSync_waitsForTheIdentity(t *testing.T) {
 	require.NoError(t, Sync(machine.env, loadDefs(t), SyncOptions{Wait: time.Minute}))
 	assert.Len(t, machine.fetched, fetchFailures+1)
 	assert.Equal(t, fetchFailures*fetchInterval, machine.slept)
+}
+
+// The sync run by service-discover.service finds Consul without a leader for a few seconds: the token is checked again
+// instead of being left unchecked.
+func TestSync_waitsForConsulToCheckTheToken(t *testing.T) {
+	t.Parallel()
+
+	machine := newMachine(t)
+	machine.installFiles(t)
+
+	require.NoError(t, Sync(machine.env, loadDefs(t), SyncOptions{}))
+
+	machine.slept = 0
+	machine.failValid = 3
+
+	require.NoError(t, Sync(machine.env, loadDefs(t), SyncOptions{Wait: time.Minute}))
+	assert.Equal(t, 3*fetchInterval, machine.slept)
+	assert.Equal(t, 1, machine.logins, "the token was valid: kept")
+
+	machine.failValid = 1000
+
+	err := Sync(machine.env, loadDefs(t), SyncOptions{Wait: 5 * time.Second})
+	require.ErrorIs(t, err, errNoLeader)
+	require.ErrorContains(t, err, "unable to validate the token")
 }
 
 func TestSync_givesUpAfterTheWait(t *testing.T) {

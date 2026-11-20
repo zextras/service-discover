@@ -335,7 +335,7 @@ func ensureToken(
 
 	current := readToken(path)
 	if current != "" && !renew {
-		valid, err := env.Valid(current)
+		valid, err := validToken(env, current, deadline)
 		if err != nil {
 			return "", false, fmt.Errorf("unable to validate the token: %w", err)
 		}
@@ -374,6 +374,20 @@ func ensureToken(
 	}
 
 	return token, true, nil
+}
+
+// validToken asks Consul whether the token is valid, again until the deadline passes while Consul fails to answer:
+// the sync run when the agent starts finds it without a leader for some seconds ("No cluster leader"), and a token
+// that cannot be checked is not renewed.
+func validToken(env *Env, token string, deadline time.Time) (bool, error) {
+	for {
+		valid, err := env.Valid(token)
+		if err == nil || !env.Now().Before(deadline) {
+			return valid, err
+		}
+
+		env.Sleep(fetchInterval)
+	}
 }
 
 // fetchJWT asks for the JWT-SVID until it is issued or the deadline passes: the identity of a service becomes
