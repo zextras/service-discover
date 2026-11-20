@@ -8,11 +8,13 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zextras/service-discover/pkg/command"
+	"github.com/zextras/service-discover/pkg/legacytoken"
 	"github.com/zextras/service-discover/pkg/mesh"
 )
 
@@ -141,4 +143,116 @@ func TestApply_requiresRoot(t *testing.T) {
 
 	require.ErrorIs(t, run(t, cmd), errNotRoot)
 	assert.Empty(t, fix.applied)
+}
+
+// revoker plays legacytoken.RevokeLegacyServiceTokens over the services files, proxy and unknown: it asks the selector
+// about each one and revokes the token of the services it accepts.
+type revoker struct {
+	selector legacytoken.Selector
+	called   bool
+	err      error
+}
+
+func (r *revoker) revoke(_ string, selector legacytoken.Selector) ([]legacytoken.Token, []legacytoken.Kept, error) {
+	r.called = true
+	r.selector = selector
+
+	var (
+		revoked []legacytoken.Token
+		kept    []legacytoken.Kept
+	)
+
+	for _, service := range []string{"carbonio-files", "carbonio-proxy", "carbonio-unknown"} {
+		ok, err := selector.ServiceRegistered(service)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		token := legacytoken.Token{AccessorID: "id-" + service, Service: service}
+		if ok {
+			revoked = append(revoked, token)
+		} else {
+			kept = append(kept, legacytoken.Kept{Token: token, Reason: "no login token yet"})
+		}
+	}
+
+	return revoked, kept, r.err
+}
+
+func (f *fixture) revoking(registered map[string]bool, withLogin ...string) (*Apply, *revoker) {
+	cmd := f.command(true, rootUID)
+	cmd.RevokeLegacy = true
+
+	rev := &revoker{}
+	cmd.revoke = rev.revoke
+	cmd.hasEntry = func(parentID, spiffeID string) (bool, error) {
+		return registered[parentID+" "+spiffeID], nil
+	}
+	cmd.loginInPlace = func(string) (func(*mesh.Definition) bool, error) {
+		return func(def *mesh.Definition) bool { return slices.Contains(withLogin, def.Name) }, nil
+	}
+
+	return cmd, rev
+}
+
+func TestApply_revokeLegacyOnlyForTheServicesWithALoginToken(t *testing.T) {
+	fix := newFixture()
+	registered := map[string]bool{
+		"spiffe://carbonio/node/mail.example.com spiffe://carbonio/service/carbonio-files": true,
+		"spiffe://carbonio/node/mail.example.com spiffe://carbonio/service/carbonio-proxy": true,
+	}
+
+	// The proxy is registered in SPIRE but its login token is not in place yet.
+	cmd, rev := fix.revoking(registered, "carbonio-files")
+
+	require.NoError(t, run(t, cmd))
+
+	assert.True(t, rev.called)
+	assert.Equal(t, "mail.example.com", rev.selector.Hostnames[0])
+	assert.Equal(t, command.ConsulNodeName(command.Server, "mail.example.com"), rev.selector.NodeName)
+
+	out := fix.out.String()
+	assert.Contains(t, out, "Legacy ACL token id-carbonio-files of carbonio-files deleted")
+	assert.Contains(t, out, "Legacy ACL token id-carbonio-proxy of carbonio-proxy kept: no login token yet")
+	assert.Contains(t, out, "Legacy ACL token id-carbonio-unknown of carbonio-unknown kept")
+	assert.Contains(t, out, "Legacy ACL tokens: 1 deleted, 2 kept")
+}
+
+func TestApply_revokeLegacyNeedsTheIdentityInSpire(t *testing.T) {
+	fix := newFixture()
+
+	cmd, _ := fix.revoking(map[string]bool{}, "carbonio-files")
+
+	require.NoError(t, run(t, cmd))
+	assert.Contains(t, fix.out.String(), "Legacy ACL tokens: 0 deleted, 3 kept")
+}
+
+func TestApply_legacyTokensAreKeptWithoutTheFlag(t *testing.T) {
+	fix := newFixture()
+
+	cmd, rev := fix.revoking(map[string]bool{}, "carbonio-files")
+	cmd.RevokeLegacy = false
+
+	require.NoError(t, run(t, cmd))
+	assert.False(t, rev.called)
+}
+
+func TestApply_noRevocationWhenTheRegistrationFailed(t *testing.T) {
+	fix := newFixture()
+	fix.applyErr = errApply
+
+	cmd, rev := fix.revoking(map[string]bool{}, "carbonio-files")
+
+	require.ErrorIs(t, run(t, cmd), errApply)
+	assert.False(t, rev.called)
+}
+
+func TestApply_revokeLegacyReportsTheFailure(t *testing.T) {
+	fix := newFixture()
+
+	cmd, rev := fix.revoking(map[string]bool{}, "carbonio-files")
+	rev.err = errApply
+
+	require.ErrorIs(t, run(t, cmd), errApply)
+	assert.NotContains(t, fix.out.String(), "Legacy ACL tokens:")
 }

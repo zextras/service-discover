@@ -202,3 +202,27 @@ func TestConsulConfigArgs_marksAChangedServiceSet(t *testing.T) {
 	require.NoError(t, err)
 	assert.FileExists(t, machine.env.sidecarsMarker(), "another set")
 }
+
+func TestEnv_HasLoginToken(t *testing.T) {
+	t.Parallel()
+
+	machine := newMachine(t)
+	machine.installFiles(t)
+
+	defs := loadDefs(t)
+
+	files, found := Find(defs, "carbonio-files")
+	require.True(t, found)
+
+	assert.False(t, machine.env.HasLoginToken(files), "no token file yet")
+
+	require.NoError(t, Sync(machine.env, defs, SyncOptions{}))
+	assert.True(t, machine.env.HasLoginToken(files))
+
+	machine.legacy["secret-1"] = true
+	assert.False(t, machine.env.HasLoginToken(files), "a token created by hand is not a login token")
+
+	machine.legacy = map[string]bool{}
+	delete(machine.tokens, "secret-1")
+	assert.False(t, machine.env.HasLoginToken(files), "a token that is gone")
+}

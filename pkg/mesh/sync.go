@@ -163,6 +163,24 @@ func (e *Env) tokenFile(def *Definition) string {
 	return filepath.Join(e.serviceDirectory(def), "token")
 }
 
+// HasLoginToken tells if the token file of the service holds a token that Consul accepts and that was issued by the
+// login of the auth method: the service runs with its SPIRE identity.
+func (e *Env) HasLoginToken(def *Definition) bool {
+	token := readToken(e.tokenFile(def))
+	if token == "" {
+		return false
+	}
+
+	valid, err := e.Valid(token)
+	if err != nil || !valid {
+		return false
+	}
+
+	login, err := e.IsLogin(token)
+
+	return err == nil && login
+}
+
 // Sync brings the credentials of the services installed on this node up to date. For each one:
 //   - a valid token in the token file is kept, otherwise a JWT-SVID is requested as the service user and exchanged for
 //     a new token, written to the token file (the previous one is logged out);
