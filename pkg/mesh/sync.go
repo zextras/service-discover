@@ -624,14 +624,19 @@ func apply(env *Env, outcomes []outcome, reload, noBlock bool, log func(string, 
 
 // reloadConsul makes the running Consul agent read its service definitions again. A stopped agent reads them at its
 // start.
+//
+// The agent is signalled without checking first that the unit is active: the sync run by the unit itself
+// (ExecStartPost) finds it activating, after the agent has read the definitions, and the ones it renders then (the
+// services whose token was not issued yet) would not be loaded until the next change.
 func reloadConsul(env *Env, log func(string, ...any)) []error {
-	if env.Systemctl("is-active", "--quiet", ConsulUnit) != nil {
-		return nil
-	}
-
 	// consul reload is not used: it needs agent:write, that the token of a node does not have.
 	err := env.Systemctl("kill", "--signal=SIGHUP", "--kill-whom=main", ConsulUnit)
 	if err != nil {
+		// No main process to signal: the agent is stopped and reads the definitions when it starts.
+		if env.Systemctl("is-active", "--quiet", ConsulUnit) != nil {
+			return nil
+		}
+
 		return []error{fmt.Errorf("unable to reload %s: %w", ConsulUnit, err)}
 	}
 

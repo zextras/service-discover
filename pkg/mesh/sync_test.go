@@ -40,8 +40,9 @@ type fakeMachine struct {
 	tokens     map[string]bool // valid tokens
 	loggedOut  []string
 	systemctl  [][]string
-	inactive   bool
-	failFetch  int // number of fetches failing before one works
+	inactive   bool // Consul is stopped: it is not active and has no process to signal
+	starting   bool // Consul is activating (ExecStartPost): not active, but running
+	failFetch  int  // number of fetches failing before one works
 	failUnit   string
 	now        time.Time
 	slept      time.Duration
@@ -162,7 +163,11 @@ func newMachine(t *testing.T) *fakeMachine {
 		Systemctl: func(args ...string) error {
 			machine.systemctl = append(machine.systemctl, args)
 
-			if args[0] == "is-active" && machine.inactive {
+			if args[0] == "is-active" && (machine.inactive || machine.starting) {
+				return errUnit
+			}
+
+			if args[0] == "kill" && machine.inactive {
 				return errUnit
 			}
 
@@ -451,7 +456,7 @@ func TestSync_noBlock(t *testing.T) {
 	assert.Contains(t, machine.systemctl, []string{"restart", "--no-block", "carbonio-files.service"})
 }
 
-func TestSync_doesNotSignalAStoppedConsul(t *testing.T) {
+func TestSync_ignoresAStoppedConsul(t *testing.T) {
 	t.Parallel()
 
 	machine := newMachine(t)
@@ -460,7 +465,22 @@ func TestSync_doesNotSignalAStoppedConsul(t *testing.T) {
 
 	require.NoError(t, Sync(machine.env, loadDefs(t), SyncOptions{}))
 
-	assert.Zero(t, machine.calls("reload"))
+	assert.FileExists(t, filepath.Join(machine.env.RenderedDir, "carbonio-files.hcl"), "read when Consul starts")
+}
+
+// The sync run by service-discover.service after its start finds the unit activating: the definitions it renders
+// have to be loaded by the running agent.
+func TestSync_signalsAConsulStartingUp(t *testing.T) {
+	t.Parallel()
+
+	machine := newMachine(t)
+	machine.installFiles(t)
+	machine.starting = true
+
+	require.NoError(t, Sync(machine.env, loadDefs(t), SyncOptions{}))
+
+	assert.Equal(t, 1, machine.calls("reload"))
+	assert.Contains(t, machine.systemctl, []string{"kill", "--signal=SIGHUP", "--kill-whom=main", ConsulUnit})
 }
 
 func TestSync_removesTheDefinitionOfARemovedPackage(t *testing.T) {
