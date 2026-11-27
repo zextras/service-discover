@@ -18,6 +18,9 @@
   "enable_local_script_checks": true,
   "encrypt": "ELImtwre/oob36+WAqcYM1fvBwBnWe7NqqHosziDwFA=",
   "key_file": "/var/lib/service-discover/dc1-server-consul-0-key.pem",
+  "limits": {
+    "http_max_conns_per_client": 500
+  },
   "log_level": "INFO",
   "node_name": "server-mail-carbonio-test",
   "ports": {

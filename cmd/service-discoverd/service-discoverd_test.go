@@ -410,6 +410,81 @@ func Test_runAddGrpcTLS(t *testing.T) {
 
 }
 
+func Test_addHTTPMaxConnsPerClient(t *testing.T) {
+	writeMain := func(t *testing.T, content string) string {
+		t.Helper()
+		path := t.TempDir() + "/main.json"
+		assert.Nil(t, os.WriteFile(path, []byte(content), 0600))
+
+		return path
+	}
+	readMain := func(t *testing.T, path string) map[string]any {
+		t.Helper()
+		data, err := os.ReadFile(path)
+		assert.Nil(t, err)
+		var jsonData map[string]any
+		assert.Nil(t, json.Unmarshal(data, &jsonData))
+
+		return jsonData
+	}
+
+	t.Run("file not found", func(t *testing.T) {
+		errLimits := addHTTPMaxConnsPerClient(t.TempDir() + "/missing.json")
+		assert.NotNil(t, errLimits)
+		assert.Equal(t, ReadMainJSON, errLimits.ExitCode)
+	})
+
+	t.Run("file has non valid json", func(t *testing.T) {
+		errLimits := addHTTPMaxConnsPerClient("test_invalid.json")
+		assert.NotNil(t, errLimits)
+		assert.Equal(t, ParseMainJSON, errLimits.ExitCode)
+	})
+
+	t.Run("file is json null", func(t *testing.T) {
+		errLimits := addHTTPMaxConnsPerClient(writeMain(t, "null"))
+		assert.NotNil(t, errLimits)
+		assert.Equal(t, ParseMainJSON, errLimits.ExitCode)
+	})
+
+	t.Run("limits is not an object", func(t *testing.T) {
+		errLimits := addHTTPMaxConnsPerClient(writeMain(t, `{"limits": 5}`))
+		assert.NotNil(t, errLimits)
+		assert.Equal(t, ParseLimitsMainJSON, errLimits.ExitCode)
+	})
+
+	t.Run("adds limits when missing and keeps the rest", func(t *testing.T) {
+		path := writeMain(t, `{"ports": {"grpc": 8502, "grpc_tls": 8503}, "server": true}`)
+		assert.Nil(t, addHTTPMaxConnsPerClient(path))
+
+		jsonData := readMain(t, path)
+		limits, ok := jsonData["limits"].(map[string]any)
+		assert.True(t, ok)
+		assert.Equal(t, float64(500), limits["http_max_conns_per_client"])
+		assert.Equal(t, true, jsonData["server"])
+		assert.Equal(t, map[string]any{"grpc": float64(8502), "grpc_tls": float64(8503)}, jsonData["ports"])
+	})
+
+	t.Run("adds the key to existing limits", func(t *testing.T) {
+		path := writeMain(t, `{"limits": {"rpc_max_conns_per_client": 150}}`)
+		assert.Nil(t, addHTTPMaxConnsPerClient(path))
+
+		limits, ok := readMain(t, path)["limits"].(map[string]any)
+		assert.True(t, ok)
+		assert.Equal(t, float64(500), limits["http_max_conns_per_client"])
+		assert.Equal(t, float64(150), limits["rpc_max_conns_per_client"])
+	})
+
+	t.Run("keeps a value already set", func(t *testing.T) {
+		content := `{"limits": {"http_max_conns_per_client": 1000}}`
+		path := writeMain(t, content)
+		assert.Nil(t, addHTTPMaxConnsPerClient(path))
+
+		data, err := os.ReadFile(path)
+		assert.Nil(t, err)
+		assert.Equal(t, content, string(data))
+	})
+}
+
 func setupMock(mockDependencies *mockDependencies, isServer bool) {
 	mockDependencies.On("Getuid").Return(0)
 	mockDependencies.On("Getenv", "SHELL").Return("/bin/custom-shell")

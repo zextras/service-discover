@@ -24,16 +24,21 @@ const (
 	// status is truncated to 8 bits, so codes must stay below 256, and they
 	// must avoid the range 200-243 that systemd reserves for its own
 	// exit statuses (e.g. 236 is shown as SMACK_PROCESS_LABEL).
-	ExitCodeWrongArgs  = 64
-	ExitCodeUserStuff  = 65
-	ExitCodeLocalCfg   = 66
-	ExitCodeLdapError  = 67
-	ExitCodeExecError  = 68
-	ReadMainJSON       = 69
-	ParseMainJSON      = 70
-	ParsePortsMainJSON = 71
-	MarshallMainJSON   = 72
-	WriteMainJSON      = 73
+	ExitCodeWrongArgs   = 64
+	ExitCodeUserStuff   = 65
+	ExitCodeLocalCfg    = 66
+	ExitCodeLdapError   = 67
+	ExitCodeExecError   = 68
+	ReadMainJSON        = 69
+	ParseMainJSON       = 70
+	ParsePortsMainJSON  = 71
+	MarshallMainJSON    = 72
+	WriteMainJSON       = 73
+	ParseLimitsMainJSON = 74
+
+	// Every local client reaches Consul from 127.0.0.1, so this per-IP cap
+	// (Consul default 200) is shared by all the services of the node.
+	httpMaxConnsPerClient = 500
 
 	// The LDAP server may be restarting together with service-discoverd
 	// (e.g. systemctl restart carbonio.target): retry the startup query with
@@ -173,6 +178,14 @@ func runServiceDiscoverDaemon(deps deps, args []string) {
 	if errTLS != nil {
 		deps.Log(errTLS.Log)
 		deps.Exit(errTLS.ExitCode)
+
+		return
+	}
+
+	errLimits := addHTTPMaxConnsPerClient(mainJSONPath)
+	if errLimits != nil {
+		deps.Log(errLimits.Log)
+		deps.Exit(errLimits.ExitCode)
 
 		return
 	}
@@ -372,24 +385,9 @@ func queryAllServiceDiscoverServers(deps deps, ldapHandler carbonio.LdapHandler)
 }
 
 func addGrpcTLS(inputFile string) *ErrorWithExitCode {
-	// Read the input JSON file
-	inputData, err := os.ReadFile(filepath.Clean(inputFile))
-	if err != nil {
-		return &ErrorWithExitCode{
-			Log:      "Failed to read input file:" + err.Error(),
-			ExitCode: ReadMainJSON,
-		}
-	}
-
-	// Parse the JSON data
-	var jsonData map[string]any
-
-	err = json.Unmarshal(inputData, &jsonData)
-	if err != nil {
-		return &ErrorWithExitCode{
-			Log:      "Failed to parse JSON data:" + err.Error(),
-			ExitCode: ParseMainJSON,
-		}
+	jsonData, errRead := readMainJSON(inputFile)
+	if errRead != nil {
+		return errRead
 	}
 
 	// Check if the 'ports' field exists and is a map
@@ -405,26 +403,92 @@ func addGrpcTLS(inputFile string) *ErrorWithExitCode {
 	if _, exists := ports["grpc_tls"]; !exists {
 		ports["grpc_tls"] = 8503
 
-		modifiedData, err := json.MarshalIndent(jsonData, "", "  ")
-		if err != nil {
-			return &ErrorWithExitCode{
-				Log:      "Failed to marshal modified JSON data:" + err.Error(),
-				ExitCode: MarshallMainJSON,
-			}
-		}
+		return writeMainJSON(inputFile, jsonData)
+	}
 
-		// Write the modified JSON data to the output file
-		outputFile := inputFile
+	fmt.Println("'grpc_tls' port already exists")
 
-		err = os.WriteFile(outputFile, modifiedData, 0644) //nolint:gosec // consul config needs to be readable
-		if err != nil {
-			return &ErrorWithExitCode{
-				Log:      "Failed to write output file:" + err.Error(),
-				ExitCode: WriteMainJSON,
-			}
+	return nil
+}
+
+func addHTTPMaxConnsPerClient(inputFile string) *ErrorWithExitCode {
+	jsonData, errRead := readMainJSON(inputFile)
+	if errRead != nil {
+		return errRead
+	}
+
+	limits, exists := jsonData["limits"]
+	if !exists {
+		limits = map[string]any{}
+		jsonData["limits"] = limits
+	}
+
+	limitsMap, ok := limits.(map[string]any)
+	if !ok {
+		return &ErrorWithExitCode{
+			Log:      "Invalid JSON structure: 'limits' field is not an object",
+			ExitCode: ParseLimitsMainJSON,
 		}
-	} else {
-		fmt.Println("'grpc_tls' port already exists")
+	}
+
+	if _, exists := limitsMap["http_max_conns_per_client"]; exists {
+		fmt.Println("'limits.http_max_conns_per_client' already exists")
+
+		return nil
+	}
+
+	limitsMap["http_max_conns_per_client"] = httpMaxConnsPerClient
+
+	return writeMainJSON(inputFile, jsonData)
+}
+
+func readMainJSON(inputFile string) (map[string]any, *ErrorWithExitCode) {
+	// Read the input JSON file
+	inputData, err := os.ReadFile(filepath.Clean(inputFile))
+	if err != nil {
+		return nil, &ErrorWithExitCode{
+			Log:      "Failed to read input file:" + err.Error(),
+			ExitCode: ReadMainJSON,
+		}
+	}
+
+	// Parse the JSON data
+	var jsonData map[string]any
+
+	err = json.Unmarshal(inputData, &jsonData)
+	if err != nil {
+		return nil, &ErrorWithExitCode{
+			Log:      "Failed to parse JSON data:" + err.Error(),
+			ExitCode: ParseMainJSON,
+		}
+	}
+
+	if jsonData == nil {
+		return nil, &ErrorWithExitCode{
+			Log:      "Failed to parse JSON data: not a JSON object",
+			ExitCode: ParseMainJSON,
+		}
+	}
+
+	return jsonData, nil
+}
+
+func writeMainJSON(outputFile string, jsonData map[string]any) *ErrorWithExitCode {
+	modifiedData, err := json.MarshalIndent(jsonData, "", "  ")
+	if err != nil {
+		return &ErrorWithExitCode{
+			Log:      "Failed to marshal modified JSON data:" + err.Error(),
+			ExitCode: MarshallMainJSON,
+		}
+	}
+
+	// Write the modified JSON data to the output file
+	err = os.WriteFile(outputFile, modifiedData, 0644) //nolint:gosec // consul config needs to be readable
+	if err != nil {
+		return &ErrorWithExitCode{
+			Log:      "Failed to write output file:" + err.Error(),
+			ExitCode: WriteMainJSON,
+		}
 	}
 
 	return nil
